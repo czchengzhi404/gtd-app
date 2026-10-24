@@ -3,6 +3,8 @@
 # 若未来需要源码编译：先跑 scripts/rebuild-native.mjs（@electron/rebuild）。
 appId: app.gtd.local
 productName: GTD 清单
+# AppImage 等目标要求可执行文件名仅含字母/数字/连字符/下划线/点
+executableName: gtd-list
 copyright: Local-first GTD
 
 directories:

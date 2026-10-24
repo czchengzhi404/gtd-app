@@ -100,6 +100,6 @@ function drawCircle(size) {
 
 fs.writeFileSync(path.join(assetsDir, "tray.png"), encodePng(16, 16, drawCircle(16)));
 fs.writeFileSync(path.join(assetsDir, "tray@2x.png"), encodePng(32, 32, drawCircle(32)));
-// electron-builder 打包图标（≥256x256 PNG）
-fs.writeFileSync(path.join(assetsDir, "icon.png"), encodePng(256, 256, drawCircle(256)));
+// electron-builder 打包图标（≥512x512 PNG，mac/win/linux 均要求）
+fs.writeFileSync(path.join(assetsDir, "icon.png"), encodePng(512, 512, drawCircle(512)));
 console.log("[gen-tray-icon] tray.png / tray@2x.png / icon.png 已生成（透明底）");

@@ -1,9 +1,11 @@
 name: release
 
 # 推送 v* 标签时：云端构建全平台安装包并发布到 GitHub Releases
+# workflow_dispatch：允许从 Actions 页面/API 手动触发（网络受限环境的兜底）
 on:
   push:
     tags: ["v*"]
+  workflow_dispatch: {}
 
 permissions:
   contents: write
