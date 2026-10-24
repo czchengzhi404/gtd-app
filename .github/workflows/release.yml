@@ -150,9 +150,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          FILES=$(find artifacts -type f | sed 's/^/"/;s/$/"/' | tr '\n' ' ')
+          shopt -s globstar nullglob
+          FILES=()
+          for f in artifacts/**/*; do
+            if [ -f "$f" ]; then FILES+=("$f"); fi
+          done
           gh release create "${GITHUB_REF_NAME}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "GTD 清单 ${GITHUB_REF_NAME}" \
             --notes "安装包由 CI 构建。APK 为 debug 签名可直接安装；macOS dmg 未签名（首次打开需右键 → 打开）。" \
-            $FILES
+            "${FILES[@]}"
