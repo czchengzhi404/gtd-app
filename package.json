@@ -1,0 +1,22 @@
+{
+  "name": "gtd-app",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:mobile": "bun --cwd apps/mobile start",
+    "dev:web": "bun --cwd apps/mobile start --web",
+    "export:web": "bun --cwd apps/mobile export:web",
+    "dev:desktop": "bun --cwd apps/desktop dev",
+    "build:desktop": "bun --cwd apps/desktop build",
+    "smoke:desktop": "bun --cwd apps/desktop smoke",
+    "verify:sqlite": "bun --cwd apps/desktop verify:sqlite",
+    "test": "bun test packages/core"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "typescript": "^5.9.3"
+  }
+}

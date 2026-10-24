@@ -1,0 +1,13 @@
+{
+  "name": "@gtd/core",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.7",
+    "zustand": "^5.0.16"
+  }
+}

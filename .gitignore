@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-electron/
+.expo/
+web-build/
+release/
+*.log
+.DS_Store
+.mimosa/
+.zcode/
+apps/mobile/ios/
+apps/mobile/android/
+packages/core/dist/
+packages/ui/dist/

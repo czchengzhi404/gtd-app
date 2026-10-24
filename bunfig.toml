@@ -1,0 +1,5 @@
+# 必须在任何 bun install 之前生效：Expo 原生工具链（Metro 解析、CocoaPods 路径、
+# 重复包检查）假设平坦的 node_modules，Bun 1.3.2+ 对 workspace 默认的 isolated
+# linker 会导致 Expo 构建失败。同时确认 bun.lock 的 configVersion = 0。
+[install]
+linker = "hoisted"
