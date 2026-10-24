@@ -2,6 +2,8 @@ name: release
 
 # 推送 v* 标签时：云端构建全平台安装包并发布到 GitHub Releases
 # workflow_dispatch：允许从 Actions 页面/API 手动触发（网络受限环境的兜底）
+# 桌面三平台只构建上传产物（--publish never），由 release job 统一创建
+# Release —— 并行 electron-builder 发布同一 Release 会 422 冲突
 on:
   push:
     tags: ["v*"]
@@ -16,6 +18,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # 释放磁盘：删无关大件（dotnet/ghc/模拟器镜像），保留 Android SDK 本体
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /opt/hostedtoolcache /usr/local/share/boost /usr/local/lib/android/sdk/system-images || true
+          sudo apt-get clean || true
+          df -h /
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -57,12 +65,18 @@ jobs:
       - name: Build electron main
         run: bun run build
         working-directory: apps/desktop
-      - name: Build and publish
-        run: bunx electron-builder --win --publish always
+      - name: Build installer (no publish)
+        run: bunx electron-builder --win --publish never
         working-directory: apps/desktop
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gtd-windows
+          path: |
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.blockmap
 
   desktop-linux:
     name: Linux AppImage
@@ -82,11 +96,14 @@ jobs:
       - name: Build electron main
         run: bun run build
         working-directory: apps/desktop
-      - name: Build and publish
-        run: bunx electron-builder --linux --publish always
+      - name: Build AppImage (no publish)
+        run: bunx electron-builder --linux --publish never
         working-directory: apps/desktop
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gtd-linux
+          path: apps/desktop/release/*.AppImage
 
   desktop-macos:
     name: macOS dmg (unsigned)
@@ -106,29 +123,36 @@ jobs:
       - name: Build electron main
         run: bun run build
         working-directory: apps/desktop
-      - name: Build and publish (unsigned)
-        run: bunx electron-builder --mac --publish always
+      - name: Build dmg (no publish)
+        run: bunx electron-builder --mac --publish never
         working-directory: apps/desktop
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gtd-macos
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.blockmap
 
   release:
-    name: Attach artifacts to release
+    name: Create release with all artifacts
     runs-on: ubuntu-latest
     needs: [android-apk, desktop-windows, desktop-linux, desktop-macos]
     steps:
-      - uses: actions/checkout@v4
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Create release with APK
+      - name: Create release with all installers
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -e
+          FILES=$(find artifacts -type f | sed 's/^/"/;s/$/"/' | tr '\n' ' ')
           gh release create "${GITHUB_REF_NAME}" \
+            --repo "$GITHUB_REPOSITORY" \
             --title "GTD 清单 ${GITHUB_REF_NAME}" \
             --notes "安装包由 CI 构建。APK 为 debug 签名可直接安装；macOS dmg 未签名（首次打开需右键 → 打开）。" \
-            "artifacts/gtd-android-apk/app-debug.apk#GTD-清单-android.apk" \
-            --clobber
+            $FILES
