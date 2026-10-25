@@ -456,6 +456,9 @@ function createWindow(): BrowserWindow {
     minWidth: 375,
     minHeight: 500,
     title: "GTD 清单",
+    // 冒烟/诊断在后台跑：不显示、不抢焦点（executeJavaScript 不依赖前台）
+    show: !isSmoke && !process.argv.includes("--diag"),
+    focusable: !isSmoke,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -553,27 +556,34 @@ async function waitForText(win: BrowserWindow, marker: string): Promise<string> 
   return text;
 }
 
-async function runCommandE2e(): Promise<void> {
+/**
+ * 命令链路 E2E：断言全部基于本次运行自建的数据（时间戳唯一），
+ * 不依赖种子/用户已有数据——用户对库的任何操作都不影响冒烟。
+ */
+async function runCommandE2e(): Promise<string> {
+  const uniqueTitle = `冒烟任务 ${Date.now()}`;
   const result = (await mainWindow!.webContents.executeJavaScript(
     `
     (async () => {
-      const created = await window.gtd.command("task.create", { title: "冒烟测试任务" });
-      const rows = await window.gtd.query("SELECT COUNT(*) AS n FROM tasks WHERE deleted_at IS NULL", []);
-      const boot = await window.gtd.query("SELECT id, title, status FROM tasks WHERE deleted_at IS NULL", []);
+      const unique = ${JSON.stringify(uniqueTitle)};
+      const created = await window.gtd.command("task.create", { title: unique });
+      const rows = await window.gtd.query("SELECT title FROM tasks WHERE title = ? AND deleted_at IS NULL", [unique]);
+      const total = await window.gtd.query("SELECT COUNT(*) AS n FROM tasks WHERE deleted_at IS NULL", []);
       return {
         ids: created.ids,
         records: created.records.length,
-        count: rows[0] ? Number(rows[0].n) : -1,
-        seeded: boot.some((r) => r.title === "整理桌面"),
+        visible: rows.length,
+        total: total[0] ? Number(total[0].n) : -1,
       };
     })()
   `,
     true,
-  )) as { ids: string[]; records: number; count: number; seeded: boolean };
+  )) as { ids: string[]; records: number; visible: number; total: number };
   if (result.ids.length !== 1) throw new Error(`command 应返回 1 个 id，实际 ${result.ids.length}`);
   if (result.records !== 1) throw new Error("command 应返回 1 条变更记录");
-  if (result.count < 2) throw new Error(`任务数异常: ${result.count}`);
-  if (!result.seeded) throw new Error("种子任务未写入（种子链路失败）");
+  if (result.visible !== 1) throw new Error(`写读不一致：查询到 ${result.visible} 条`);
+  if (result.total < 1) throw new Error(`任务总数异常: ${result.total}`);
+  return uniqueTitle;
 }
 
 /** 阶段三冒烟：原生能力 + 文件夹同步双设备 E2E（主进程侧执行） */
@@ -655,8 +665,9 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     app.exit(1);
   };
   try {
+    // 1) 首页加载：等待应用骨架（品牌名恒在，与用户数据/语言无关）
     await win.loadURL(`${APP_SCHEME}://${APP_HOST}/`);
-    await waitForText(win, "整理桌面");
+    await waitForText(win, "GTD");
 
     await win.loadURL(`${APP_SCHEME}://${APP_HOST}/about`);
     // about 文案随语言切换：断言双语共有的品牌字符
@@ -675,7 +686,10 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     );
     if (assetStatus !== 200) return fail(`静态资源加载失败：HTTP ${assetStatus}`);
 
-    await runCommandE2e();
+    // 4) 命令链路 E2E + DOM 断言：回到首页，自建任务应出现在列表（与用户存量数据无关）
+    const smokeTaskTitle = await runCommandE2e();
+    await win.loadURL(`${APP_SCHEME}://${APP_HOST}/`);
+    await waitForText(win, smokeTaskTitle.slice(0, 6));
 
     // 5) 菜单本地化与语言切换：切 en → 标签为英文；切回 zh → 恢复中文（对启动语言鲁棒）
     await mainWindow!.webContents.executeJavaScript(

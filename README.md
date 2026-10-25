@@ -15,12 +15,16 @@
 
 推送 `v*` 标签后，GitHub Actions 自动构建并发布到 [Releases](../../releases)：
 
-- **Android**：`GTD-清单-android.apk`（debug 签名，下载后允许安装未知来源即可）
-- **Windows**：NSIS 安装器（`GTD 清单 Setup *.exe`）与便携版
+- **Android**：`GTD-v*.*.*-android.apk` —— **签名 release 包**（v0.2.0 起）。⚠️ 曾安装过 v0.1.0 的 debug 包请先卸载（签名不同无法覆盖安装）；安装时允许"未知来源"。
+- **Windows**：NSIS 安装器（`GTD.Setup.*.exe`）与便携版
 - **macOS**：未签名 dmg（首次打开：右键 → 打开；自动更新需签名后启用）
 - **Linux**：AppImage
 
 发布新版本：`git tag v0.2.0 && git push origin v0.2.0`。
+
+### Android 签名说明
+
+签名密钥库 `apps/mobile/keys/gtd-release.p12` 随私有仓库保存（保证跨构建签名稳定、可平滑升级）；密码存 GitHub Secrets（`ANDROID_KEYSTORE_PASSWORD`），本地重置密码见 `scripts/gen-android-keystore.mjs`（重新生成会使已装用户无法覆盖升级，慎用）。仓库转公开前请评估是否迁移密钥管理。
 
 ## 常用命令（根目录）
 

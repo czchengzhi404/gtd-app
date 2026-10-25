@@ -9,6 +9,7 @@ import {
   quickAdd,
   selectActiveProjects,
 } from "@gtd/core";
+import { useProjectActions } from "@/hooks/useRowActions";
 
 /** 项目：列表（顺序/并行 + 下一步行动）；新建项目复用快速添加语法 */
 export default function ProjectsScreen() {
@@ -17,6 +18,7 @@ export default function ProjectsScreen() {
   const [creating, setCreating] = useState(false);
   const colors = useTheme();
   const t = useT();
+  const projectActions = useProjectActions();
 
   if (!loaded) return null;
 
@@ -42,6 +44,7 @@ export default function ProjectsScreen() {
             project={item}
             openCount={openTasks.length}
             nextActionTitle={next?.title ?? null}
+            actions={projectActions}
             onPress={() => undefined}
           />
         );

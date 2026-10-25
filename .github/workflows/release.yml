@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   android-apk:
-    name: Android APK
+    name: Android APK (release, signed)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -38,14 +38,48 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_NO_TELEMETRY: "1"
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Inject release signing config
+        run: |
+          cat >> apps/mobile/android/app/build.gradle <<'EOF'
+          android {
+            signingConfigs {
+              release {
+                storeFile file("../../../../keys/gtd-release.p12")
+                storePassword System.getenv("GTD_KEYSTORE_PASSWORD")
+                keyAlias "gtd"
+                keyPassword System.getenv("GTD_KEYSTORE_PASSWORD")
+                storeType "PKCS12"
+              }
+            }
+            buildTypes {
+              release {
+                signingConfig signingConfigs.release
+              }
+            }
+          }
+          EOF
+          echo "signing injected"
+        env:
+          GTD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      - name: Build release APK
+        run: ./gradlew assembleRelease --no-daemon
         working-directory: apps/mobile/android
+        env:
+          GTD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ORG_GRADLE_PROJECT_reactNativeArchitectures: "arm64-v8a,armeabi-v7a,x86_64"
+      - name: Verify APK (signature + manifest)
+        run: |
+          set -e
+          APK="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
+          test -f "$APK"
+          BT="$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)"
+          "$BT/apksigner" verify --print-certs "$APK" | head -4
+          "$BT/aapt" dump badging "$APK" | grep -E "^package|^application-label:|launchable-activity" | head -4
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: gtd-android-apk
-          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
 
   desktop-windows:
     name: Windows installer
@@ -145,6 +179,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+      - name: Rename for clarity
+        run: |
+          mv artifacts/gtd-android-apk/app-release.apk "artifacts/gtd-android-apk/GTD-${GITHUB_REF_NAME}-android.apk" || true
       - name: Create release with all installers
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -158,5 +195,5 @@ jobs:
           gh release create "${GITHUB_REF_NAME}" \
             --repo "$GITHUB_REPOSITORY" \
             --title "GTD 清单 ${GITHUB_REF_NAME}" \
-            --notes "安装包由 CI 构建。APK 为 debug 签名可直接安装；macOS dmg 未签名（首次打开需右键 → 打开）。" \
+            --notes "安装包由 CI 构建。Android 为签名 release 包（如曾装过旧 debug 版请先卸载）；macOS dmg 未签名（首次打开需右键 → 打开）。" \
             "${FILES[@]}"

@@ -4,6 +4,7 @@ import { Text, View } from "react-native";
 
 import { SectionHeader, TaskList, useAppStore, useTheme, useT } from "@gtd/ui";
 import { selectContexts, getTodayTasks, runCommand } from "@gtd/core";
+import { useTaskActions } from "@/hooks/useRowActions";
 
 /** 专注：只展示当下能做的事——已选中的下一步行动（starred）+ 今日到期，分区展示 */
 export default function FocusScreen() {
@@ -13,6 +14,7 @@ export default function FocusScreen() {
   const loaded = useAppStore((s) => s.loaded);
   const colors = useTheme();
   const t = useT();
+  const taskActions = useTaskActions();
 
   const contextNameById = useMemo(() => {
     const map: Record<string, string> = {};
@@ -36,6 +38,7 @@ export default function FocusScreen() {
         tasks={starred}
         now={Date.now()}
         contextNameById={contextNameById}
+        actions={taskActions}
         onToggleTask={(task) => void runCommand("task.complete", { id: task.id }).catch(() => undefined)}
         onPressTask={(task) => router.push(`/task/${task.id}`)}
         emptyTitle={t("focus.emptyStarred")}
@@ -49,6 +52,7 @@ export default function FocusScreen() {
         tasks={todayTasks}
         now={Date.now()}
         contextNameById={contextNameById}
+        actions={taskActions}
         onToggleTask={(task) =>
           void runCommand(
             task.status === "done" ? "task.uncomplete" : "task.complete",

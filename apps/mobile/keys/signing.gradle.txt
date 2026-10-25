@@ -1,0 +1,22 @@
+// Android release 签名配置（CI 在 expo prebuild 后 append 到 app/build.gradle）。
+// 密钥库与密码见 apps/mobile/keys/（私有仓库随库保存，保证签名跨构建稳定）。
+// 变量由环境注入：GTD_KEYSTORE_PASSWORD。
+// 该文件为 Groovy 片段（.gradle.txt 后缀避免构建工具误扫），使用时按字面拼接。
+//
+// 内容（由 CI heredoc 原样写入）：
+// android {
+//   signingConfigs {
+//     release {
+//       storeFile file("../../../../keys/gtd-release.p12")
+//       storePassword System.getenv("GTD_KEYSTORE_PASSWORD")
+//       keyAlias "gtd"
+//       keyPassword System.getenv("GTD_KEYSTORE_PASSWORD")
+//       storeType "PKCS12"
+//     }
+//   }
+//   buildTypes {
+//     release {
+//       signingConfig signingConfigs.release
+//     }
+//   }
+// }

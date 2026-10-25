@@ -11,6 +11,7 @@ import {
   runCommand,
   selectContexts,
 } from "@gtd/core";
+import { useTaskActions } from "@/hooks/useRowActions";
 
 type InboxView = "list" | "kanban";
 
@@ -23,6 +24,7 @@ export default function InboxScreen() {
   const somedayTasks = useAppStore((s) => getTasksByStatus(s, "someday"));
   const loaded = useAppStore((s) => s.loaded);
   const t = useT();
+  const taskActions = useTaskActions();
   const [view, setView] = useState<InboxView>("list");
   const [submitting, setSubmitting] = useState(false);
   const [input, setInput] = useState("");
@@ -90,6 +92,7 @@ export default function InboxScreen() {
           tasks={tasks}
           now={Date.now()}
           contextNameById={contextNameById}
+          actions={taskActions}
           onToggleTask={(task) =>
             void runCommand(
               task.status === "done" ? "task.uncomplete" : "task.complete",
@@ -103,6 +106,7 @@ export default function InboxScreen() {
       ) : (
         <KanbanBoard
           now={Date.now()}
+          actions={taskActions}
           columns={[
             { key: "inbox", title: t("detail.status.inbox"), tasks },
             { key: "next", title: t("detail.status.next"), tasks: nextTasks },

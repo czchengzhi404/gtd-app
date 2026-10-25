@@ -13,6 +13,7 @@ import {
   ViewToggle,
 } from "@gtd/ui";
 import { selectContexts, getTodayTasks, runCommand } from "@gtd/core";
+import { useTaskActions } from "@/hooks/useRowActions";
 
 type TodayView = "list" | "calendar" | "timeline";
 
@@ -24,6 +25,7 @@ export default function TodayScreen() {
   const loaded = useAppStore((s) => s.loaded);
   const { isWideUp } = useBreakpoint();
   const t = useT();
+  const taskActions = useTaskActions();
   const [view, setView] = useState<TodayView>("list");
 
   const contextNameById = useMemo(() => {
@@ -53,6 +55,7 @@ export default function TodayScreen() {
             tasks={tasks}
             now={Date.now()}
             contextNameById={contextNameById}
+            actions={taskActions}
             onToggleTask={(task) =>
               void runCommand(
                 task.status === "done" ? "task.uncomplete" : "task.complete",

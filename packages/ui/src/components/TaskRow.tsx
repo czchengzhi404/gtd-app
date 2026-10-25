@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import { t } from "../i18n";
 import { useTheme } from "../hooks/useTheme";
 import { minTouchTarget, radius, spacing } from "../tokens";
+import { RowActions } from "./RowActions";
 
 export interface TaskRowProps {
   title: string;
@@ -12,13 +13,18 @@ export interface TaskRowProps {
   onPress?: () => void;
   /** 行内元信息（到期/优先级/情境 chips），渲染在标题下 */
   meta?: ReactNode;
+  /** 行尾更多操作（删除/重命名等）；不传则不渲染入口 */
+  actions?: { key: string; label: string; danger?: boolean; onSelect: () => void }[];
+  /** 长按整行（移动端快捷删除入口） */
+  onLongPress?: () => void;
 }
 
 /**
  * 任务行。ui-ux-pro-max 约束：触控目标 ≥44px；checkbox 与整行分离为两个
  * 可达性目标（checkbox=checkbox role，行=button role）；按压反馈用透明度。
+ * actions 提供时行尾渲染 ⋯ 更多操作面板。
  */
-export function TaskRow({ title, done = false, onToggle, onPress, meta }: TaskRowProps) {
+export function TaskRow({ title, done = false, onToggle, onPress, meta, actions, onLongPress }: TaskRowProps) {
   const colors = useTheme();
   return (
     <View
@@ -46,6 +52,7 @@ export function TaskRow({ title, done = false, onToggle, onPress, meta }: TaskRo
         accessibilityRole="button"
         accessibilityLabel={t("task.a11yOpen", { title })}
         onPress={onPress}
+        onLongPress={onLongPress}
         style={({ pressed }) => [styles.body, pressed && { opacity: 0.6 }]}
       >
         <Text
@@ -56,6 +63,9 @@ export function TaskRow({ title, done = false, onToggle, onPress, meta }: TaskRo
         </Text>
         {meta ? <View style={styles.meta}>{meta}</View> : null}
       </Pressable>
+      {actions !== undefined && actions.length > 0 ? (
+        <RowActions actions={actions} accessibilityLabel={t("common.moreActions")} />
+      ) : null}
     </View>
   );
 }

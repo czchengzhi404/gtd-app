@@ -8,6 +8,8 @@ release/
 .DS_Store
 .mimosa/
 .zcode/
+# 签名密码只入 GitHub Secrets，不入库（keystore 本体入库以稳定签名）
+apps/mobile/keys/keystore.env
 apps/mobile/ios/
 apps/mobile/android/
 packages/core/dist/

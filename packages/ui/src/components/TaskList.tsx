@@ -5,8 +5,16 @@ import { DueDateChip } from "./DueDateChip";
 import { PriorityBadge } from "./PriorityBadge";
 import { Chip } from "./Chip";
 import { TaskRow } from "./TaskRow";
+import { t } from "../i18n";
 import { useTheme } from "../hooks/useTheme";
 import { spacing } from "../tokens";
+
+export interface TaskRowAction {
+  key: string;
+  label: string;
+  danger?: boolean;
+  onSelect: (task: Task) => void;
+}
 
 export interface TaskListProps {
   tasks: Task[];
@@ -15,6 +23,8 @@ export interface TaskListProps {
   contextNameById?: Record<string, string>;
   onToggleTask: (task: Task) => void;
   onPressTask: (task: Task) => void;
+  /** 行尾更多操作（删除/重命名）；不传则不渲染入口 */
+  actions?: TaskRowAction[];
   emptyTitle?: string;
   emptyHint?: string;
 }
@@ -26,8 +36,9 @@ export function TaskList({
   contextNameById = {},
   onToggleTask,
   onPressTask,
-  emptyTitle = "没有任务",
-  emptyHint = "用顶部输入框快速添加",
+  actions,
+  emptyTitle,
+  emptyHint,
 }: TaskListProps) {
   const colors = useTheme();
   const renderItem = ({ item }: ListRenderItemInfo<Task>) => (
@@ -36,6 +47,12 @@ export function TaskList({
       done={item.status === "done"}
       onToggle={() => onToggleTask(item)}
       onPress={() => onPressTask(item)}
+      actions={actions?.map((action) => ({
+        key: action.key,
+        label: action.label,
+        danger: action.danger,
+        onSelect: () => action.onSelect(item),
+      }))}
       meta={
         <View style={styles.meta}>
           <PriorityBadge priority={item.priority} />
@@ -53,7 +70,12 @@ export function TaskList({
       data={tasks}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
-      ListEmptyComponent={<EmptyState title={emptyTitle} hint={emptyHint} />}
+      ListEmptyComponent={
+        <EmptyState
+          title={emptyTitle ?? t("empty.list")}
+          hint={emptyHint ?? t("empty.listHint")}
+        />
+      }
       contentContainerStyle={tasks.length === 0 ? styles.emptyContent : undefined}
       keyboardShouldPersistTaps="handled"
       style={{ backgroundColor: colors.bg }}
