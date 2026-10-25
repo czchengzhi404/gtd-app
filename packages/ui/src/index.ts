@@ -19,6 +19,7 @@ export * from "./components/Fab";
 export * from "./components/Sidebar";
 export * from "./components/TwoPaneLayout";
 export * from "./components/ProjectCard";
+export * from "./components/AppTabBar";
 export * from "./components/RowActions";
 export * from "./components/ViewToggle";
 export * from "./components/CalendarView";

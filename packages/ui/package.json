@@ -7,7 +7,9 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@gtd/core": "workspace:*"
+    "@expo/vector-icons": "^15.1.1",
+    "@gtd/core": "workspace:*",
+    "react-native-safe-area-context": "~5.7.0"
   },
   "peerDependencies": {
     "react": "*",

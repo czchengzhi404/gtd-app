@@ -11,7 +11,7 @@
     },
     "apps/desktop": {
       "name": "@gtd/desktop",
-      "version": "0.1.0",
+      "version": "0.2.1",
       "dependencies": {
         "better-sqlite3": "13.0.3",
         "electron-updater": "^6.8.11",
@@ -26,7 +26,7 @@
     },
     "apps/mobile": {
       "name": "@gtd/mobile",
-      "version": "0.1.0",
+      "version": "0.2.1",
       "dependencies": {
         "@expo/metro-runtime": "~57.0.17",
         "@gtd/core": "workspace:*",
@@ -67,7 +67,9 @@
       "name": "@gtd/ui",
       "version": "0.1.0",
       "dependencies": {
+        "@expo/vector-icons": "^15.1.1",
         "@gtd/core": "workspace:*",
+        "react-native-safe-area-context": "~5.7.0",
       },
       "peerDependencies": {
         "react": "*",
@@ -355,6 +357,8 @@
     "@expo/sudo-prompt": ["@expo/sudo-prompt@9.3.2", "https://registry.npmmirror.com/@expo/sudo-prompt/-/sudo-prompt-9.3.2.tgz", {}, "sha512-HHQigo3rQWKMDzYDLkubN5WQOYXJJE2eNqIQC2axC2iO3mHdwnIR7FgZVvHWtBwAdzBgAP0ECp8KqS8TiMKvgw=="],
 
     "@expo/ui": ["@expo/ui@57.0.26", "https://registry.npmmirror.com/@expo/ui/-/ui-57.0.26.tgz", { "dependencies": { "sf-symbols-typescript": "^2.1.0", "vaul": "^1.1.2" }, "peerDependencies": { "@babel/core": "*", "expo": "*", "react": "*", "react-dom": "*", "react-native": "*", "react-native-worklets": "*" }, "optionalPeers": ["@babel/core", "react-dom", "react-native-worklets"] }, "sha512-sEvRjKK08nCq4sXo5PjDckA9OBpxFokCXs5MakWlI1wT1gQNvyliWn/Dwic8XC6YPTN/TbnEp2X/SEduD9+I3Q=="],
+
+    "@expo/vector-icons": ["@expo/vector-icons@15.1.1", "https://registry.npmmirror.com/@expo/vector-icons/-/vector-icons-15.1.1.tgz", { "peerDependencies": { "expo-font": ">=14.0.4", "react": "*", "react-native": "*" } }, "sha512-Iu2VkcoI5vygbtYngm7jb4ifxElNVXQYdDrYkT7UCEIiKLeWnQY0wf2ZhHZ+Wro6Sc5TaumpKUOqDRpLi5rkvw=="],
 
     "@expo/xcpretty": ["@expo/xcpretty@4.4.7", "https://registry.npmmirror.com/@expo/xcpretty/-/xcpretty-4.4.7.tgz", { "dependencies": { "@babel/code-frame": "^7.20.0", "chalk": "^4.1.0", "js-yaml": "^4.1.0" }, "bin": { "excpretty": "build/cli.js" } }, "sha512-EbxYllZ7/ozONVZd425cm4XnolfW+AmSFT5aP7Jdno6oc3WrYQcHz2CO20z/2rwWwYgztmV2PXvYH+BQ8YFjqg=="],
 
