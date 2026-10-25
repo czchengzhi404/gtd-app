@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# 签名密钥库例外：release 签名跨构建稳定所需（密码不入库）
+!keys/*.p12
