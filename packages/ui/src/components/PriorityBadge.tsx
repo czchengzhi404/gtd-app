@@ -24,7 +24,7 @@ export function PriorityBadge({ priority }: { priority: PriorityLevel }) {
       accessibilityLabel={t("task.priorityA11y", { n: priority })}
       style={[styles.badge, { backgroundColor: bg }]}
     >
-      <Text style={[styles.label, { color: fg }]}>{LABELS[priority]}</Text>
+      <Text maxFontSizeMultiplier={1.2} style={[styles.label, { color: fg }]}>{LABELS[priority]}</Text>
     </View>
   );
 }

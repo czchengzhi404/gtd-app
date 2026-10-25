@@ -7,8 +7,8 @@ export function EmptyState({ title, hint }: { title: string; hint?: string }) {
   const colors = useTheme();
   return (
     <View style={styles.wrap} accessibilityRole="text" accessibilityLabel={`${title}。${hint ?? ""}`}>
-      <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-      {hint ? <Text style={[styles.hint, { color: colors.textSecondary }]}>{hint}</Text> : null}
+      <Text maxFontSizeMultiplier={1.2} style={[styles.title, { color: colors.text }]}>{title}</Text>
+      {hint ? <Text maxFontSizeMultiplier={1.2} style={[styles.hint, { color: colors.textSecondary }]}>{hint}</Text> : null}
     </View>
   );
 }

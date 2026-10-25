@@ -131,27 +131,27 @@ export default function MoreScreen() {
     <Screen>
       <SectionHeader
         title={t("more.waiting")}
-        trailing={<Text style={{ color: colors.textSecondary }}>{waiting.length}</Text>}
+        trailing={<Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary }}>{waiting.length}</Text>}
       />
       <View style={styles.list}>
         {waiting.slice(0, 3).map((task) => (
           <TaskLink key={task.id} id={task.id} title={task.title} waitingFor={task.waitingFor} />
         ))}
         {waiting.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.textSecondary }]}>{t("more.waitingEmpty")}</Text>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.empty, { color: colors.textSecondary }]}>{t("more.waitingEmpty")}</Text>
         ) : null}
       </View>
 
       <SectionHeader
         title={t("more.someday")}
-        trailing={<Text style={{ color: colors.textSecondary }}>{someday.length}</Text>}
+        trailing={<Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary }}>{someday.length}</Text>}
       />
       <View style={styles.list}>
         {someday.slice(0, 3).map((task) => (
           <TaskLink key={task.id} id={task.id} title={task.title} waitingFor={null} />
         ))}
         {someday.length === 0 ? (
-          <Text style={[styles.empty, { color: colors.textSecondary }]}>{t("more.somedayEmpty")}</Text>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.empty, { color: colors.textSecondary }]}>{t("more.somedayEmpty")}</Text>
         ) : null}
       </View>
 
@@ -173,7 +173,7 @@ export default function MoreScreen() {
 
       <SectionHeader
         title={t("more.reviewSection")}
-        trailing={<Text style={{ color: colors.textSecondary }}>{lastReview}</Text>}
+        trailing={<Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary }}>{lastReview}</Text>}
       />
       <View style={styles.list}>
         <ActionButton label={t("more.reviewStart")} onPress={() => router.push("/review")} primary />
@@ -223,7 +223,7 @@ export default function MoreScreen() {
           <ActionButton label={t("more.saveConfig")} disabled={busy} onPress={() => void onSave()} />
           <ActionButton label={t("more.syncNow")} disabled={busy} onPress={() => void onSyncNow()} primary />
         </View>
-        <Text style={[styles.empty, { color: colors.textSecondary }]}>
+        <Text maxFontSizeMultiplier={1.2} style={[styles.empty, { color: colors.textSecondary }]}>
           {t("more.lastSync")}
           {lastSync}
         </Text>
@@ -241,7 +241,7 @@ export default function MoreScreen() {
       </View>
 
       {status.length > 0 ? (
-        <Text style={[styles.status, { color: colors.textSecondary }]}>{status}</Text>
+        <Text maxFontSizeMultiplier={1.2} style={[styles.status, { color: colors.textSecondary }]}>{status}</Text>
       ) : null}
     </Screen>
   );
@@ -260,11 +260,11 @@ function TaskLink({ id, title, waitingFor }: { id: string; title: string; waitin
         { backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 },
       ]}
     >
-      <Text style={[styles.rowText, { color: colors.text }]} numberOfLines={1}>
+      <Text maxFontSizeMultiplier={1.2} style={[styles.rowText, { color: colors.text }]} numberOfLines={1}>
         {title}
       </Text>
       {waitingFor !== null ? (
-        <Text style={[styles.sub, { color: colors.textSecondary }]}>
+        <Text maxFontSizeMultiplier={1.2} style={[styles.sub, { color: colors.textSecondary }]}>
           {t("more.waitingFor", { who: waitingFor })}
         </Text>
       ) : null}
@@ -300,7 +300,7 @@ function ChipButton({
         },
       ]}
     >
-      <Text style={{ color: selected ? colors.onPrimary : colors.text, fontSize: 14 }}>{label}</Text>
+      <Text maxFontSizeMultiplier={1.2} style={{ color: selected ? colors.onPrimary : colors.text, fontSize: 14 }}>{label}</Text>
     </Pressable>
   );
 }
@@ -331,7 +331,7 @@ function ActionButton({
         },
       ]}
     >
-      <Text style={{ color: primary === true ? colors.onPrimary : colors.text, fontSize: 15, fontWeight: "600" }}>
+      <Text maxFontSizeMultiplier={1.2} style={{ color: primary === true ? colors.onPrimary : colors.text, fontSize: 15, fontWeight: "600" }}>
         {label}
       </Text>
     </Pressable>
@@ -352,8 +352,8 @@ function Field({
   const colors = useTheme();
   return (
     <View style={styles.field}>
-      <Text style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <TextInput
+      <Text maxFontSizeMultiplier={1.2} style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
+      <TextInput maxFontSizeMultiplier={1.2}
         accessibilityLabel={label}
         value={value}
         onChangeText={onChangeText}

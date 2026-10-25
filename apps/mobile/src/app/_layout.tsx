@@ -71,8 +71,8 @@ function BootError({ message }: { message: string }) {
   return (
     <Screen>
       <View style={styles.errorWrap}>
-        <Text style={[styles.errorTitle, { color: colors.danger }]}>{t("boot.error")}</Text>
-        <Text style={[styles.errorBody, { color: colors.text }]}>{message}</Text>
+        <Text maxFontSizeMultiplier={1.2} style={[styles.errorTitle, { color: colors.danger }]}>{t("boot.error")}</Text>
+        <Text maxFontSizeMultiplier={1.2} style={[styles.errorBody, { color: colors.text }]}>{message}</Text>
       </View>
     </Screen>
   );

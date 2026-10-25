@@ -11,8 +11,8 @@ export default function AboutScreen() {
   return (
     <Screen>
       <View style={styles.wrap}>
-        <Text style={[styles.title, { color: colors.text }]}>{t("about.title")}</Text>
-        <Text style={[styles.body, { color: colors.textSecondary }]}>
+        <Text maxFontSizeMultiplier={1.2} style={[styles.title, { color: colors.text }]}>{t("about.title")}</Text>
+        <Text maxFontSizeMultiplier={1.2} style={[styles.body, { color: colors.textSecondary }]}>
           {t("about.body", { version })}
         </Text>
       </View>

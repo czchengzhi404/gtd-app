@@ -22,7 +22,7 @@ export function Sidebar({ activeRoute, onSelect, footer }: SidebarProps) {
   const brand = t("common.brand");
   return (
     <View style={[styles.wrap, { backgroundColor: colors.surface, borderRightColor: colors.border }]}>
-      <Text accessibilityRole="header" style={[styles.brand, { color: colors.text }]}>
+      <Text maxFontSizeMultiplier={1.2} accessibilityRole="header" style={[styles.brand, { color: colors.text }]}>
         {brand}
       </Text>
       <View accessibilityRole="tablist">
@@ -47,7 +47,7 @@ export function Sidebar({ activeRoute, onSelect, footer }: SidebarProps) {
               <View
                 style={[styles.dot, { backgroundColor: active ? colors.primary : "transparent" }]}
               />
-              <Text style={[styles.label, { color: active ? colors.text : colors.textSecondary }]}>
+              <Text maxFontSizeMultiplier={1.2} style={[styles.label, { color: active ? colors.text : colors.textSecondary }]}>
                 {label}
               </Text>
             </Pressable>

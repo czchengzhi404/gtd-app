@@ -64,7 +64,7 @@ export default function ProjectsScreen() {
               { backgroundColor: colors.surface, opacity: creating ? 0.5 : pressed ? 0.7 : 1 },
             ]}
           >
-            <Text style={[styles.createText, { color: colors.primary }]}>
+            <Text maxFontSizeMultiplier={1.2} style={[styles.createText, { color: colors.primary }]}>
               {creating ? t("projects.creating") : t("projects.create")}
             </Text>
           </Pressable>

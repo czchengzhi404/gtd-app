@@ -32,7 +32,7 @@ export default function FocusScreen() {
     <View style={{ flex: 1 }}>
       <SectionHeader
         title={t("focus.starredSection")}
-        trailing={<Text style={{ color: colors.textSecondary }}>{starred.length}</Text>}
+        trailing={<Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary }}>{starred.length}</Text>}
       />
       <TaskList
         tasks={starred}
@@ -46,7 +46,7 @@ export default function FocusScreen() {
       />
       <SectionHeader
         title={t("focus.todaySection")}
-        trailing={<Text style={{ color: colors.textSecondary }}>{todayTasks.length}</Text>}
+        trailing={<Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary }}>{todayTasks.length}</Text>}
       />
       <TaskList
         tasks={todayTasks}

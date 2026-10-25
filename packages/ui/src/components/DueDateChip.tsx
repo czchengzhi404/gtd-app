@@ -18,7 +18,7 @@ export function DueDateChip({ task, now }: { task: Pick<Task, "dueAt" | "recurre
   const label = `${task.recurrence ? "↻ " : ""}${date}${hasMeaningfulTime ? ` ${time}` : ""}`;
   const color = overdue ? colors.danger : today ? colors.primary : colors.textSecondary;
   return (
-    <Text
+    <Text maxFontSizeMultiplier={1.2}
       accessibilityRole="text"
       accessibilityLabel={overdue ? t("task.dueA11y", { label }) : t("task.dueA11yOk", { label })}
       style={[styles.label, { color }]}

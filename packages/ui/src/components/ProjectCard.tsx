@@ -40,22 +40,22 @@ export function ProjectCard({ project, openCount, nextActionTitle, onPress, acti
         ]}
       >
         <View style={styles.headerRow}>
-          <Text style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.name, { color: colors.text }]} numberOfLines={1}>
             {project.name}
           </Text>
-          <Text style={[styles.kind, { color: colors.textSecondary }]}>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.kind, { color: colors.textSecondary }]}>
             {t(project.kind === "sequential" ? "projects.sequential" : "projects.parallel")}
           </Text>
         </View>
         {nextActionTitle ? (
-          <Text style={[styles.next, { color: colors.primary }]} numberOfLines={1}>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.next, { color: colors.primary }]} numberOfLines={1}>
             {t("projects.next")}
             {nextActionTitle}
           </Text>
         ) : (
-          <Text style={[styles.next, { color: colors.textSecondary }]}>{t("projects.noneNext")}</Text>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.next, { color: colors.textSecondary }]}>{t("projects.noneNext")}</Text>
         )}
-        <Text style={[styles.count, { color: colors.textSecondary }]}>
+        <Text maxFontSizeMultiplier={1.2} style={[styles.count, { color: colors.textSecondary }]}>
           {t("projects.openCount", { n: openCount })}
         </Text>
       </Pressable>

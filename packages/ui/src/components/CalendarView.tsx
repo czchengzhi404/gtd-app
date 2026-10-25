@@ -53,9 +53,9 @@ export function CalendarView({ tasks, now, onPressTask }: CalendarViewProps) {
           onPress={() => setMonthOffset((m) => m - 1)}
           style={({ pressed }) => [styles.nav, focus, { opacity: pressed ? 0.6 : 1 }]}
         >
-          <Text style={{ color: colors.text, fontSize: 18 }}>‹</Text>
+          <Text maxFontSizeMultiplier={1.2} style={{ color: colors.text, fontSize: 18 }}>‹</Text>
         </Pressable>
-        <Text accessibilityRole="header" style={[styles.monthTitle, { color: colors.text }]}>
+        <Text maxFontSizeMultiplier={1.2} accessibilityRole="header" style={[styles.monthTitle, { color: colors.text }]}>
           {t("calendar.month", { y: year, m: month + 1 })}
         </Text>
         <Pressable
@@ -64,13 +64,13 @@ export function CalendarView({ tasks, now, onPressTask }: CalendarViewProps) {
           onPress={() => setMonthOffset((m) => m + 1)}
           style={({ pressed }) => [styles.nav, focus, { opacity: pressed ? 0.6 : 1 }]}
         >
-          <Text style={{ color: colors.text, fontSize: 18 }}>›</Text>
+          <Text maxFontSizeMultiplier={1.2} style={{ color: colors.text, fontSize: 18 }}>›</Text>
         </Pressable>
       </View>
 
       <View style={styles.weekRow}>
         {WEEKDAY_LABELS.map((label) => (
-          <Text key={label} style={[styles.weekday, { color: colors.textSecondary }]}>
+          <Text maxFontSizeMultiplier={1.2} key={label} style={[styles.weekday, { color: colors.textSecondary }]}>
             {label}
           </Text>
         ))}
@@ -106,7 +106,7 @@ export function CalendarView({ tasks, now, onPressTask }: CalendarViewProps) {
                 },
               ]}
             >
-              <Text
+              <Text maxFontSizeMultiplier={1.2}
                 style={[
                   styles.dayNum,
                   {
@@ -118,7 +118,7 @@ export function CalendarView({ tasks, now, onPressTask }: CalendarViewProps) {
               </Text>
               {dayTasks.length > 0 ? (
                 <View style={[styles.badge, { backgroundColor: isSelected ? colors.onPrimary : colors.primary }]}>
-                  <Text style={{ color: isSelected ? colors.primary : colors.onPrimary, fontSize: 10 }}>
+                  <Text maxFontSizeMultiplier={1.2} style={{ color: isSelected ? colors.primary : colors.onPrimary, fontSize: 10 }}>
                     {dayTasks.length}
                   </Text>
                 </View>
@@ -130,10 +130,10 @@ export function CalendarView({ tasks, now, onPressTask }: CalendarViewProps) {
 
       <View style={styles.dayList}>
         {sameMonth ? null : (
-          <Text style={{ color: colors.textSecondary, padding: spacing.md }}>{t("calendar.wrongMonth")}</Text>
+          <Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary, padding: spacing.md }}>{t("calendar.wrongMonth")}</Text>
         )}
         {sameMonth && selectedTasks.length === 0 ? (
-          <Text style={{ color: colors.textSecondary, padding: spacing.md }}>{t("calendar.emptyDay")}</Text>
+          <Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary, padding: spacing.md }}>{t("calendar.emptyDay")}</Text>
         ) : null}
         {selectedTasks.map((task) => (
           <Pressable
@@ -146,7 +146,7 @@ export function CalendarView({ tasks, now, onPressTask }: CalendarViewProps) {
               { backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 },
             ]}
           >
-            <Text style={{ color: colors.text, fontSize: 16 }} numberOfLines={1}>
+            <Text maxFontSizeMultiplier={1.2} style={{ color: colors.text, fontSize: 16 }} numberOfLines={1}>
               {task.title}
             </Text>
           </Pressable>

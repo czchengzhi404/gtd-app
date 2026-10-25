@@ -37,7 +37,7 @@ export function QuickAddBar({ preview, placeholder, onSubmit, submitting = false
           },
         ]}
       >
-        <TextInput
+        <TextInput maxFontSizeMultiplier={1.2}
           accessibilityLabel={t("inbox.a11yQuickAdd")}
           accessibilityHint={t("inbox.a11yQuickAddHint")}
           placeholder={placeholder ?? t("inbox.quickAddPlaceholder")}
@@ -65,13 +65,13 @@ export function QuickAddBar({ preview, placeholder, onSubmit, submitting = false
             },
           ]}
         >
-          <Text style={[styles.submitText, { color: colors.onPrimary }]}>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.submitText, { color: colors.onPrimary }]}>
             {submitting ? t("inbox.submitting") : t("common.add")}
           </Text>
         </Pressable>
       </View>
       {preview !== undefined && preview.length > 0 ? (
-        <Text
+        <Text maxFontSizeMultiplier={1.2}
           accessibilityRole="text"
           accessibilityLabel={preview}
           style={[styles.preview, { color: colors.textSecondary }]}

@@ -7,7 +7,7 @@ export function SectionHeader({ title, trailing }: { title: string; trailing?: R
   const colors = useTheme();
   return (
     <View style={styles.wrap}>
-      <Text accessibilityRole="header" style={[styles.title, { color: colors.textSecondary }]}>
+      <Text maxFontSizeMultiplier={1.2} accessibilityRole="header" style={[styles.title, { color: colors.textSecondary }]}>
         {title}
       </Text>
       {trailing}

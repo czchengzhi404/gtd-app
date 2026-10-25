@@ -45,7 +45,7 @@ export function ViewToggle<T extends string>({ options, value, onChange, label }
               },
             ]}
           >
-            <Text
+            <Text maxFontSizeMultiplier={1.2}
               style={[
                 styles.label,
                 { color: active ? colors.primary : colors.textSecondary },

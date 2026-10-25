@@ -49,8 +49,8 @@ export function KanbanBoard({ columns, now, onPressTask, actions }: KanbanBoardP
           style={[styles.column, { backgroundColor: colors.surface }]}
         >
           <View style={styles.columnHeader}>
-            <Text style={[styles.columnTitle, { color: colors.text }]}>{column.title}</Text>
-            <Text style={[styles.count, { color: colors.textSecondary }]}>{column.tasks.length}</Text>
+            <Text maxFontSizeMultiplier={1.2} style={[styles.columnTitle, { color: colors.text }]}>{column.title}</Text>
+            <Text maxFontSizeMultiplier={1.2} style={[styles.count, { color: colors.textSecondary }]}>{column.tasks.length}</Text>
           </View>
           <ScrollView showsVerticalScrollIndicator={false}>
             {column.tasks.map((task) => (
@@ -61,7 +61,7 @@ export function KanbanBoard({ columns, now, onPressTask, actions }: KanbanBoardP
                   onPress={() => onPressTask(task)}
                   style={({ pressed }) => [styles.card, focus, pressed && { opacity: 0.7 }]}
                 >
-                  <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
+                  <Text maxFontSizeMultiplier={1.2} style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
                     {task.title}
                   </Text>
                   <View style={styles.cardMeta}>
@@ -85,7 +85,7 @@ export function KanbanBoard({ columns, now, onPressTask, actions }: KanbanBoardP
               </View>
             ))}
             {column.tasks.length === 0 ? (
-              <Text style={[styles.empty, { color: colors.textSecondary }]}>—</Text>
+              <Text maxFontSizeMultiplier={1.2} style={[styles.empty, { color: colors.textSecondary }]}>—</Text>
             ) : null}
           </ScrollView>
         </View>

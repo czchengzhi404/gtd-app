@@ -7,7 +7,7 @@
 // android {
 //   signingConfigs {
 //     release {
-//       storeFile file("../../../../keys/gtd-release.p12")
+//       storeFile file("../../keys/gtd-release.p12")
 //       storePassword System.getenv("GTD_KEYSTORE_PASSWORD")
 //       keyAlias "gtd"
 //       keyPassword System.getenv("GTD_KEYSTORE_PASSWORD")

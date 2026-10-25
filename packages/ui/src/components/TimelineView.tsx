@@ -63,11 +63,11 @@ export function TimelineView({ tasks, now, days = 14 }: TimelineViewProps) {
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
       {groups.length === 0 ? (
-        <Text style={{ color: colors.textSecondary, padding: spacing.lg }}>未来 {days} 天没有到期任务</Text>
+        <Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary, padding: spacing.lg }}>未来 {days} 天没有到期任务</Text>
       ) : null}
       {groups.map((group) => (
         <View key={group.key} style={styles.group}>
-          <Text
+          <Text maxFontSizeMultiplier={1.2}
             accessibilityRole="header"
             style={[styles.groupLabel, { color: group.key === "overdue" ? colors.danger : colors.text }]}
           >
@@ -77,13 +77,13 @@ export function TimelineView({ tasks, now, days = 14 }: TimelineViewProps) {
             <View key={task.id} style={[styles.item, { borderLeftColor: colors.border }]}>
               <View style={[styles.dot, { backgroundColor: colors.primary }]} />
               <View style={styles.itemBody}>
-                <Text style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>
+                <Text maxFontSizeMultiplier={1.2} style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>
                   {task.title}
                 </Text>
                 <View style={styles.itemMeta}>
                   <PriorityBadge priority={task.priority} />
                   {timeLabel !== null ? (
-                    <Text style={{ color: colors.textSecondary, fontSize: 13 }}>{timeLabel}</Text>
+                    <Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary, fontSize: 13 }}>{timeLabel}</Text>
                   ) : null}
                 </View>
               </View>

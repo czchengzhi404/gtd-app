@@ -45,7 +45,7 @@ export function TaskDetailContent({
       contentContainerStyle={styles.container}
       style={{ backgroundColor: colors.bg }}
     >
-      <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>
+      <Text maxFontSizeMultiplier={1.2} accessibilityRole="header" style={[styles.title, { color: colors.text }]}>
         {task.title}
       </Text>
 
@@ -95,7 +95,7 @@ export function TaskDetailContent({
       {task.notes.length > 0 ? (
         <>
           <SectionHeader title={t("detail.notes")} />
-          <Text style={[styles.notes, { color: colors.text }]}>{task.notes}</Text>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.notes, { color: colors.text }]}>{task.notes}</Text>
         </>
       ) : null}
     </ScrollView>

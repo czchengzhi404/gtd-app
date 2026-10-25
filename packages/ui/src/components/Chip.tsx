@@ -24,7 +24,7 @@ export function Chip({ label, color, selected = false, onPress }: ChipProps) {
   const fg = selected ? colors.onPrimary : colors.text;
   const display = onPress === undefined ? (label.startsWith("@") ? label : `@${label}`) : label;
   const content = (
-    <Text style={[styles.label, { color: fg }]} numberOfLines={1}>
+    <Text maxFontSizeMultiplier={1.2} style={[styles.label, { color: fg }]} numberOfLines={1}>
       {display}
     </Text>
   );

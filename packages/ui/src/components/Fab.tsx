@@ -11,7 +11,7 @@ export interface FabProps {
 export function Fab({ onPress, label = "新建任务" }: FabProps) {
   const colors = useTheme();
   return (
-    <Text
+    <Text maxFontSizeMultiplier={1.2}
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}

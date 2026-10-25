@@ -52,7 +52,7 @@ export function RowActions({ actions, accessibilityLabel }: RowActionsProps) {
           { backgroundColor: open ? colors.surface : "transparent", opacity: pressed ? 0.6 : 1 },
         ]}
       >
-        <Text style={{ color: colors.textSecondary, fontSize: 20, lineHeight: 24 }}>⋯</Text>
+        <Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary, fontSize: 20, lineHeight: 24 }}>⋯</Text>
       </Pressable>
       {open ? (
         <>
@@ -80,7 +80,7 @@ export function RowActions({ actions, accessibilityLabel }: RowActionsProps) {
                   { backgroundColor: pressed ? colors.surface : "transparent" },
                 ]}
               >
-                <Text
+                <Text maxFontSizeMultiplier={1.2}
                   style={{
                     color: action.danger === true ? colors.danger : colors.text,
                     fontSize: 15,

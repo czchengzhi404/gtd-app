@@ -21,7 +21,7 @@ export function SearchBar({ placeholder = "搜索任务", onChangeText }: Search
         },
       ]}
     >
-      <TextInput
+      <TextInput maxFontSizeMultiplier={1.2}
         accessibilityLabel={placeholder}
         placeholder={placeholder}
         placeholderTextColor={colors.textSecondary}

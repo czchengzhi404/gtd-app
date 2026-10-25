@@ -55,7 +55,7 @@ export function TaskRow({ title, done = false, onToggle, onPress, meta, actions,
         onLongPress={onLongPress}
         style={({ pressed }) => [styles.body, pressed && { opacity: 0.6 }]}
       >
-        <Text
+        <Text maxFontSizeMultiplier={1.2}
           style={[styles.title, { color: colors.text }, done && styles.titleDone]}
           numberOfLines={2}
         >

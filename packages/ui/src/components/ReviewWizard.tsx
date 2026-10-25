@@ -55,37 +55,37 @@ export function ReviewWizard({ state, now, onGoInbox, onOpenTask, onFinish }: Re
           />
         ))}
       </View>
-      <Text accessibilityRole="header" style={[styles.title, { color: colors.text }]}>
+      <Text maxFontSizeMultiplier={1.2} accessibilityRole="header" style={[styles.title, { color: colors.text }]}>
         {step + 1}. {t(STEP_KEYS[step] ?? "review.steps.inbox")}
       </Text>
 
       {step === 0 ? (
         <View style={styles.body}>
-          <Text style={[styles.text, { color: colors.text }]}>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>
             {t("review.inboxBody", { n: summary.inboxCount })}
           </Text>
           {summary.inboxSample.map((task) => (
-            <Text key={task.id} style={[styles.sample, { color: colors.textSecondary }]}>
+            <Text maxFontSizeMultiplier={1.2} key={task.id} style={[styles.sample, { color: colors.textSecondary }]}>
               · {task.title}
             </Text>
           ))}
           {summary.inboxCount > 0 ? (
             <StepButton label={t("review.goInbox")} onPress={onGoInbox} colors={colors} focus={focus} />
           ) : (
-            <Text style={[styles.okText, { color: colors.success }]}>{t("review.inboxClean")}</Text>
+            <Text maxFontSizeMultiplier={1.2} style={[styles.okText, { color: colors.success }]}>{t("review.inboxClean")}</Text>
           )}
         </View>
       ) : null}
 
       {step === 1 ? (
         <View style={styles.body}>
-          <Text style={[styles.text, { color: colors.text }]}>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>
             {summary.projectsWithoutNext.length === 0
               ? t("review.projectsOk")
               : t("review.projectsBody")}
           </Text>
           {summary.projectsWithoutNext.map((p) => (
-            <Text key={p.projectId} style={[styles.sample, { color: colors.danger }]}>
+            <Text maxFontSizeMultiplier={1.2} key={p.projectId} style={[styles.sample, { color: colors.danger }]}>
               · {p.name}（{t(p.kind === "sequential" ? "projects.sequential" : "projects.parallel")}）
             </Text>
           ))}
@@ -94,7 +94,7 @@ export function ReviewWizard({ state, now, onGoInbox, onOpenTask, onFinish }: Re
 
       {step === 2 ? (
         <View style={styles.body}>
-          <Text style={[styles.text, { color: colors.text }]}>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>
             {t("review.calendarBody", { completed: summary.completedLastWeek, upcoming: summary.upcomingCount })}
           </Text>
         </View>
@@ -102,7 +102,7 @@ export function ReviewWizard({ state, now, onGoInbox, onOpenTask, onFinish }: Re
 
       {step === 3 ? (
         <View style={styles.body}>
-          <Text style={[styles.text, { color: colors.text }]}>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>
             {t("review.waitingBody", { n: summary.waitingCount })}
           </Text>
           {summary.waitingSample.map((task) => (
@@ -113,21 +113,21 @@ export function ReviewWizard({ state, now, onGoInbox, onOpenTask, onFinish }: Re
               onPress={() => onOpenTask(task.id)}
               style={({ pressed }) => [styles.sampleButton, focus, { opacity: pressed ? 0.6 : 1 }]}
             >
-              <Text style={[styles.sample, { color: colors.textSecondary }]}>
+              <Text maxFontSizeMultiplier={1.2} style={[styles.sample, { color: colors.textSecondary }]}>
                 · {task.title}
                 {task.waitingFor !== null ? `（${t("more.waitingFor", { who: task.waitingFor })}）` : ""}
               </Text>
             </Pressable>
           ))}
           {summary.waitingCount === 0 ? (
-            <Text style={[styles.okText, { color: colors.success }]}>{t("more.waitingEmpty")}</Text>
+            <Text maxFontSizeMultiplier={1.2} style={[styles.okText, { color: colors.success }]}>{t("more.waitingEmpty")}</Text>
           ) : null}
         </View>
       ) : null}
 
       {step === 4 ? (
         <View style={styles.body}>
-          <Text style={[styles.text, { color: colors.text }]}>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>
             {t("review.somedayBody", { n: summary.somedayCount })}
           </Text>
         </View>
@@ -135,7 +135,7 @@ export function ReviewWizard({ state, now, onGoInbox, onOpenTask, onFinish }: Re
 
       {step === 5 ? (
         <View style={styles.body}>
-          <Text style={[styles.text, { color: colors.text }]}>{t("review.finishBody")}</Text>
+          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>{t("review.finishBody")}</Text>
           <StepButton label={t("review.finish")} onPress={() => void finish()} colors={colors} focus={focus} primary />
         </View>
       ) : null}
@@ -191,7 +191,7 @@ function StepButton({
         },
       ]}
     >
-      <Text style={{ color: primary === true ? colors.onPrimary : colors.text, fontSize: 15, fontWeight: "600" }}>
+      <Text maxFontSizeMultiplier={1.2} style={{ color: primary === true ? colors.onPrimary : colors.text, fontSize: 15, fontWeight: "600" }}>
         {label}
       </Text>
     </Pressable>
