@@ -11,6 +11,9 @@ function setLangFromKv(lang: "zh" | "en"): void {
 }
 import { appStore, bootstrapStore } from "@gtd/core";
 import { initPlatform } from "@/platform/bootstrap";
+import { installFontScaleOverride } from "@/platform/font-scale";
+
+installFontScaleOverride();
 
 /**
  * 根布局：注入平台端口（Electron→IPC / 原生→expo-sqlite）→ 迁移（原生）→

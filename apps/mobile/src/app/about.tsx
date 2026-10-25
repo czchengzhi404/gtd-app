@@ -15,6 +15,9 @@ export default function AboutScreen() {
         <Text maxFontSizeMultiplier={1.2} style={[styles.body, { color: colors.textSecondary }]}>
           {t("about.body", { version })}
         </Text>
+        <Text maxFontSizeMultiplier={1.2} style={[styles.buildTag, { color: colors.textSecondary }]}>
+          build: {version}
+        </Text>
       </View>
     </Screen>
   );
@@ -33,5 +36,9 @@ const styles = StyleSheet.create({
   body: {
     fontSize: 16,
     lineHeight: 24,
+  },
+  buildTag: {
+    fontSize: 13,
+    paddingTop: 8,
   },
 });
