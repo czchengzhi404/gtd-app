@@ -38,6 +38,27 @@ jobs:
         working-directory: apps/mobile
         env:
           EXPO_NO_TELEMETRY: "1"
+      - name: Inject native fontScale lock (OriginOS/MIUI 大字体根治)
+        run: |
+          python3 - <<'PYEOF'
+          p = "apps/mobile/android/app/src/main/java/app/gtd/local/MainActivity.kt"
+          s = open(p, encoding="utf-8").read()
+          if "attachBaseContext" not in s:
+              marker = "class MainActivity : ReactActivity() {"
+              assert marker in s, "MainActivity marker not found"
+              inject = marker + """
+                  override fun attachBaseContext(newBase: android.content.Context) {
+                      val config = android.content.res.Configuration(newBase.resources.configuration)
+                      config.fontScale = 1.0f
+                      super.attachBaseContext(newBase.createConfigurationContext(config))
+                  }
+          """
+              s = s.replace(marker, inject, 1)
+              open(p, "w", encoding="utf-8").write(s)
+              print("fontScale=1 injected into MainActivity")
+          else:
+              print("already injected")
+          PYEOF
       - name: Inject release signing config
         run: |
           cat >> apps/mobile/android/app/build.gradle <<'EOF'
