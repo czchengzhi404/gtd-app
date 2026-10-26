@@ -151,11 +151,29 @@ function StepProjects({ summary, tr }: StepProps) {
           </AppText>
         </View>
       ))}
+
+      {summary.staleProjects.length > 0 ? (
+        <>
+          <AppText variant="caption" tone="tertiary" lines={1}>
+            {tr("review.staleSection")}
+          </AppText>
+          {summary.staleProjects.map((p) => (
+            <View key={p.projectId} style={styles.sampleRow}>
+              <Ionicons name="pause-circle-outline" size={13} color={colors.textTertiary} />
+              <AppText variant="label" tone="secondary" lines={1} style={styles.sampleText}>
+                {tr("review.staleItem", { name: p.name, days: p.days })}
+              </AppText>
+            </View>
+          ))}
+        </>
+      ) : null}
     </View>
   );
 }
 
 function StepCalendar({ summary, tr }: StepProps) {
+  const colors = useTheme();
+  const max = Math.max(1, ...summary.weeklyCompletion);
   return (
     <View style={styles.stepBody}>
       <AppText variant="body" lines={5}>
@@ -163,6 +181,35 @@ function StepCalendar({ summary, tr }: StepProps) {
           completed: summary.completedLastWeek,
           upcoming: summary.upcomingCount,
         })}
+      </AppText>
+
+      <AppText variant="caption" tone="tertiary" lines={1}>
+        {tr("review.trendSection")}
+      </AppText>
+      <View style={styles.trendRow}>
+        {summary.weeklyCompletion.map((count, index) => (
+          <View key={index} style={styles.trendCol}>
+            <View
+              style={[
+                styles.trendBar,
+                {
+                  height: Math.max(3, Math.round((count / max) * 44)),
+                  backgroundColor: count === 0 ? colors.surfaceMuted : colors.primary,
+                },
+              ]}
+            />
+            <AppText variant="caption" tone="tertiary" align="center" lines={1}>
+              {String(count)}
+            </AppText>
+          </View>
+        ))}
+      </View>
+
+      <AppText variant="caption" tone="tertiary" lines={1}>
+        {tr("review.progressSection")}
+      </AppText>
+      <AppText variant="label" tone="secondary" lines={1}>
+        {tr("review.progressValue", { done: summary.doneCount, open: summary.openCount })}
       </AppText>
     </View>
   );
@@ -260,6 +307,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: space.sm,
     minHeight: 28,
+  },
+  trendRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    gap: space.sm,
+    height: 64,
+    paddingTop: space.xs,
+  },
+  trendCol: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 2,
+  },
+  trendBar: {
+    width: "70%",
+    borderRadius: 3,
   },
   navRow: {
     flexDirection: "row",

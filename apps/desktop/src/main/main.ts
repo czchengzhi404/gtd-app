@@ -78,10 +78,13 @@ const COMMAND_OP_FLAG: { [K in CommandOp]: true } = {
   "task.complete": true,
   "task.uncomplete": true,
   "task.softDelete": true,
+  "task.restore": true,
   "project.upsert": true,
   "project.softDelete": true,
   "context.upsert": true,
   "section.create": true,
+  "attachment.add": true,
+  "attachment.remove": true,
   "settings.set": true,
   "sync.applyRemote": true,
   "import.merge": true,
@@ -216,6 +219,34 @@ function registerIpc(): void {
     allowedRoots.add(resolved);
     return resolved;
   });
+  /* ---- 本地备份：VACUUM INTO 快照（一致性快照，无需停库） ---- */
+  ipcMain.handle("backup:now", () =>
+    enqueueDb(async () => {
+      try {
+        const file = await createBackup();
+        return { ok: true, file, count: listBackups().length };
+      } catch (err) {
+        return { ok: false, error: err instanceof Error ? err.message : String(err) };
+      }
+    }),
+  );
+  ipcMain.handle("backup:list", () => ({ count: listBackups().length, latest: listBackups()[0] ?? null }));
+  ipcMain.handle("backup:restore", async () => {
+    try {
+      const restored = restoreLatestBackup();
+      if (restored === null) return { ok: false, error: "no-backup" };
+      // 关闭数据库并重启，让新数据生效
+      setTimeout(() => {
+        sqlite?.close();
+        app.relaunch();
+        app.exit(0);
+      }, 200);
+      return { ok: true, file: restored };
+    } catch (err) {
+      return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    }
+  });
+
   ipcMain.handle("app:quit", () => {
     isQuitting = true;
     app.quit();
@@ -243,6 +274,66 @@ function registerIpc(): void {
   }));
 }
 
+/* ---------------- 本地备份 ---------------- */
+
+const BACKUP_KEEP = 7;
+
+function backupDir(): string {
+  const dir = path.join(app.getPath("userData"), "backups");
+  fs.mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function listBackups(): string[] {
+  try {
+    return fs
+      .readdirSync(backupDir())
+      .filter((name) => name.endsWith(".db"))
+      .sort()
+      .reverse();
+  } catch {
+    return [];
+  }
+}
+
+/** 生成一份一致性快照，并只保留最近 BACKUP_KEEP 份 */
+async function createBackup(): Promise<string> {
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const target = path.join(backupDir(), `gtd-${stamp}.db`);
+  await sqlite!.executor.run("VACUUM INTO ?", [target]);
+  const files = listBackups();
+  for (const stale of files.slice(BACKUP_KEEP)) {
+    fs.rmSync(path.join(backupDir(), stale), { force: true });
+  }
+  return target;
+}
+
+/** 用最近一份备份覆盖当前库（调用方随后重启应用） */
+function restoreLatestBackup(): string | null {
+  const latest = listBackups()[0];
+  if (latest === undefined) return null;
+  const source = path.join(backupDir(), latest);
+  const target = path.join(app.getPath("userData"), "gtd.db");
+  sqlite?.close();
+  for (const suffix of ["", "-wal", "-shm"]) {
+    fs.rmSync(target + suffix, { force: true });
+  }
+  fs.copyFileSync(source, target);
+  return latest;
+}
+
+function startAutoBackup(): void {
+  void createBackup().catch((err) => {
+    console.warn("[backup] 首次备份失败:", err instanceof Error ? err.message : String(err));
+  });
+  setInterval(
+    () => {
+      void createBackup().catch(() => undefined);
+    },
+    6 * 60 * 60 * 1000,
+  );
+}
+
 /* ---------------- 托盘 / 菜单 / 快捷键（中英双语，随 kv.lang 重建） ---------------- */
 
 type MenuLang = "zh" | "en";
@@ -253,6 +344,9 @@ interface MenuStrings {
   quickCapture: string;
   syncNow: string;
   weeklyReview: string;
+  search: string;
+  focusMode: string;
+  backupNow: string;
   edit: string;
   undo: string;
   redo: string;
@@ -283,6 +377,9 @@ const MENU_I18N: Record<MenuLang, MenuStrings> = {
     quickCapture: "快速收集",
     syncNow: "立即同步",
     weeklyReview: "每周回顾",
+    search: "搜索",
+    focusMode: "专注模式",
+    backupNow: "立即备份",
     edit: "编辑",
     undo: "撤销",
     redo: "重做",
@@ -311,6 +408,9 @@ const MENU_I18N: Record<MenuLang, MenuStrings> = {
     quickCapture: "Quick Capture",
     syncNow: "Sync Now",
     weeklyReview: "Weekly Review",
+    search: "Search",
+    focusMode: "Focus Mode",
+    backupNow: "Back Up Now",
     edit: "Edit",
     undo: "Undo",
     redo: "Redo",
@@ -403,6 +503,26 @@ function buildAppMenu(lang: MenuLang): void {
           label: m.weeklyReview,
           accelerator: "CmdOrCtrl+Shift+R",
           click: () => sendToRenderer("menu:action", { action: "review" }),
+        },
+        { type: "separator" },
+        {
+          label: m.search,
+          accelerator: "CmdOrCtrl+F",
+          click: () => sendToRenderer("menu:action", { action: "search" }),
+        },
+        {
+          label: m.focusMode,
+          accelerator: "CmdOrCtrl+Shift+F",
+          click: () => sendToRenderer("menu:action", { action: "focus" }),
+        },
+        {
+          label: m.backupNow,
+          accelerator: "CmdOrCtrl+Shift+B",
+          click: () => {
+            void createBackup()
+              .then((file) => sendToRenderer("menu:action", { action: "backup-done", file }))
+              .catch(() => undefined);
+          },
         },
       ],
     },
@@ -777,6 +897,7 @@ void app.whenReady().then(async () => {
   createTray(menuLang);
   buildAppMenu(menuLang);
   registerDefaultShortcut();
+  startAutoBackup();
   void setupAutoUpdater();
   if (shotCfg !== null) {
     void runShot(mainWindow);

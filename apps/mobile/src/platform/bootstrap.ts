@@ -136,6 +136,13 @@ function wireDesktop(): () => void {
         case "review":
           router.push("/review");
           break;
+        case "search":
+          // 搜索框在收集箱/今天页顶部，跳到收集箱即可直接输入
+          router.navigate("/");
+          break;
+        case "focus":
+          router.navigate("/focus");
+          break;
         default:
           break;
       }

@@ -133,6 +133,7 @@ export async function syncNow(deps: SyncDeps): Promise<SyncReport> {
   let applied = 0;
   let remoteWins = 0;
   let localWins = 0;
+  const conflictSamples: { deviceId: string; kind: string; label: string; reason: string }[] = [];
   for (const deviceId of deviceIds) {
     const theirManifest = await deps.provider.readManifest(deviceId);
     if (theirManifest === null) continue;
@@ -146,6 +147,21 @@ export async function syncNow(deps: SyncDeps): Promise<SyncReport> {
       applied += appliedBatch.length;
       remoteWins += appliedBatch.length;
       localWins += batch.length - appliedBatch.length;
+      // 冲突样本：远端条目未被采纳 = 本地 revision 更高而被保留
+      if (appliedBatch.length < batch.length) {
+        const appliedIds = new Set(appliedBatch.map((record) => record.record.id));
+        for (const remote of batch) {
+          if (appliedIds.has(remote.record.id)) continue;
+          if (conflictSamples.length >= 10) break;
+          const record = remote.record as { title?: string; name?: string };
+          conflictSamples.push({
+            deviceId,
+            kind: remote.type,
+            label: record.title ?? record.name ?? remote.record.id.slice(0, 8),
+            reason: "local-revision-higher",
+          });
+        }
+      }
     }
   }
 
@@ -155,6 +171,29 @@ export async function syncNow(deps: SyncDeps): Promise<SyncReport> {
   await deps.provider.writeManifest(deps.deviceId, finalManifest);
   await deps.provider.writeRecords(deps.deviceId, finalRecords);
 
+  const finishedAt = deps.now?.() ?? Date.now();
+  // 冲突日志（不参与同步，各设备独立）：供「更多 → 同步日志」展示
+  try {
+    await executeCommand(
+      executor,
+      "settings.set",
+      {
+        key: "sync.log",
+        value: JSON.stringify({
+          at: finishedAt,
+          applied,
+          localWins,
+          remoteWins,
+          devices: deviceIds.length,
+          conflicts: conflictSamples,
+        }),
+      },
+      { now: () => finishedAt },
+    );
+  } catch {
+    /* 日志写入失败不影响同步结果 */
+  }
+
   return {
     deviceId: deps.deviceId,
     applied,
@@ -163,7 +202,7 @@ export async function syncNow(deps: SyncDeps): Promise<SyncReport> {
     pushed: finalRecords.length,
     devices: deviceIds.length,
     startedAt,
-    finishedAt: deps.now?.() ?? Date.now(),
+    finishedAt,
   };
 }
 

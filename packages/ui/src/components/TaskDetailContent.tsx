@@ -1,11 +1,13 @@
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { Task, TaskStatusInput } from "@gtd/core";
+import type { AttachmentMeta, Task, TaskStatusInput } from "@gtd/core";
 
 import { SectionHeader } from "./Screen";
 import { Chip } from "./Chip";
 import { DueDateChip } from "./DueDateChip";
 import { PriorityBadge } from "./PriorityBadge";
+import { ChecklistEditor } from "./ChecklistEditor";
+import { AttachmentList } from "./AttachmentList";
 import { Button, Divider } from "../theme/primitives";
 import { AppText } from "../theme/AppText";
 import { useTheme } from "../hooks/useTheme";
@@ -28,6 +30,15 @@ export interface TaskDetailContentProps {
   onToggleStar: () => void;
   onDelete: () => void;
   onSetPriority: (priority: 0 | 1 | 2 | 3) => void;
+  /** 清单子项 */
+  onToggleChecklist?: (itemId: string) => void;
+  onAddChecklist?: (title: string) => void;
+  onRemoveChecklist?: (itemId: string) => void;
+  /** 附件（元数据列表由调用方查询） */
+  attachments?: AttachmentMeta[];
+  onAddAttachment?: () => void;
+  onRemoveAttachment?: (id: string) => void;
+  onOpenAttachment?: (item: AttachmentMeta) => void;
 }
 
 /** 任务详情（移动全屏 / 桌面右栏复用） */
@@ -40,6 +51,13 @@ export function TaskDetailContent({
   onToggleStar,
   onDelete,
   onSetPriority,
+  onToggleChecklist,
+  onAddChecklist,
+  onRemoveChecklist,
+  attachments,
+  onAddAttachment,
+  onRemoveAttachment,
+  onOpenAttachment,
 }: TaskDetailContentProps) {
   const colors = useTheme();
   const t = useT();
@@ -106,6 +124,36 @@ export function TaskDetailContent({
         <Button label={t("detail.delete")} icon="trash-outline" variant="danger" onPress={onDelete} />
       </View>
 
+      {onToggleChecklist !== undefined &&
+      onAddChecklist !== undefined &&
+      onRemoveChecklist !== undefined ? (
+        <>
+          <SectionHeader title={t("detail.checklist")} />
+          <View style={styles.sectionBlock}>
+            <ChecklistEditor
+              items={task.checklist}
+              onToggle={onToggleChecklist}
+              onAdd={onAddChecklist}
+              onRemove={onRemoveChecklist}
+            />
+          </View>
+        </>
+      ) : null}
+
+      {attachments !== undefined && onRemoveAttachment !== undefined ? (
+        <>
+          <SectionHeader title={t("detail.attachments")} />
+          <View style={styles.sectionBlock}>
+            <AttachmentList
+              items={attachments}
+              onAdd={onAddAttachment}
+              onRemove={onRemoveAttachment}
+              onOpen={onOpenAttachment}
+            />
+          </View>
+        </>
+      ) : null}
+
       {task.notes.length > 0 ? (
         <>
           <SectionHeader title={t("detail.notes")} />
@@ -157,6 +205,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: space.sm,
+    paddingHorizontal: space.lg,
+  },
+  sectionBlock: {
     paddingHorizontal: space.lg,
   },
   notesCard: {

@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -17,9 +17,12 @@ import {
 import { getSyncConfig, getSqliteExecutor, getWaitingTasks, getSomedayTasks, runCommand } from "@gtd/core";
 import type { SyncConfig } from "@gtd/core";
 import {
+  backupCount,
+  backupNow,
   exportAllToFile,
   importFromFile,
   pickSyncFolder,
+  restoreLatestBackup,
   runManualSync,
   saveSyncConfig,
 } from "@/platform/desktop-actions";
@@ -50,11 +53,34 @@ export default function MoreScreen() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [lang, setLangUi] = useState(getLang());
+  const [backups, setBackups] = useState(0);
+
+  const syncLog = useMemo(() => {
+    const raw = kv["sync.log"];
+    if (raw === undefined) return null;
+    try {
+      const parsed = JSON.parse(raw) as {
+        applied?: number;
+        localWins?: number;
+        remoteWins?: number;
+        conflicts?: { label: string }[];
+      };
+      return {
+        applied: parsed.applied ?? 0,
+        localWins: parsed.localWins ?? 0,
+        remoteWins: parsed.remoteWins ?? 0,
+        conflicts: parsed.conflicts ?? [],
+      };
+    } catch {
+      return null;
+    }
+  }, [kv]);
 
   useEffect(() => {
     void (async () => {
       const saved = await getSyncConfig(getSqliteExecutor());
       if (saved !== null) setConfig(saved);
+      setBackups(await backupCount());
     })();
   }, []);
 
@@ -105,6 +131,30 @@ export default function MoreScreen() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const onBackup = async () => {
+    setBusy(true);
+    try {
+      const outcome = await backupNow();
+      setStatus(outcome.message);
+      setBackups(await backupCount());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onRestore = () => {
+    Alert.alert(t("more.backupSection"), t("more.backupConfirm"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("more.backupRestore"),
+        style: "destructive",
+        onPress: () => {
+          void restoreLatestBackup().then((outcome) => setStatus(outcome.message));
+        },
+      },
+    ]);
   };
 
   const onExport = async () => {
@@ -270,6 +320,70 @@ export default function MoreScreen() {
             {lastSync}
           </AppText>
         </Card>
+
+        {/* 同步日志 */}
+        <SectionHeader title={t("more.syncLogSection")} />
+        <Card style={styles.block}>
+          {syncLog === null ? (
+            <AppText variant="label" tone="tertiary" lines={1}>
+              {t("more.syncLogEmpty")}
+            </AppText>
+          ) : (
+            <>
+              <AppText variant="label" tone="secondary" lines={2}>
+                {t("more.syncLogSummary", {
+                  applied: syncLog.applied,
+                  local: syncLog.localWins,
+                  remote: syncLog.remoteWins,
+                })}
+              </AppText>
+              {syncLog.conflicts.length > 0 ? (
+                <>
+                  <AppText variant="caption" tone="tertiary" lines={1}>
+                    {t("more.syncLogConflicts")}
+                  </AppText>
+                  {syncLog.conflicts.slice(0, 5).map((conflict, index) => (
+                    <AppText key={`${conflict.label}-${index}`} variant="caption" tone="tertiary" lines={1}>
+                      {`· ${conflict.label}`}
+                    </AppText>
+                  ))}
+                </>
+              ) : null}
+            </>
+          )}
+        </Card>
+
+        {/* 本地备份（桌面端） */}
+        {isDesktop() ? (
+          <>
+            <SectionHeader
+              title={t("more.backupSection")}
+              trailing={
+                <AppText variant="caption" tone="tertiary" lines={1}>
+                  {backups > 0 ? t("more.backupList", { n: backups }) : t("more.backupNever")}
+                </AppText>
+              }
+            />
+            <View style={styles.block}>
+              <Button
+                label={t("more.backupNow")}
+                icon="save-outline"
+                disabled={busy}
+                block
+                onPress={() => void onBackup()}
+              />
+              <View style={styles.gap} />
+              <Button
+                label={t("more.backupRestore")}
+                icon="time-outline"
+                variant="danger"
+                disabled={busy || backups === 0}
+                block
+                onPress={onRestore}
+              />
+            </View>
+          </>
+        ) : null}
 
         {/* 数据 */}
         <SectionHeader title={t("more.dataSection")} />

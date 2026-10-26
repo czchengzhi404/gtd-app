@@ -17,6 +17,11 @@ export interface GtdApi {
     listDir(path: string): Promise<string[]>;
   };
   sync: { setFolderRoot(root: string): Promise<string> };
+  backup: {
+    now(): Promise<{ ok: boolean; file?: string; count?: number; error?: string }>;
+    list(): Promise<{ count: number; latest: string | null }>;
+    restore(): Promise<{ ok: boolean; file?: string; error?: string }>;
+  };
   on(channel: string, listener: (...args: unknown[]) => void): () => void;
 }
 

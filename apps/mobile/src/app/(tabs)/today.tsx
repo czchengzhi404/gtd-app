@@ -4,7 +4,7 @@ import { View } from "react-native";
 
 import {
   CalendarView,
-  SectionHeader,
+  FilterBar,
   TaskList,
   TimelineView,
   ViewToggle,
@@ -12,12 +12,13 @@ import {
   useBreakpoint,
   useT,
 } from "@gtd/ui";
-import { selectContexts, getTodayTasks, runCommand } from "@gtd/core";
-import { useTaskActions } from "@/hooks/useRowActions";
+import { applyListFilter, getTodayTasks, selectContexts } from "@gtd/core";
+import { useOrderedTaskActions } from "@/hooks/useRowActions";
+import { completeTaskWithUndo, uncompleteTask } from "@/lib/task-ops";
 
 type TodayView = "list" | "calendar" | "timeline";
 
-/** 今天：今日到期 + 逾期。列表 / 日历 / Timeline（≥1440）三视图 */
+/** 今天：今日到期 + 逾期；列表 / 日历 / Timeline（≥1440） */
 export default function TodayScreen() {
   const tasks = useAppStore((s) => getTodayTasks(s, Date.now()));
   const allTasks = useAppStore((s) => Object.values(s.tasks));
@@ -25,8 +26,17 @@ export default function TodayScreen() {
   const loaded = useAppStore((s) => s.loaded);
   const { isWideUp } = useBreakpoint();
   const t = useT();
-  const taskActions = useTaskActions();
+
   const [view, setView] = useState<TodayView>("list");
+  const [query, setQuery] = useState("");
+  const [contextId, setContextId] = useState<string | null>(null);
+  const [overdueOnly, setOverdueOnly] = useState(false);
+
+  const filtered = useMemo(
+    () => applyListFilter(tasks, { query, contextId, overdueOnly }, Date.now()),
+    [tasks, query, contextId, overdueOnly],
+  );
+  const actions = useOrderedTaskActions(filtered);
 
   const contextNameById = useMemo(() => {
     const map: Record<string, string> = {};
@@ -38,6 +48,16 @@ export default function TodayScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <FilterBar
+        query={query}
+        onQueryChange={setQuery}
+        contexts={contexts.map((c) => ({ id: c.id, name: c.name }))}
+        contextId={contextId}
+        onContextChange={setContextId}
+        overdueOnly={overdueOnly}
+        onOverdueChange={setOverdueOnly}
+        resultCount={filtered.length}
+      />
       <ViewToggle<TodayView>
         label={t("view.todayLabel")}
         value={view}
@@ -51,15 +71,12 @@ export default function TodayScreen() {
 
       {view === "list" ? (
         <TaskList
-          tasks={tasks}
+          tasks={filtered}
           now={Date.now()}
           contextNameById={contextNameById}
-          actions={taskActions}
+          actions={actions}
           onToggleTask={(task) =>
-            void runCommand(
-              task.status === "done" ? "task.uncomplete" : "task.complete",
-              { id: task.id },
-            ).catch(() => undefined)
+            void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
           }
           onPressTask={(task) => router.push(`/task/${task.id}`)}
           emptyTitle={t("today.emptyTitle")}

@@ -58,6 +58,35 @@ export async function saveSyncConfig(config: SyncConfig): Promise<void> {
   await runCommand("settings.set", { key: "sync.config", value: JSON.stringify(final) });
 }
 
+/* ---------------- 本地备份 ---------------- */
+
+export interface BackupOutcome {
+  ok: boolean;
+  message: string;
+}
+
+export async function backupNow(): Promise<BackupOutcome> {
+  if (!isDesktop()) return { ok: false, message: t("more.backupDesktopOnly") };
+  const result = await gtd().backup.now();
+  return result.ok
+    ? { ok: true, message: t("more.backupDone", { count: result.count ?? 0 }) }
+    : { ok: false, message: result.error ?? "failed" };
+}
+
+export async function backupCount(): Promise<number> {
+  if (!isDesktop()) return 0;
+  const info = await gtd().backup.list().catch(() => ({ count: 0, latest: null }));
+  return info.count;
+}
+
+export async function restoreLatestBackup(): Promise<BackupOutcome> {
+  if (!isDesktop()) return { ok: false, message: t("more.backupDesktopOnly") };
+  const result = await gtd().backup.restore();
+  return result.ok
+    ? { ok: true, message: t("more.backupRestoring") }
+    : { ok: false, message: result.error ?? "failed" };
+}
+
 export async function pickSyncFolder(): Promise<string | null> {
   if (!isDesktop()) return null;
   return gtd().dialog.open({ directory: true });

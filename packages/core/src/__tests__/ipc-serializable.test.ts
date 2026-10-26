@@ -9,6 +9,7 @@ import {
   projectUpsertPayloadSchema,
   contextUpsertPayloadSchema,
   sectionCreatePayloadSchema,
+  attachmentAddPayloadSchema,
   settingsSetPayloadSchema,
   recordsApplyPayloadSchema,
   type CommandMap,
@@ -43,6 +44,7 @@ const FIXTURES: { [K in keyof CommandMap]: CommandMap[K] } = {
   "task.complete": { id: "t1" },
   "task.uncomplete": { id: "t1" },
   "task.softDelete": { id: "t1" },
+  "task.restore": { id: "t1" },
   "project.upsert": {
     name: "装修房子",
     description: "顺序项目",
@@ -53,6 +55,14 @@ const FIXTURES: { [K in keyof CommandMap]: CommandMap[K] } = {
   "project.softDelete": { id: "p1" },
   "context.upsert": { name: "电脑", color: null, icon: null },
   "section.create": { projectId: "p1", name: "设计" },
+  "attachment.add": {
+    taskId: "t1",
+    fileName: "报价单.pdf",
+    mimeType: "application/pdf",
+    size: 12345,
+    storagePath: "/data/attachments/quote.pdf",
+  },
+  "attachment.remove": { id: "a1" },
   "sync.applyRemote": {
     records: [
       {
@@ -94,10 +104,13 @@ const SCHEMAS = {
   "task.complete": taskCompletePayloadSchema,
   "task.uncomplete": taskCompletePayloadSchema,
   "task.softDelete": idOnlyPayloadSchema,
+  "task.restore": idOnlyPayloadSchema,
   "project.upsert": projectUpsertPayloadSchema,
   "project.softDelete": idOnlyPayloadSchema,
   "context.upsert": contextUpsertPayloadSchema,
   "section.create": sectionCreatePayloadSchema,
+  "attachment.add": attachmentAddPayloadSchema,
+  "attachment.remove": idOnlyPayloadSchema,
   "sync.applyRemote": recordsApplyPayloadSchema,
   "import.merge": recordsApplyPayloadSchema,
   "settings.set": settingsSetPayloadSchema,

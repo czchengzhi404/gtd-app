@@ -1,11 +1,27 @@
+import { useEffect, useState } from "react";
 import { useLocalSearchParams, router } from "expo-router";
 import { Alert, View } from "react-native";
 
 import { Screen, TaskDetailContent, useAppStore, useT } from "@gtd/ui";
-import { selectContexts, selectActiveProjects, selectTaskById, runCommand } from "@gtd/core";
-import type { TaskStatusInput } from "@gtd/core";
+import {
+  getAttachmentsForTask,
+  getSqliteExecutor,
+  selectActiveProjects,
+  selectContexts,
+  selectTaskById,
+  runCommand,
+} from "@gtd/core";
+import type { AttachmentMeta, TaskStatusInput } from "@gtd/core";
+import {
+  addAttachmentFromDialog,
+  addChecklistItem,
+  deleteTaskWithUndo,
+  removeChecklistItem,
+  toggleChecklistItem,
+} from "@/lib/task-ops";
+import { isDesktop } from "@/platform/env";
 
-/** 任务详情（理清/组织的主场所）：状态流转、优先级、专注、删除 */
+/** 任务详情：状态流转、优先级、专注、清单子项、附件、删除（可撤销） */
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const taskId = typeof id === "string" ? id : "";
@@ -13,6 +29,15 @@ export default function TaskDetailScreen() {
   const contexts = useAppStore(selectContexts);
   const projects = useAppStore(selectActiveProjects);
   const t = useT();
+  const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
+
+  useEffect(() => {
+    if (taskId.length === 0) return;
+    void (async () => {
+      const list = await getAttachmentsForTask(getSqliteExecutor(), taskId).catch(() => []);
+      setAttachments(list);
+    })();
+  }, [taskId, task?.revision]);
 
   if (task === null) return <Screen>{null}</Screen>;
 
@@ -28,11 +53,9 @@ export default function TaskDetailScreen() {
         text: t("common.delete"),
         style: "destructive",
         onPress: () => {
-          void runCommand("task.softDelete", { id: task.id })
-            .then(() => {
-              if (router.canGoBack()) router.back();
-            })
-            .catch(() => undefined);
+          void deleteTaskWithUndo(task).then(() => {
+            if (router.canGoBack()) router.back();
+          });
         },
       },
     ]);
@@ -59,6 +82,25 @@ export default function TaskDetailScreen() {
             void runCommand("task.update", { id: task.id, patch: { priority } }).catch(() => undefined)
           }
           onDelete={confirmDelete}
+          onToggleChecklist={(itemId) => void toggleChecklistItem(task, itemId)}
+          onAddChecklist={(title) => void addChecklistItem(task, title)}
+          onRemoveChecklist={(itemId) => void removeChecklistItem(task, itemId)}
+          attachments={attachments}
+          onAddAttachment={
+            isDesktop()
+              ? () =>
+                  void addAttachmentFromDialog(task).then(async () => {
+                    setAttachments(await getAttachmentsForTask(getSqliteExecutor(), task.id));
+                  })
+              : undefined
+          }
+          onRemoveAttachment={(attachmentId) =>
+            void runCommand("attachment.remove", { id: attachmentId })
+              .then(async () => {
+                setAttachments(await getAttachmentsForTask(getSqliteExecutor(), task.id));
+              })
+              .catch(() => undefined)
+          }
         />
       </View>
     </Screen>

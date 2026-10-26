@@ -74,6 +74,8 @@ export function nextOccurrence(
     case "monthly": {
       const d = new Date(anchor);
       const dayOfMonth = d.getDate();
+      const hh = d.getHours();
+      const mm = d.getMinutes();
       let year = d.getFullYear();
       let month = d.getMonth();
       let steps = 0;
@@ -81,7 +83,10 @@ export function nextOccurrence(
         month += interval;
         year += Math.floor(month / 12);
         month = ((month % 12) + 12) % 12;
-        const next = new Date(year, month, Math.min(dayOfMonth, daysInMonth(year, month))).getTime();
+        const next =
+          rule.lastWeekday === true
+            ? lastWeekdayOfMonth(year, month, hh, mm)
+            : new Date(year, month, Math.min(dayOfMonth, daysInMonth(year, month)), hh, mm).getTime();
         if (next > floor) return checkUntil(next, rule);
         if (++steps >= limit) return checkUntil(null, rule);
       }
@@ -102,6 +107,17 @@ export function nextOccurrence(
       }
     }
   }
+}
+
+/** 当月最后一个工作日（周一至周五） */
+function lastWeekdayOfMonth(year: number, monthIndex0: number, hour: number, minute: number): number {
+  let day = daysInMonth(year, monthIndex0);
+  for (;;) {
+    const weekday = new Date(year, monthIndex0, day).getDay();
+    if (weekday !== 0 && weekday !== 6) break;
+    day -= 1;
+  }
+  return new Date(year, monthIndex0, day, hour, minute).getTime();
 }
 
 function sameWeekdayCycle(weekday: number, weekdays: number[], baseWeekday: number): boolean {

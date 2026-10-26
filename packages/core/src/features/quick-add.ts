@@ -137,6 +137,30 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
 
   // 5) 重复规则（每周X 可多次出现收集多天；其余形式各一次，循环 cut 保证标题干净）
   {
+    // 5a) 优先识别多周期间隔与特殊月规则：双周 / 每隔N天 / 每月最后工作日
+    let early: RecurrenceRule | undefined;
+    {
+      const biweekly = text.match(/(?:^|\s)(?:每两周|双周|隔周|biweekly)(?=\s|$)/iu);
+      if (biweekly) {
+        early = { freq: "weekly", interval: 2, until: null };
+        text = cut(text, biweekly);
+      }
+      if (early === undefined) {
+        const lastWorkday = text.match(/(?:^|\s)每月最后一?个?工作日(?=\s|$)/u);
+        if (lastWorkday) {
+          early = { freq: "monthly", interval: 1, lastWeekday: true, until: null };
+          text = cut(text, lastWorkday);
+        }
+      }
+      if (early === undefined) {
+        const everyNDays = text.match(/(?:^|\s)(?:每隔|每)(\d{1,2})天(?=\s|$)/u);
+        if (everyNDays) {
+          early = { freq: "daily", interval: Math.max(2, Number(everyNDays[1])), until: null };
+          text = cut(text, everyNDays);
+        }
+      }
+    }
+
     const weeklyDays: number[] = [];
     for (;;) {
       const m = text.match(/(?:^|\s)每周([一二三四五六日天])?/u);
@@ -145,7 +169,9 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
       text = cut(text, m);
       if (m[1] === undefined) break; // 裸"每周"只出现一次
     }
-    if (text.match(/(?:^|\s)(?:每天|每日|daily)(?=\s|$)/u)) {
+    if (early !== undefined) {
+      recurrence = early;
+    } else if (text.match(/(?:^|\s)(?:每天|每日|daily)(?=\s|$)/u)) {
       for (;;) {
         const m = text.match(/(?:^|\s)(?:每天|每日|daily)(?=\s|$)/u);
         if (!m) break;

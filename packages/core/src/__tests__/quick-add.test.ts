@@ -139,5 +139,41 @@ function at(d: Date, hour: number, minute: number): number {
   return copy.getTime();
 }
 
+describe("重复规则增强（v0.4.0）", () => {
+  it("双周/每两周 → weekly interval 2", () => {
+    const r = parseQuickAdd("复盘 双周", NOW);
+    expect(r.recurrence?.freq).toBe("weekly");
+    expect(r.recurrence?.interval).toBe(2);
+    expect(r.title).toBe("复盘");
+  });
+
+  it("每隔3天 → daily interval 3", () => {
+    const r = parseQuickAdd("浇花 每隔3天", NOW);
+    expect(r.recurrence?.freq).toBe("daily");
+    expect(r.recurrence?.interval).toBe(3);
+  });
+
+  it("每月最后一个工作日 → lastWeekday 标记", () => {
+    const r = parseQuickAdd("对账 每月最后一个工作日", NOW);
+    expect(r.recurrence?.freq).toBe("monthly");
+    expect(r.recurrence?.lastWeekday).toBe(true);
+    expect(r.title).toBe("对账");
+  });
+
+  it("lastWeekday 推进：跳过周末", () => {
+    // 2026-11-30 是周一 → 下一月最后工作日应为 2026-12-31（周四）
+    const anchor = at(new Date(2026, 10, 30), 18, 0);
+    const next = nextOccurrence(
+      anchor,
+      { freq: "monthly", interval: 1, lastWeekday: true, until: null },
+      anchor + 1,
+    );
+    const d = new Date(next ?? 0);
+    expect(d.getMonth()).toBe(11);
+    expect(d.getDate()).toBe(31);
+    expect([1, 2, 3, 4, 5]).toContain(d.getDay());
+  });
+});
+
 // 防止未使用导入告警（startOfDay 被 quick-add 模块复用）
 void startOfDay;

@@ -62,11 +62,22 @@ export const taskUpdatePayloadSchema = z.object({
     contextIds: z.array(idSchema).optional(),
     waitingFor: z.string().max(500).nullable().optional(),
     starred: z.boolean().optional(),
+    checklist: z
+      .array(
+        z.object({
+          id: idSchema,
+          title: z.string().min(1).max(2000),
+          done: z.boolean(),
+          orderKey: z.string(),
+        }),
+      )
+      .optional(),
     recurrence: z
       .object({
         freq: z.enum(["daily", "weekly", "monthly", "yearly"]),
         interval: z.number().int().min(1).max(999),
         byWeekday: z.array(z.number().int().min(0).max(6)).optional(),
+        lastWeekday: z.boolean().optional(),
         until: timestampSchema.nullable().optional(),
       })
       .nullable()
@@ -126,6 +137,16 @@ export type SectionCreatePayload = z.infer<typeof sectionCreatePayloadSchema>;
  * 远端/导入记录应用。records 经 coerceTaggedRecords 逐条安全转换后再合并
  * （revision 优先规则），本 schema 只做结构级校验。
  */
+/** 附件：库内只存元数据，二进制由壳层写入文件系统 */
+export const attachmentAddPayloadSchema = z.object({
+  taskId: idSchema,
+  fileName: z.string().min(1).max(500),
+  mimeType: z.string().max(200).optional(),
+  size: z.number().int().nonnegative().optional(),
+  storagePath: z.string().min(1).max(2000),
+});
+export type AttachmentAddPayload = z.infer<typeof attachmentAddPayloadSchema>;
+
 export const recordsApplyPayloadSchema = z.object({
   records: z.array(
     z.object({
@@ -148,10 +169,14 @@ export interface CommandMap {
   "task.complete": TaskCompletePayload;
   "task.uncomplete": TaskCompletePayload;
   "task.softDelete": IdOnlyPayload;
+  /** 撤销删除：清空墓碑并提升 revision（供 Undo 使用） */
+  "task.restore": IdOnlyPayload;
   "project.upsert": ProjectUpsertPayload;
   "project.softDelete": IdOnlyPayload;
   "context.upsert": ContextUpsertPayload;
   "section.create": SectionCreatePayload;
+  "attachment.add": AttachmentAddPayload;
+  "attachment.remove": IdOnlyPayload;
   "settings.set": SettingsSetPayload;
   /** 同步：按批应用远端记录（每批一个独立 immediate 事务） */
   "sync.applyRemote": RecordsApplyPayload;

@@ -4,7 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
 import { useColorScheme } from "react-native";
 
-import { Screen, ThemeProvider, useTheme, setLang, useT } from "@gtd/ui";
+import { Screen, ThemeProvider, UndoHost, useTheme, setLang, useT } from "@gtd/ui";
 
 function setLangFromKv(lang: "zh" | "en"): void {
   setLang(lang);
@@ -57,12 +57,17 @@ export default function RootLayout() {
       {error !== null ? (
         <BootError message={error} />
       ) : (
-        <Stack>
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="task/[id]" options={{ title: t("detail.title") }} />
-          <Stack.Screen name="review" options={{ title: t("review.title") }} />
-          <Stack.Screen name="about" options={{ title: t("more.about") }} />
-        </Stack>
+        <>
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="task/[id]" options={{ title: t("detail.title") }} />
+            <Stack.Screen name="project/[id]" options={{ title: t("nav.projects") }} />
+            <Stack.Screen name="review" options={{ title: t("review.title") }} />
+            <Stack.Screen name="add" options={{ title: t("nav.inbox"), headerShown: false }} />
+            <Stack.Screen name="about" options={{ title: t("more.about") }} />
+          </Stack>
+          <UndoHost />
+        </>
       )}
     </ThemeProvider>
   );

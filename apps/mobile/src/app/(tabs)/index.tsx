@@ -2,32 +2,50 @@ import { useMemo, useState } from "react";
 import { router } from "expo-router";
 import { View } from "react-native";
 
-import { KanbanBoard, QuickAddBar, TaskList, useAppStore, ViewToggle, useT } from "@gtd/ui";
 import {
+  FilterBar,
+  KanbanBoard,
+  QuickAddBar,
+  TaskList,
+  useAppStore,
+  ViewToggle,
+  useT,
+} from "@gtd/ui";
+import {
+  applyListFilter,
   getInboxTasks,
   getTasksByStatus,
   parseQuickAdd,
   quickAdd,
-  runCommand,
   selectContexts,
 } from "@gtd/core";
-import { useTaskActions } from "@/hooks/useRowActions";
+import { useOrderedTaskActions } from "@/hooks/useRowActions";
+import { completeTaskWithUndo, uncompleteTask } from "@/lib/task-ops";
 
 type InboxView = "list" | "kanban";
 
-/** 收集箱：快速添加 + 列表/看板切换（看板覆盖四个 GTD 状态，便于横向理清） */
+/** 收集箱：快速添加 + 搜索/情境筛选 + 列表或看板 */
 export default function InboxScreen() {
-  const tasks = useAppStore(getInboxTasks);
+  const inbox = useAppStore(getInboxTasks);
   const contexts = useAppStore(selectContexts);
   const nextTasks = useAppStore((s) => getTasksByStatus(s, "next"));
   const waitingTasks = useAppStore((s) => getTasksByStatus(s, "waiting"));
   const somedayTasks = useAppStore((s) => getTasksByStatus(s, "someday"));
   const loaded = useAppStore((s) => s.loaded);
   const t = useT();
-  const taskActions = useTaskActions();
+
   const [view, setView] = useState<InboxView>("list");
   const [submitting, setSubmitting] = useState(false);
   const [input, setInput] = useState("");
+  const [query, setQuery] = useState("");
+  const [contextId, setContextId] = useState<string | null>(null);
+  const [overdueOnly, setOverdueOnly] = useState(false);
+
+  const filtered = useMemo(
+    () => applyListFilter(inbox, { query, contextId, overdueOnly }, Date.now()),
+    [inbox, query, contextId, overdueOnly],
+  );
+  const actions = useOrderedTaskActions(filtered);
 
   const contextNameById = useMemo(() => {
     const map: Record<string, string> = {};
@@ -45,17 +63,17 @@ export default function InboxScreen() {
       parts.push(`${d.getMonth() + 1}/${d.getDate()}`);
     }
     if (parsed.recurrence !== undefined) {
-      parts.push(
-        t(
-          parsed.recurrence.freq === "daily"
-            ? "recurrence.daily"
-            : parsed.recurrence.freq === "weekly"
-              ? "recurrence.weekly"
-              : parsed.recurrence.freq === "monthly"
-                ? "recurrence.monthly"
-                : "recurrence.yearly",
-        ),
+      const rule = parsed.recurrence;
+      const base = t(
+        rule.freq === "daily"
+          ? "recurrence.daily"
+          : rule.freq === "weekly"
+            ? "recurrence.weekly"
+            : rule.freq === "monthly"
+              ? "recurrence.monthly"
+              : "recurrence.yearly",
       );
+      parts.push(rule.interval > 1 ? `${base} ×${rule.interval}` : base);
     }
     if (parsed.projectName !== undefined) parts.push(`#${parsed.projectName}`);
     for (const name of parsed.contextNames) parts.push(`@${name}`);
@@ -78,6 +96,16 @@ export default function InboxScreen() {
   return (
     <View style={{ flex: 1 }}>
       <QuickAddBar preview={preview} onSubmit={submit} submitting={submitting} />
+      <FilterBar
+        query={query}
+        onQueryChange={setQuery}
+        contexts={contexts.map((c) => ({ id: c.id, name: c.name }))}
+        contextId={contextId}
+        onContextChange={setContextId}
+        overdueOnly={overdueOnly}
+        onOverdueChange={setOverdueOnly}
+        resultCount={filtered.length}
+      />
       <ViewToggle<InboxView>
         label={t("view.inboxLabel")}
         value={view}
@@ -87,17 +115,15 @@ export default function InboxScreen() {
           { key: "kanban", label: t("view.kanban") },
         ]}
       />
+
       {view === "list" ? (
         <TaskList
-          tasks={tasks}
+          tasks={filtered}
           now={Date.now()}
           contextNameById={contextNameById}
-          actions={taskActions}
+          actions={actions}
           onToggleTask={(task) =>
-            void runCommand(
-              task.status === "done" ? "task.uncomplete" : "task.complete",
-              { id: task.id },
-            ).catch(() => undefined)
+            void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
           }
           onPressTask={(task) => router.push(`/task/${task.id}`)}
           emptyTitle={t("inbox.emptyTitle")}
@@ -106,9 +132,9 @@ export default function InboxScreen() {
       ) : (
         <KanbanBoard
           now={Date.now()}
-          actions={taskActions}
+          actions={actions}
           columns={[
-            { key: "inbox", title: t("detail.status.inbox"), tasks },
+            { key: "inbox", title: t("detail.status.inbox"), tasks: filtered },
             { key: "next", title: t("detail.status.next"), tasks: nextTasks },
             { key: "waiting", title: t("detail.status.waiting"), tasks: waitingTasks },
             { key: "someday", title: t("detail.status.someday"), tasks: somedayTasks },

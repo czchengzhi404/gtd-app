@@ -1,6 +1,7 @@
 import type { CommandMap, CommandOp, CommandResult, TaggedRecord } from "../models/commands";
 import type {
   AttachmentMeta,
+  ChecklistItem,
   Context,
   Project,
   RecurrenceRule,
@@ -28,6 +29,7 @@ import { nextOccurrence } from "../features/recurrence";
 import { findContextByName, findProjectByName, getTaskById } from "./queries";
 import type { SqliteExecutor, SqliteRow } from "../platform/executor";
 import {
+  attachmentAddPayloadSchema,
   contextUpsertPayloadSchema,
   idOnlyPayloadSchema,
   projectUpsertPayloadSchema,
@@ -247,6 +249,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
       contextIds: patch.contextIds ?? existing.contextIds,
       waitingFor: patch.waitingFor !== undefined ? patch.waitingFor : existing.waitingFor,
       starred: patch.starred ?? existing.starred,
+      checklist: (patch.checklist as ChecklistItem[] | undefined) ?? existing.checklist,
       recurrence:
         patch.recurrence !== undefined ? (patch.recurrence as RecurrenceRule | null) : existing.recurrence,
       updatedAt: ctx.now(),
@@ -336,6 +339,21 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
       ...existing,
       status: existing.projectId ? "next" : "inbox",
       completedAt: null,
+      updatedAt: ctx.now(),
+      revision: existing.revision + 1,
+    };
+    await tx.run(SQL_UPDATE_TASK, taskUpdateParams(task));
+    return [tagTask(task)];
+  },
+
+  "task.restore": async (tx, payload, ctx) => {
+    // 墓碑记录也要能找回：直接按 id 查（含已删除行）
+    const rows = await tx.query<SqliteRow>("SELECT * FROM tasks WHERE id = ?", [payload.id]);
+    if (rows.length === 0) throw new Error(`task not found: ${payload.id}`);
+    const existing = taskFromRow(rows[0] as SqliteRow);
+    const task: Task = {
+      ...existing,
+      deletedAt: null,
       updatedAt: ctx.now(),
       revision: existing.revision + 1,
     };
@@ -492,6 +510,48 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
     return [{ type: "section", record: section }];
   },
 
+  "attachment.add": async (tx, payload, ctx) => {
+    const now = ctx.now();
+    const attachment: AttachmentMeta = {
+      id: uuidv7(now),
+      taskId: payload.taskId,
+      fileName: payload.fileName,
+      mimeType: payload.mimeType ?? "application/octet-stream",
+      size: payload.size ?? 0,
+      storagePath: payload.storagePath,
+      createdAt: now,
+      updatedAt: now,
+      revision: 1,
+      deletedAt: null,
+    };
+    await tx.run(
+      "INSERT INTO attachments (id, task_id, file_name, mime_type, size, storage_path, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      attachmentToParams(attachment),
+    );
+    return [{ type: "attachment", record: attachment }];
+  },
+
+  "attachment.remove": async (tx, payload, ctx) => {
+    const rows = await tx.query<SqliteRow>(
+      "SELECT * FROM attachments WHERE id = ? AND deleted_at IS NULL",
+      [payload.id],
+    );
+    if (rows.length === 0) throw new Error(`attachment not found: ${payload.id}`);
+    const now = ctx.now();
+    const removed = {
+      ...attachmentFromRow(rows[0] as SqliteRow),
+      deletedAt: now,
+      updatedAt: now,
+      revision: 0,
+    };
+    removed.revision = removed.revision + 1;
+    await tx.run(
+      "UPDATE attachments SET deleted_at = ?, updated_at = ?, revision = ? WHERE id = ?",
+      [removed.deletedAt, removed.updatedAt, removed.revision, removed.id],
+    );
+    return [{ type: "attachment", record: removed }];
+  },
+
   "settings.set": async (tx, payload) => {
     await tx.run(
       "INSERT INTO kv (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
@@ -517,10 +577,13 @@ const SCHEMAS: { [K in CommandOp]: z.ZodType<CommandMap[K]> } = {
   "task.complete": taskCompletePayloadSchema,
   "task.uncomplete": taskCompletePayloadSchema,
   "task.softDelete": idOnlyPayloadSchema,
+  "task.restore": idOnlyPayloadSchema,
   "project.upsert": projectUpsertPayloadSchema,
   "project.softDelete": idOnlyPayloadSchema,
   "context.upsert": contextUpsertPayloadSchema,
   "section.create": sectionCreatePayloadSchema,
+  "attachment.add": attachmentAddPayloadSchema,
+  "attachment.remove": idOnlyPayloadSchema,
   "settings.set": settingsSetPayloadSchema,
   "sync.applyRemote": recordsApplyPayloadSchema,
   "import.merge": recordsApplyPayloadSchema,

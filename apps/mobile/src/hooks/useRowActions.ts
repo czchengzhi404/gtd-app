@@ -2,18 +2,21 @@ import { Alert } from "react-native";
 import type { Task, Project } from "@gtd/core";
 import { runCommand } from "@gtd/core";
 import { t } from "@gtd/ui";
+import { moveTask, deleteTaskWithUndo } from "@/lib/task-ops";
 
 /**
- * 列表行操作接线：删除（确认对话框）+ 重命名（RN Alert.prompt iOS / 手动弹窗）。
- * Alert.prompt 仅 iOS 原生可用；Android/web 走简单的 prompt 回退。
+ * 列表行操作接线：重命名 / 排序 / 删除。
+ * 重命名用 window.prompt（Android 无 Alert.prompt），删除走软删除 + 撤销条。
  */
 
-export function useTaskActions(): {
+export type TaskRowAction = {
   key: string;
   label: string;
   danger?: boolean;
   onSelect: (task: Task) => void;
-}[] {
+};
+
+export function useTaskActions(): TaskRowAction[] {
   return [
     {
       key: "rename",
@@ -24,8 +27,27 @@ export function useTaskActions(): {
       key: "delete",
       label: t("task.actionDelete"),
       danger: true,
-      onSelect: (task) => confirmDeleteTask(task),
+      onSelect: (task) => void deleteTaskWithUndo(task),
     },
+  ];
+}
+
+/** 带排序能力的行操作：需要当前列表顺序 */
+export function useOrderedTaskActions(tasks: Task[]): TaskRowAction[] {
+  const base = useTaskActions();
+  return [
+    base[0] as TaskRowAction,
+    {
+      key: "up",
+      label: t("task.moveUp"),
+      onSelect: (task) => void moveTask(tasks, task.id, -1),
+    },
+    {
+      key: "down",
+      label: t("task.moveDown"),
+      onSelect: (task) => void moveTask(tasks, task.id, 1),
+    },
+    base[1] as TaskRowAction,
   ];
 }
 
@@ -38,18 +60,6 @@ async function renameTask(task: Task): Promise<void> {
   await runCommand("task.update", { id: task.id, patch: { title } }).catch(() => undefined);
 }
 
-function confirmDeleteTask(task: Task): void {
-  Alert.alert(t("detail.deleteConfirm"), t("detail.deleteConfirmBody", { title: task.title }), [
-    { text: t("common.cancel"), style: "cancel" },
-    {
-      text: t("common.delete"),
-      style: "destructive",
-      onPress: () => {
-        void runCommand("task.softDelete", { id: task.id }).catch(() => undefined);
-      },
-    },
-  ]);
-}
 
 export function useProjectActions(): {
   key: string;

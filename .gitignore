@@ -23,3 +23,6 @@ release-local/
 
 # 安全 hook 的基线快照
 .mimosa/
+
+# 目视审查截图
+apps/desktop/.shots/

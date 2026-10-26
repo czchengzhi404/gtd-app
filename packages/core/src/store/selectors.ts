@@ -95,6 +95,47 @@ export function selectTaskById(state: AppState, id: string): Task | null {
   return task && task.deletedAt === null ? task : null;
 }
 
+/* ---------------- 搜索与筛选 ---------------- */
+
+export interface ListFilter {
+  /** 关键词（标题/笔记，忽略大小写） */
+  query?: string;
+  /** 情境筛选（null/undefined = 不限） */
+  contextId?: string | null;
+  /** 只看逾期 */
+  overdueOnly?: boolean;
+}
+
+/** 对任意任务集合应用搜索 + 情境 + 逾期筛选（纯函数） */
+export function applyListFilter(tasks: Task[], filter: ListFilter, now: number): Task[] {
+  const q = (filter.query ?? "").trim().toLowerCase();
+  const dayStart = startOfDayOf(now);
+  return tasks.filter((task) => {
+    if (q.length > 0) {
+      const hay = `${task.title}\n${task.notes}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (filter.contextId !== undefined && filter.contextId !== null) {
+      if (!task.contextIds.includes(filter.contextId)) return false;
+    }
+    if (filter.overdueOnly === true) {
+      if (task.dueAt === null || task.dueAt >= dayStart || task.status === "done") return false;
+    }
+    return true;
+  });
+}
+
+/** 全局搜索（所有未删除任务，含已完成） */
+export function searchTasks(state: AppState, query: string): Task[] {
+  return applyListFilter(liveTasks(state), { query }, Date.now()).sort(byOrder);
+}
+
+function startOfDayOf(now: number): number {
+  const d = new Date(now);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 function endOfDayOf(now: number): number {
   const d = new Date(now);
   d.setHours(23, 59, 59, 999);

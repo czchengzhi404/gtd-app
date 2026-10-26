@@ -44,6 +44,11 @@ const api = {
   sync: {
     setFolderRoot: (root: string) => ipcRenderer.invoke("sync:setFolderRoot", root),
   },
+  backup: {
+    now: () => ipcRenderer.invoke("backup:now"),
+    list: () => ipcRenderer.invoke("backup:list"),
+    restore: () => ipcRenderer.invoke("backup:restore"),
+  },
   app: {
     getInfo: () => ipcRenderer.invoke("app:getInfo"),
     quit: () => ipcRenderer.invoke("app:quit"),

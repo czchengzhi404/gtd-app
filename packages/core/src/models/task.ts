@@ -8,9 +8,12 @@ export type TaskStatusInput = Exclude<TaskStatus, "done">;
 
 export interface RecurrenceRule {
   freq: "daily" | "weekly" | "monthly" | "yearly";
+  /** 间隔：2 = 每两周/每两月 */
   interval: number;
   /** 0=周日 … 6=周六，仅 freq=weekly 时有意义 */
   byWeekday?: number[];
+  /** monthly 专用：取当月最后一个工作日（周一至周五），优先于日序 */
+  lastWeekday?: boolean;
   /** 不再重复的截止时间（毫秒），null 表示无限重复 */
   until?: number | null;
 }
