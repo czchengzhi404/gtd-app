@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { FlatList, Pressable, StyleSheet, Text, View } from "react-native";
+import { FlatList, StyleSheet, View } from "react-native";
 
-import { EmptyState, ProjectCard, useAppStore, useTheme, useT } from "@gtd/ui";
+import { Button, EmptyState, ProjectCard, useAppStore, useT } from "@gtd/ui";
 import {
   appStore,
   getProjectNextAction,
@@ -11,12 +11,11 @@ import {
 } from "@gtd/core";
 import { useProjectActions } from "@/hooks/useRowActions";
 
-/** 项目：列表（顺序/并行 + 下一步行动）；新建项目复用快速添加语法 */
+/** 项目：卡片列表 + 新建。新建走快速添加语法（#名称） */
 export default function ProjectsScreen() {
   const projects = useAppStore(selectActiveProjects);
   const loaded = useAppStore((s) => s.loaded);
   const [creating, setCreating] = useState(false);
-  const colors = useTheme();
   const t = useT();
   const projectActions = useProjectActions();
 
@@ -35,6 +34,7 @@ export default function ProjectsScreen() {
     <FlatList
       data={projects}
       keyExtractor={(item) => item.id}
+      contentContainerStyle={styles.content}
       renderItem={({ item }) => {
         const state = appStore.getState();
         const openTasks = getProjectTasks(state, item.id).filter((task) => task.status !== "done");
@@ -49,47 +49,33 @@ export default function ProjectsScreen() {
           />
         );
       }}
-      ListEmptyComponent={
-        <EmptyState title={t("projects.emptyTitle")} hint={t("projects.emptyHint")} />
-      }
+      ListEmptyComponent={<EmptyState icon="folder-open-outline" title={t("projects.emptyTitle")} hint={t("projects.emptyHint")} />}
       ListFooterComponent={
-        <View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("projects.create")}
+        <View style={styles.footer}>
+          <Button
+            label={creating ? t("projects.creating") : t("projects.create")}
+            icon="add"
+            variant="secondary"
+            block
             disabled={creating}
             onPress={() => void createProject()}
-            style={({ pressed }) => [
-              styles.createButton,
-              { backgroundColor: colors.surface, opacity: creating ? 0.5 : pressed ? 0.7 : 1 },
-            ]}
-          >
-            <Text maxFontSizeMultiplier={1.2} style={[styles.createText, { color: colors.primary }]}>
-              {creating ? t("projects.creating") : t("projects.create")}
-            </Text>
-          </Pressable>
+          />
         </View>
       }
-      contentContainerStyle={styles.content}
     />
   );
 }
 
 const styles = StyleSheet.create({
   content: {
+    paddingTop: 12,
+    paddingBottom: 32,
+  },
+  footer: {
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+    paddingHorizontal: 16,
     paddingTop: 8,
-    paddingBottom: 96,
-  },
-  createButton: {
-    minHeight: 44,
-    marginHorizontal: 16,
-    marginTop: 8,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  createText: {
-    fontSize: 16,
-    fontWeight: "600",
   },
 });

@@ -1,13 +1,15 @@
 import { FlatList, StyleSheet, View, type ListRenderItemInfo } from "react-native";
 import type { Task } from "@gtd/core";
+
 import { EmptyState } from "./EmptyState";
-import { DueDateChip } from "./DueDateChip";
-import { PriorityBadge } from "./PriorityBadge";
-import { Chip } from "./Chip";
 import { TaskRow } from "./TaskRow";
+import { Chip } from "./Chip";
+import { PriorityBadge } from "./PriorityBadge";
+import { DueDateChip } from "./DueDateChip";
+import { Divider } from "../theme/primitives";
 import { t } from "../i18n";
 import { useTheme } from "../hooks/useTheme";
-import { spacing } from "../tokens";
+import { radius, space } from "../theme/tokens";
 
 export interface TaskRowAction {
   key: string;
@@ -19,17 +21,22 @@ export interface TaskRowAction {
 export interface TaskListProps {
   tasks: Task[];
   now: number;
-  /** 状态名 → 显示文本（上下文名由调用方解析后传入） */
+  /** 情境 id → 名称 */
   contextNameById?: Record<string, string>;
   onToggleTask: (task: Task) => void;
   onPressTask: (task: Task) => void;
-  /** 行尾更多操作（删除/重命名）；不传则不渲染入口 */
+  /** 行尾更多操作 */
   actions?: TaskRowAction[];
   emptyTitle?: string;
   emptyHint?: string;
+  /** 卡片化容器（列表页默认开；嵌在其他卡片内时可关） */
+  carded?: boolean;
 }
 
-/** 任务列表（FlatList 虚拟化；行内渲染到期/优先级/情境元信息） */
+/**
+ * 任务列表：单卡片 + 细分隔线（比逐行卡片更紧凑、滚动更省空间）。
+ * 空态不套卡片，保持留白。
+ */
 export function TaskList({
   tasks,
   now,
@@ -39,8 +46,14 @@ export function TaskList({
   actions,
   emptyTitle,
   emptyHint,
+  carded = true,
 }: TaskListProps) {
   const colors = useTheme();
+
+  if (tasks.length === 0) {
+    return <EmptyState title={emptyTitle ?? t("empty.list")} hint={emptyHint ?? t("empty.listHint")} />;
+  }
+
   const renderItem = ({ item }: ListRenderItemInfo<Task>) => (
     <TaskRow
       title={item.title}
@@ -54,43 +67,52 @@ export function TaskList({
         onSelect: () => action.onSelect(item),
       }))}
       meta={
-        <View style={styles.meta}>
+        <>
           <PriorityBadge priority={item.priority} />
           <DueDateChip task={item} now={now} />
-          {item.contextIds.map((id) => {
+          {item.contextIds.slice(0, 2).map((id) => {
             const name = contextNameById[id];
-            return name ? <Chip key={id} label={name} /> : null;
+            return name !== undefined ? <Chip key={id} label={name} /> : null;
           })}
-        </View>
+        </>
       }
     />
   );
+
   return (
     <FlatList
       data={tasks}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
-      ListEmptyComponent={
-        <EmptyState
-          title={emptyTitle ?? t("empty.list")}
-          hint={emptyHint ?? t("empty.listHint")}
-        />
-      }
-      contentContainerStyle={tasks.length === 0 ? styles.emptyContent : undefined}
+      ItemSeparatorComponent={() => <Divider inset={space.lg} />}
       keyboardShouldPersistTaps="handled"
-      style={{ backgroundColor: colors.bg }}
+      style={[
+        styles.list,
+        carded
+          ? {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              borderRadius: radius.md,
+              borderWidth: StyleSheet.hairlineWidth,
+            }
+          : undefined,
+      ]}
+      contentContainerStyle={carded ? styles.content : undefined}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  meta: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  emptyContent: {
+  list: {
     flex: 1,
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+    paddingHorizontal: space.lg,
+    paddingTop: space.xs,
+  },
+  content: {
+    overflow: "hidden",
+    borderRadius: radius.md,
   },
 });

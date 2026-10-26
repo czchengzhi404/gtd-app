@@ -1,4 +1,6 @@
-export * from "./tokens";
+export * from "./theme/tokens";
+export * from "./theme/AppText";
+export * from "./theme/primitives";
 export * from "./nav-config";
 export * from "./i18n";
 export * from "./hooks/useTheme";
@@ -13,7 +15,6 @@ export * from "./components/EmptyState";
 export * from "./components/Chip";
 export * from "./components/PriorityBadge";
 export * from "./components/DueDateChip";
-export * from "./components/SectionHeader";
 export * from "./components/SearchBar";
 export * from "./components/Fab";
 export * from "./components/Sidebar";

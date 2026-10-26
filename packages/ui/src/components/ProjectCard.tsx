@@ -1,75 +1,82 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import type { Project } from "@gtd/core";
+
 import { t } from "../i18n";
 import { useTheme } from "../hooks/useTheme";
-import { RowActions } from "./RowActions";
-import { minTouchTarget, radius, spacing } from "../tokens";
-
-export interface ProjectCardAction {
-  key: string;
-  label: string;
-  danger?: boolean;
-  onSelect: (project: Project) => void;
-}
+import { AppText } from "../theme/AppText";
+import { Card } from "../theme/primitives";
+import { RowActions, type ActionItem } from "./RowActions";
+import { radius, space } from "../theme/tokens";
 
 export interface ProjectCardProps {
   project: Project;
-  /** 未完成任务数 */
   openCount: number;
-  /** 顺序项目的下一步行动标题 */
   nextActionTitle?: string | null;
   onPress: () => void;
-  /** 卡片更多操作（重命名/切换类型/删除）；不传则不渲染入口 */
-  actions?: ProjectCardAction[];
+  actions?: ActionItem[] | { key: string; label: string; danger?: boolean; onSelect: (p: Project) => void }[];
 }
 
-export function ProjectCard({ project, openCount, nextActionTitle, onPress, actions }: ProjectCardProps) {
+/** 项目卡片：名称 / 类型 / 下一步行动 / 未完成数 */
+export function ProjectCard({
+  project,
+  openCount,
+  nextActionTitle,
+  onPress,
+  actions,
+}: ProjectCardProps) {
   const colors = useTheme();
+  const resolvedActions: ActionItem[] | undefined = actions?.map((action) => ({
+    key: action.key,
+    label: action.label,
+    danger: action.danger,
+    onSelect: () => (action.onSelect as (p: Project) => void)(project),
+  }));
+
   return (
-    <View style={[styles.cardWrap, { backgroundColor: colors.surface }]}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("projects.a11yOpen", { name: project.name, n: openCount })}
+    <View style={styles.wrap}>
+      <Card
         onPress={onPress}
-        style={({ pressed }) => [
-          styles.card,
-          {
-            backgroundColor: colors.surface,
-            opacity: pressed ? 0.7 : 1,
-          },
-        ]}
+        accessibilityLabel={t("projects.a11yOpen", { name: project.name, n: openCount })}
+        style={styles.card}
       >
-        <View style={styles.headerRow}>
-          <Text maxFontSizeMultiplier={1.2} style={[styles.name, { color: colors.text }]} numberOfLines={1}>
+        <View style={styles.titleRow}>
+          <AppText variant="bodyStrong" lines={1} style={styles.name}>
             {project.name}
-          </Text>
-          <Text maxFontSizeMultiplier={1.2} style={[styles.kind, { color: colors.textSecondary }]}>
-            {t(project.kind === "sequential" ? "projects.sequential" : "projects.parallel")}
-          </Text>
+          </AppText>
+          <View style={[styles.kindPill, { backgroundColor: colors.surfaceMuted }]}>
+            <AppText variant="caption" tone="tertiary" lines={1}>
+              {t(project.kind === "sequential" ? "projects.sequential" : "projects.parallel")}
+            </AppText>
+          </View>
         </View>
-        {nextActionTitle ? (
-          <Text maxFontSizeMultiplier={1.2} style={[styles.next, { color: colors.primary }]} numberOfLines={1}>
-            {t("projects.next")}
-            {nextActionTitle}
-          </Text>
-        ) : (
-          <Text maxFontSizeMultiplier={1.2} style={[styles.next, { color: colors.textSecondary }]}>{t("projects.noneNext")}</Text>
-        )}
-        <Text maxFontSizeMultiplier={1.2} style={[styles.count, { color: colors.textSecondary }]}>
-          {t("projects.openCount", { n: openCount })}
-        </Text>
-      </Pressable>
-      {actions !== undefined && actions.length > 0 ? (
-        <View style={styles.actions}>
-          <RowActions
-            accessibilityLabel={t("common.moreActions")}
-            actions={actions.map((action) => ({
-              key: action.key,
-              label: action.label,
-              danger: action.danger,
-              onSelect: () => action.onSelect(project),
-            }))}
+
+        <View style={styles.nextRow}>
+          <Ionicons
+            name={nextActionTitle !== null && nextActionTitle !== undefined ? "arrow-forward" : "alert-circle-outline"}
+            size={13}
+            color={nextActionTitle !== null && nextActionTitle !== undefined ? colors.primary : colors.warning}
           />
+          <AppText
+            variant="label"
+            color={nextActionTitle !== null && nextActionTitle !== undefined ? colors.primary : colors.warning}
+            lines={1}
+            style={styles.next}
+          >
+            {nextActionTitle !== null && nextActionTitle !== undefined
+              ? `${t("projects.next")}${nextActionTitle}`
+              : t("projects.noneNext")}
+          </AppText>
+        </View>
+
+        <AppText variant="caption" tone="tertiary" lines={1}>
+          {t("projects.openCount", { n: openCount })}
+        </AppText>
+      </Card>
+
+      {resolvedActions !== undefined && resolvedActions.length > 0 ? (
+        <View style={styles.actions}>
+          <RowActions actions={resolvedActions} />
         </View>
       ) : null}
     </View>
@@ -77,44 +84,47 @@ export function ProjectCard({ project, openCount, nextActionTitle, onPress, acti
 }
 
 const styles = StyleSheet.create({
-  cardWrap: {
+  wrap: {
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: radius.md,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    minHeight: minTouchTarget,
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
+    paddingHorizontal: space.lg,
+    marginBottom: space.sm,
+    gap: space.xxs,
   },
   card: {
     flex: 1,
-    borderRadius: radius.md,
-    padding: spacing.md,
-    gap: 4,
+    minWidth: 0,
+    gap: space.xs,
   },
-  actions: {
-    paddingRight: spacing.xs,
-    alignItems: "center",
-  },
-  headerRow: {
+  titleRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
+    gap: space.sm,
   },
   name: {
-    fontSize: 17,
-    lineHeight: 24,
-    fontWeight: "600",
-    flexShrink: 1,
+    flex: 1,
+    minWidth: 0,
   },
-  kind: {
-    fontSize: 13,
+  kindPill: {
+    height: 20,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.xs,
+    justifyContent: "center",
+  },
+  nextRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xxs,
   },
   next: {
-    fontSize: 15,
-    lineHeight: 22,
+    flex: 1,
+    minWidth: 0,
   },
-  count: {
-    fontSize: 13,
+  actions: {
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

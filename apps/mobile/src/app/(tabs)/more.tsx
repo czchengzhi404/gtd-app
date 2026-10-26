@@ -1,9 +1,12 @@
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { router } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 
 import {
-  Screen,
+  AppText,
+  Button,
+  Card,
   SectionHeader,
   useAppStore,
   useTheme,
@@ -28,7 +31,7 @@ const KIND_KEYS: { kind: SyncConfig["kind"]; labelKey: string }[] = [
   { kind: "folder", labelKey: "more.kind.folder" },
 ];
 
-/** 更多：等待中 / 将来也许 / 语言 / 同步设置 / 数据导入导出 / 回顾与关于 */
+/** 更多：等待中/将来也许预览、语言、每周回顾入口、同步设置、数据导入导出 */
 export default function MoreScreen() {
   const waiting = useAppStore(getWaitingTasks);
   const someday = useAppStore(getSomedayTasks);
@@ -58,7 +61,9 @@ export default function MoreScreen() {
   if (!loaded) return null;
 
   const lastSync =
-    kv["sync.last"] !== undefined ? new Date(Number(kv["sync.last"])).toLocaleString() : t("more.lastSyncNever");
+    kv["sync.last"] !== undefined
+      ? new Date(Number(kv["sync.last"])).toLocaleString()
+      : t("more.lastSyncNever");
   const lastReview =
     kv["review.lastAt"] !== undefined
       ? new Date(Number(kv["review.lastAt"])).toLocaleDateString()
@@ -69,7 +74,6 @@ export default function MoreScreen() {
   const onSwitchLang = (next: "zh" | "en") => {
     setLang(next);
     setLangUi(next);
-    // 持久化到 kv；桌面主进程监听该命令重建菜单/托盘
     void runCommand("settings.set", { key: "lang", value: next }).catch(() => undefined);
   };
 
@@ -128,151 +132,204 @@ export default function MoreScreen() {
   };
 
   return (
-    <Screen>
-      <SectionHeader
-        title={t("more.waiting")}
-        trailing={<Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary }}>{waiting.length}</Text>}
-      />
-      <View style={styles.list}>
-        {waiting.slice(0, 3).map((task) => (
-          <TaskLink key={task.id} id={task.id} title={task.title} waitingFor={task.waitingFor} />
-        ))}
-        {waiting.length === 0 ? (
-          <Text maxFontSizeMultiplier={1.2} style={[styles.empty, { color: colors.textSecondary }]}>{t("more.waitingEmpty")}</Text>
+    <ScrollView contentContainerStyle={styles.content} style={{ backgroundColor: colors.canvas }}>
+      <View style={styles.column}>
+        {/* 等待中 / 将来也许 预览 */}
+        <SectionHeader
+          title={t("more.waiting")}
+          trailing={
+            <AppText variant="caption" tone="tertiary" lines={1}>
+              {String(waiting.length)}
+            </AppText>
+          }
+        />
+        <Card compact style={styles.block}>
+          {waiting.length === 0 ? (
+            <AppText variant="label" tone="tertiary" lines={1}>
+              {t("more.waitingEmpty")}
+            </AppText>
+          ) : (
+            waiting.slice(0, 3).map((task) => (
+              <PreviewRow
+                key={task.id}
+                title={task.title}
+                sub={task.waitingFor !== null ? t("more.waitingFor", { who: task.waitingFor }) : undefined}
+                onPress={() => router.push(`/task/${task.id}`)}
+              />
+            ))
+          )}
+        </Card>
+
+        <SectionHeader
+          title={t("more.someday")}
+          trailing={
+            <AppText variant="caption" tone="tertiary" lines={1}>
+              {String(someday.length)}
+            </AppText>
+          }
+        />
+        <Card compact style={styles.block}>
+          {someday.length === 0 ? (
+            <AppText variant="label" tone="tertiary" lines={1}>
+              {t("more.somedayEmpty")}
+            </AppText>
+          ) : (
+            someday.slice(0, 3).map((task) => (
+              <PreviewRow
+                key={task.id}
+                title={task.title}
+                onPress={() => router.push(`/task/${task.id}`)}
+              />
+            ))
+          )}
+        </Card>
+
+        {/* 语言 */}
+        <SectionHeader title={t("more.language")} />
+        <View style={styles.inlineRow}>
+          <SegPill label={t("more.lang.zh")} selected={lang === "zh"} onPress={() => onSwitchLang("zh")} />
+          <SegPill label={t("more.lang.en")} selected={lang === "en"} onPress={() => onSwitchLang("en")} />
+        </View>
+
+        {/* 每周回顾 */}
+        <SectionHeader
+          title={t("more.reviewSection")}
+          trailing={
+            <AppText variant="caption" tone="tertiary" lines={1}>
+              {lastReview}
+            </AppText>
+          }
+        />
+        <View style={styles.block}>
+          <Button
+            label={t("more.reviewStart")}
+            icon="refresh-circle-outline"
+            variant="primary"
+            block
+            onPress={() => router.push("/review")}
+          />
+        </View>
+
+        {/* 同步 */}
+        <SectionHeader title={t("more.syncSection")} />
+        <Card style={styles.block}>
+          <View style={styles.inlineRow}>
+            {KIND_KEYS.map(({ kind, labelKey }) => (
+              <SegPill
+                key={kind}
+                label={t(labelKey)}
+                selected={config.kind === kind}
+                disabled={kind === "folder" && !isDesktop()}
+                onPress={() => update({ kind })}
+              />
+            ))}
+          </View>
+
+          {config.kind === "folder" ? (
+            <Button
+              label={t("more.pickFolder")}
+              icon="folder-open-outline"
+              disabled={busy || !isDesktop()}
+              block
+              onPress={() => void onPickFolder()}
+            />
+          ) : (
+            <>
+              <Field
+                label={t("more.server")}
+                value={config.endpoint}
+                onChangeText={(text) => update({ endpoint: text })}
+                placeholder="https://dav.example.com/gtd/"
+              />
+              <Field
+                label={t("more.username")}
+                value={config.username ?? ""}
+                onChangeText={(text) => update({ username: text })}
+              />
+              <Field
+                label={t("more.password")}
+                value={config.password ?? ""}
+                onChangeText={(text) => update({ password: text })}
+                secureTextEntry
+              />
+            </>
+          )}
+
+          <View style={styles.inlineRow}>
+            <SegPill
+              label={config.enabled ? t("more.enabled") : t("more.disabled")}
+              selected={config.enabled}
+              onPress={() => update({ enabled: !config.enabled })}
+            />
+            <Button label={t("more.saveConfig")} disabled={busy} onPress={() => void onSave()} />
+            <Button label={t("more.syncNow")} variant="primary" disabled={busy} onPress={() => void onSyncNow()} />
+          </View>
+
+          <AppText variant="caption" tone="tertiary" lines={1}>
+            {t("more.lastSync")}
+            {lastSync}
+          </AppText>
+        </Card>
+
+        {/* 数据 */}
+        <SectionHeader title={t("more.dataSection")} />
+        <View style={styles.block}>
+          <Button
+            label={t("more.export")}
+            icon="download-outline"
+            disabled={busy}
+            block
+            onPress={() => void onExport()}
+          />
+          <View style={styles.gap} />
+          <Button
+            label={t("more.import")}
+            icon="cloud-upload-outline"
+            disabled={busy}
+            block
+            onPress={() => void onImport()}
+          />
+        </View>
+
+        {/* 关于 */}
+        <SectionHeader title={t("more.about")} />
+        <View style={styles.block}>
+          <Button label={t("more.about")} icon="information-circle-outline" block onPress={() => router.push("/about")} />
+        </View>
+
+        {status.length > 0 ? (
+          <AppText variant="label" tone="secondary" lines={3} style={styles.status}>
+            {status}
+          </AppText>
         ) : null}
       </View>
-
-      <SectionHeader
-        title={t("more.someday")}
-        trailing={<Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary }}>{someday.length}</Text>}
-      />
-      <View style={styles.list}>
-        {someday.slice(0, 3).map((task) => (
-          <TaskLink key={task.id} id={task.id} title={task.title} waitingFor={null} />
-        ))}
-        {someday.length === 0 ? (
-          <Text maxFontSizeMultiplier={1.2} style={[styles.empty, { color: colors.textSecondary }]}>{t("more.somedayEmpty")}</Text>
-        ) : null}
-      </View>
-
-      <SectionHeader title={t("more.language")} />
-      <View style={styles.list}>
-        <View style={styles.rowWrap}>
-          <ChipButton
-            label={t("more.lang.zh")}
-            selected={lang === "zh"}
-            onPress={() => onSwitchLang("zh")}
-          />
-          <ChipButton
-            label={t("more.lang.en")}
-            selected={lang === "en"}
-            onPress={() => onSwitchLang("en")}
-          />
-        </View>
-      </View>
-
-      <SectionHeader
-        title={t("more.reviewSection")}
-        trailing={<Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary }}>{lastReview}</Text>}
-      />
-      <View style={styles.list}>
-        <ActionButton label={t("more.reviewStart")} onPress={() => router.push("/review")} primary />
-      </View>
-
-      <SectionHeader title={t("more.syncSection")} />
-      <View style={styles.list}>
-        <View style={styles.rowWrap}>
-          {KIND_KEYS.map(({ kind, labelKey }) => (
-            <ChipButton
-              key={kind}
-              label={t(labelKey)}
-              selected={config.kind === kind}
-              disabled={kind === "folder" && !isDesktop()}
-              onPress={() => update({ kind })}
-            />
-          ))}
-        </View>
-        {config.kind === "folder" ? (
-          <ActionButton
-            label={t("more.pickFolder")}
-            disabled={busy || !isDesktop()}
-            onPress={() => void onPickFolder()}
-          />
-        ) : (
-          <>
-            <Field
-              label={t("more.server")}
-              value={config.endpoint}
-              onChangeText={(text) => update({ endpoint: text })}
-            />
-            <Field label={t("more.username")} value={config.username ?? ""} onChangeText={(text) => update({ username: text })} />
-            <Field
-              label={t("more.password")}
-              value={config.password ?? ""}
-              onChangeText={(text) => update({ password: text })}
-              secureTextEntry
-            />
-          </>
-        )}
-        <View style={styles.rowWrap}>
-          <ChipButton
-            label={config.enabled ? t("more.enabled") : t("more.disabled")}
-            selected={config.enabled}
-            onPress={() => update({ enabled: !config.enabled })}
-          />
-          <ActionButton label={t("more.saveConfig")} disabled={busy} onPress={() => void onSave()} />
-          <ActionButton label={t("more.syncNow")} disabled={busy} onPress={() => void onSyncNow()} primary />
-        </View>
-        <Text maxFontSizeMultiplier={1.2} style={[styles.empty, { color: colors.textSecondary }]}>
-          {t("more.lastSync")}
-          {lastSync}
-        </Text>
-      </View>
-
-      <SectionHeader title={t("more.dataSection")} />
-      <View style={styles.list}>
-        <ActionButton label={t("more.export")} disabled={busy} onPress={() => void onExport()} />
-        <ActionButton label={t("more.import")} disabled={busy} onPress={() => void onImport()} />
-      </View>
-
-      <SectionHeader title={t("more.about")} />
-      <View style={styles.list}>
-        <ActionButton label={t("more.about")} onPress={() => router.push("/about")} />
-      </View>
-
-      {status.length > 0 ? (
-        <Text maxFontSizeMultiplier={1.2} style={[styles.status, { color: colors.textSecondary }]}>{status}</Text>
-      ) : null}
-    </Screen>
+    </ScrollView>
   );
 }
 
-function TaskLink({ id, title, waitingFor }: { id: string; title: string; waitingFor: string | null }) {
+function PreviewRow({ title, sub, onPress }: { title: string; sub?: string; onPress: () => void }) {
   const colors = useTheme();
-  const t = useT();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t("task.a11yOpen", { title })}
-      onPress={() => router.push(`/task/${id}`)}
-      style={({ pressed }) => [
-        styles.row,
-        { backgroundColor: colors.surface, opacity: pressed ? 0.7 : 1 },
-      ]}
+      accessibilityLabel={title}
+      onPress={onPress}
+      style={({ pressed }) => [styles.previewRow, { opacity: pressed ? 0.6 : 1 }]}
     >
-      <Text maxFontSizeMultiplier={1.2} style={[styles.rowText, { color: colors.text }]} numberOfLines={1}>
+      <Ionicons name="ellipse" size={6} color={colors.textTertiary} />
+      <AppText variant="label" lines={1} style={styles.previewTitle}>
         {title}
-      </Text>
-      {waitingFor !== null ? (
-        <Text maxFontSizeMultiplier={1.2} style={[styles.sub, { color: colors.textSecondary }]}>
-          {t("more.waitingFor", { who: waitingFor })}
-        </Text>
+      </AppText>
+      {sub !== undefined ? (
+        <AppText variant="caption" tone="tertiary" lines={1}>
+          {sub}
+        </AppText>
       ) : null}
     </Pressable>
   );
 }
 
-function ChipButton({
+function SegPill({
   label,
   selected,
   disabled,
@@ -292,48 +349,21 @@ function ChipButton({
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
-        styles.chip,
+        styles.pill,
         {
-          backgroundColor: selected ? colors.primary : colors.surface,
-          borderColor: selected ? colors.primary : colors.border,
-          opacity: disabled === true ? 0.4 : pressed ? 0.7 : 1,
+          backgroundColor: selected ? colors.primary : colors.surfaceMuted,
+          opacity: disabled === true ? 0.4 : pressed ? 0.75 : 1,
         },
       ]}
     >
-      <Text maxFontSizeMultiplier={1.2} style={{ color: selected ? colors.onPrimary : colors.text, fontSize: 14 }}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function ActionButton({
-  label,
-  disabled,
-  onPress,
-  primary,
-}: {
-  label: string;
-  disabled?: boolean;
-  onPress: () => void;
-  primary?: boolean;
-}) {
-  const colors = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.action,
-        {
-          backgroundColor: primary === true ? colors.primary : colors.surface,
-          opacity: disabled === true ? 0.4 : pressed ? 0.7 : 1,
-        },
-      ]}
-    >
-      <Text maxFontSizeMultiplier={1.2} style={{ color: primary === true ? colors.onPrimary : colors.text, fontSize: 15, fontWeight: "600" }}>
+      <AppText
+        variant="label"
+        weight="600"
+        color={selected ? colors.onPrimary : colors.textSecondary}
+        lines={1}
+      >
         {label}
-      </Text>
+      </AppText>
     </Pressable>
   );
 }
@@ -342,27 +372,35 @@ function Field({
   label,
   value,
   onChangeText,
+  placeholder,
   secureTextEntry,
 }: {
   label: string;
   value: string;
   onChangeText: (text: string) => void;
+  placeholder?: string;
   secureTextEntry?: boolean;
 }) {
   const colors = useTheme();
   return (
     <View style={styles.field}>
-      <Text maxFontSizeMultiplier={1.2} style={[styles.fieldLabel, { color: colors.textSecondary }]}>{label}</Text>
-      <TextInput maxFontSizeMultiplier={1.2}
+      <AppText variant="caption" tone="tertiary" lines={1}>
+        {label}
+      </AppText>
+      <TextInput
         accessibilityLabel={label}
         value={value}
         onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.textTertiary}
         secureTextEntry={secureTextEntry}
         autoCapitalize="none"
         autoCorrect={false}
+        allowFontScaling={false}
+        maxFontSizeMultiplier={1}
         style={[
           styles.input,
-          { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text },
+          { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text },
         ]}
       />
     </View>
@@ -370,67 +408,55 @@ function Field({
 }
 
 const styles = StyleSheet.create({
-  list: {
-    paddingHorizontal: 16,
-    gap: 8,
+  content: {
+    paddingBottom: 40,
   },
-  row: {
-    minHeight: 44,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    justifyContent: "center",
-    gap: 2,
+  column: {
+    width: "100%",
+    maxWidth: 760,
+    alignSelf: "center",
   },
-  rowWrap: {
+  block: {
+    marginHorizontal: 16,
+  },
+  gap: {
+    height: 8,
+  },
+  inlineRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
     alignItems: "center",
+    gap: 8,
+    marginHorizontal: 16,
   },
-  rowText: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  sub: {
-    fontSize: 13,
-  },
-  empty: {
-    fontSize: 15,
-    paddingVertical: 4,
-  },
-  chip: {
-    minHeight: 40,
+  pill: {
+    height: 34,
     paddingHorizontal: 14,
     borderRadius: 999,
-    borderWidth: 1,
-    alignItems: "center",
     justifyContent: "center",
   },
-  action: {
-    minHeight: 44,
-    paddingHorizontal: 16,
-    borderRadius: 12,
+  previewRow: {
+    minHeight: 36,
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 8,
+  },
+  previewTitle: {
+    flex: 1,
+    minWidth: 0,
   },
   field: {
     gap: 4,
   },
-  fieldLabel: {
-    fontSize: 13,
-  },
   input: {
-    minHeight: 44,
+    height: 44,
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: 10,
     paddingHorizontal: 12,
-    fontSize: 16,
+    fontSize: 15,
   },
   status: {
-    fontSize: 14,
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 32,
+    paddingTop: 12,
   },
 });

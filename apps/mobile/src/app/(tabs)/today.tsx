@@ -7,17 +7,17 @@ import {
   SectionHeader,
   TaskList,
   TimelineView,
+  ViewToggle,
   useAppStore,
   useBreakpoint,
   useT,
-  ViewToggle,
 } from "@gtd/ui";
 import { selectContexts, getTodayTasks, runCommand } from "@gtd/core";
 import { useTaskActions } from "@/hooks/useRowActions";
 
 type TodayView = "list" | "calendar" | "timeline";
 
-/** 今天：今日日程（含逾期）——列表 / 日历切换；≥1440 开放只读 Timeline */
+/** 今天：今日到期 + 逾期。列表 / 日历 / Timeline（≥1440）三视图 */
 export default function TodayScreen() {
   const tasks = useAppStore((s) => getTodayTasks(s, Date.now()));
   const allTasks = useAppStore((s) => Object.values(s.tasks));
@@ -48,27 +48,29 @@ export default function TodayScreen() {
           { key: "timeline", label: t("view.timeline"), disabled: !isWideUp },
         ]}
       />
+
       {view === "list" ? (
-        <>
-          <SectionHeader title={t("today.section")} />
-          <TaskList
-            tasks={tasks}
-            now={Date.now()}
-            contextNameById={contextNameById}
-            actions={taskActions}
-            onToggleTask={(task) =>
-              void runCommand(
-                task.status === "done" ? "task.uncomplete" : "task.complete",
-                { id: task.id },
-              ).catch(() => undefined)
-            }
-            onPressTask={(task) => router.push(`/task/${task.id}`)}
-            emptyTitle={t("today.emptyTitle")}
-            emptyHint={t("today.emptyHint")}
-          />
-        </>
+        <TaskList
+          tasks={tasks}
+          now={Date.now()}
+          contextNameById={contextNameById}
+          actions={taskActions}
+          onToggleTask={(task) =>
+            void runCommand(
+              task.status === "done" ? "task.uncomplete" : "task.complete",
+              { id: task.id },
+            ).catch(() => undefined)
+          }
+          onPressTask={(task) => router.push(`/task/${task.id}`)}
+          emptyTitle={t("today.emptyTitle")}
+          emptyHint={t("today.emptyHint")}
+        />
       ) : view === "calendar" ? (
-        <CalendarView tasks={allTasks} now={Date.now()} onPressTask={(task) => router.push(`/task/${task.id}`)} />
+        <CalendarView
+          tasks={allTasks}
+          now={Date.now()}
+          onPressTask={(task) => router.push(`/task/${task.id}`)}
+        />
       ) : (
         <TimelineView tasks={allTasks} now={Date.now()} />
       )}

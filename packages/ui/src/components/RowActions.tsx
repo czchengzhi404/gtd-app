@@ -1,132 +1,140 @@
-import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
-import { t } from "../i18n";
+import { useState } from "react";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
+
 import { useTheme } from "../hooks/useTheme";
-import { useFocusStyle } from "../hooks/useFocusStyle";
-import { minTouchTarget, radius, spacing } from "../tokens";
+import { AppText } from "../theme/AppText";
+import { IconButton } from "../theme/primitives";
+import { hit, radius, space } from "../theme/tokens";
+import { t } from "../i18n";
+
+type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
 export interface ActionItem {
   key: string;
   label: string;
+  icon?: IoniconName;
   danger?: boolean;
   onSelect: () => void;
 }
 
 export interface RowActionsProps {
   actions: ActionItem[];
-  accessibilityLabel: string;
+  accessibilityLabel?: string;
 }
 
 /**
- * 行尾"更多操作"按钮（⋯）：点击弹出内联操作面板（删除/编辑等）。
- * 面板出现在按钮下方；点击面板外任意处关闭。触控目标 ≥44px。
+ * 行尾操作入口（⋯）→ 底部动作面板。
+ * 用 Modal 承载而非绝对定位浮层：不会与相邻行重叠、不依赖 zIndex、
+ * 自带遮罩点击关闭，且天然适配安全区。
  */
 export function RowActions({ actions, accessibilityLabel }: RowActionsProps) {
   const colors = useTheme();
-  const focus = useFocusStyle(radius.sm);
   const [open, setOpen] = useState(false);
-  const wrapRef = useRef<View>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    // web: 点击面板外关闭；native 由遮罩层承担
-    if (typeof document !== "undefined" && document.addEventListener) {
-      document.addEventListener("mousedown", close);
-      return () => document.removeEventListener("mousedown", close);
-    }
-    return undefined;
-  }, [open]);
+  const run = (action: ActionItem) => {
+    setOpen(false);
+    // 等面板关闭后再执行，避免与卸载竞争
+    setTimeout(action.onSelect, 60);
+  };
 
   return (
-    <View ref={wrapRef} style={styles.wrap} collapsable={false}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel}
-        accessibilityState={{ expanded: open }}
-        onPress={() => setOpen((v) => !v)}
-        hitSlop={4}
-        style={({ pressed }) => [
-          styles.trigger,
-          focus,
-          { backgroundColor: open ? colors.surface : "transparent", opacity: pressed ? 0.6 : 1 },
-        ]}
+    <>
+      <IconButton
+        icon="ellipsis-horizontal"
+        onPress={() => setOpen(true)}
+        accessibilityLabel={accessibilityLabel ?? t("common.moreActions")}
+      />
+      <Modal
+        visible={open}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setOpen(false)}
+        statusBarTranslucent
       >
-        <Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary, fontSize: 20, lineHeight: 24 }}>⋯</Text>
-      </Pressable>
-      {open ? (
-        <>
-          <Pressable
-            accessibilityLabel={t("common.closeMenu")}
-            style={StyleSheet.absoluteFill}
-            onPress={() => setOpen(false)}
-          />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("common.closeMenu")}
+          style={[styles.backdrop, { backgroundColor: colors.overlay }]}
+          onPress={() => setOpen(false)}
+        />
+        <View style={styles.sheetPos} pointerEvents="box-none">
           <View
             accessibilityRole="menu"
-            style={[styles.panel, { backgroundColor: colors.bg, borderColor: colors.border }]}
+            style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}
           >
+            <View style={styles.grabberWrap}>
+              <View style={[styles.grabber, { backgroundColor: colors.borderStrong }]} />
+            </View>
             {actions.map((action) => (
               <Pressable
                 key={action.key}
                 accessibilityRole="menuitem"
                 accessibilityLabel={action.label}
-                onPress={() => {
-                  setOpen(false);
-                  action.onSelect();
-                }}
+                onPress={() => run(action)}
                 style={({ pressed }) => [
                   styles.item,
-                  focus,
-                  { backgroundColor: pressed ? colors.surface : "transparent" },
+                  { backgroundColor: pressed ? colors.surfaceMuted : "transparent" },
                 ]}
               >
-                <Text maxFontSizeMultiplier={1.2}
-                  style={{
-                    color: action.danger === true ? colors.danger : colors.text,
-                    fontSize: 15,
-                  }}
+                {action.icon !== undefined ? (
+                  <Ionicons
+                    name={action.icon}
+                    size={19}
+                    color={action.danger === true ? colors.danger : colors.textSecondary}
+                  />
+                ) : null}
+                <AppText
+                  variant="body"
+                  color={action.danger === true ? colors.danger : colors.text}
+                  lines={1}
                 >
                   {action.label}
-                </Text>
+                </AppText>
               </Pressable>
             ))}
           </View>
-        </>
-      ) : null}
-    </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    position: "relative",
-  },
-  trigger: {
-    width: minTouchTarget,
-    height: minTouchTarget,
-    borderRadius: radius.sm,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  panel: {
+  backdrop: {
     position: "absolute",
-    top: minTouchTarget,
+    top: 0,
     right: 0,
-    minWidth: 160,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    paddingVertical: spacing.xs,
-    // 轻微抬升
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-    zIndex: 100,
+    bottom: 0,
+    left: 0,
+  },
+  sheetPos: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  sheet: {
+    borderTopLeftRadius: radius.lg,
+    borderTopRightRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.sm,
+    paddingBottom: space.xl,
+  },
+  grabberWrap: {
+    alignItems: "center",
+    paddingVertical: space.sm,
+  },
+  grabber: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
   },
   item: {
-    minHeight: minTouchTarget,
-    paddingHorizontal: spacing.md,
-    justifyContent: "center",
+    minHeight: hit.nav,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    paddingHorizontal: space.md,
+    borderRadius: radius.sm,
   },
 });

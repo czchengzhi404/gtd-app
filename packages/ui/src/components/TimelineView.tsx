@@ -1,9 +1,12 @@
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import type { Task } from "@gtd/core";
 import { startOfDay } from "@gtd/core";
+
+import { useT } from "../i18n";
 import { useTheme } from "../hooks/useTheme";
-import { radius, spacing } from "../tokens";
+import { AppText } from "../theme/AppText";
 import { PriorityBadge } from "./PriorityBadge";
+import { radius, space } from "../theme/tokens";
 
 export interface TimelineViewProps {
   tasks: Task[];
@@ -15,127 +18,140 @@ export interface TimelineViewProps {
 interface DayGroup {
   key: string;
   label: string;
-  tasks: { task: Task; timeLabel: string | null }[];
+  overdue: boolean;
+  items: { task: Task; timeLabel: string }[];
 }
 
-/**
- * Timeline（≥1440 只读）：按日分组的横向时间轴纵列。
- * 时间精确到分（默认 18:00 视为仅日期，不显示时刻）。
- */
+/** Timeline（≥1440 只读）：按日分组的时间轴，日期列固定宽度，内容单行省略 */
 export function TimelineView({ tasks, now, days = 14 }: TimelineViewProps) {
   const colors = useTheme();
+  const tr = useT();
   const groups: DayGroup[] = [];
 
   const overdue = tasks
-    .filter((t) => t.dueAt !== null && t.status !== "done" && t.dueAt < startOfDay(now))
+    .filter((task) => task.dueAt !== null && task.status !== "done" && task.dueAt < startOfDay(now))
     .sort((a, b) => (a.dueAt ?? 0) - (b.dueAt ?? 0));
   if (overdue.length > 0) {
     groups.push({
       key: "overdue",
-      label: "已逾期",
-      tasks: overdue.map((task) => ({ task, timeLabel: null })),
+      label: tr("timeline.overdue"),
+      overdue: true,
+      items: overdue.map((task) => ({ task, timeLabel: timeOf(task) })),
     });
   }
 
   for (let offset = 0; offset < days; offset++) {
-    const dayStart = startOfDay(now) + offset * 24 * 60 * 60 * 1000;
-    const dayEnd = dayStart + 24 * 60 * 60 * 1000;
+    const dayStart = startOfDay(now) + offset * 86400000;
+    const dayEnd = dayStart + 86400000;
     const dayTasks = tasks
-      .filter((t) => t.dueAt !== null && t.status !== "done" && t.dueAt >= dayStart && t.dueAt < dayEnd)
+      .filter((task) => task.dueAt !== null && task.status !== "done" && task.dueAt >= dayStart && task.dueAt < dayEnd)
       .sort((a, b) => (a.dueAt ?? 0) - (b.dueAt ?? 0));
     if (dayTasks.length === 0) continue;
     const date = new Date(dayStart);
-    const label = offset === 0 ? "今天" : offset === 1 ? "明天" : `${date.getMonth() + 1}/${date.getDate()}`;
+    const label =
+      offset === 0
+        ? tr("due.today")
+        : offset === 1
+          ? tr("due.tomorrow")
+          : `${date.getMonth() + 1}/${date.getDate()}`;
     groups.push({
       key: `day-${dayStart}`,
       label,
-      tasks: dayTasks.map((task) => {
-        const d = new Date(task.dueAt ?? 0);
-        const isDefault = d.getHours() === 18 && d.getMinutes() === 0;
-        return {
-          task,
-          timeLabel: isDefault ? null : `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`,
-        };
-      }),
+      overdue: false,
+      items: dayTasks.map((task) => ({ task, timeLabel: timeOf(task) })),
     });
+  }
+
+  if (groups.length === 0) {
+    return (
+      <View style={styles.emptyWrap}>
+        <AppText variant="label" tone="tertiary" align="center" lines={2}>
+          {tr("timeline.empty", { days })}
+        </AppText>
+      </View>
+    );
   }
 
   return (
     <ScrollView contentContainerStyle={styles.wrap}>
-      {groups.length === 0 ? (
-        <Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary, padding: spacing.lg }}>未来 {days} 天没有到期任务</Text>
-      ) : null}
       {groups.map((group) => (
         <View key={group.key} style={styles.group}>
-          <Text maxFontSizeMultiplier={1.2}
-            accessibilityRole="header"
-            style={[styles.groupLabel, { color: group.key === "overdue" ? colors.danger : colors.text }]}
-          >
-            {group.label}
-          </Text>
-          {group.tasks.map(({ task, timeLabel }) => (
-            <View key={task.id} style={[styles.item, { borderLeftColor: colors.border }]}>
-              <View style={[styles.dot, { backgroundColor: colors.primary }]} />
-              <View style={styles.itemBody}>
-                <Text maxFontSizeMultiplier={1.2} style={[styles.itemTitle, { color: colors.text }]} numberOfLines={1}>
-                  {task.title}
-                </Text>
-                <View style={styles.itemMeta}>
-                  <PriorityBadge priority={task.priority} />
-                  {timeLabel !== null ? (
-                    <Text maxFontSizeMultiplier={1.2} style={{ color: colors.textSecondary, fontSize: 13 }}>{timeLabel}</Text>
-                  ) : null}
+          <View style={styles.dateCol}>
+            <AppText
+              variant="label"
+              weight="700"
+              color={group.overdue ? colors.danger : colors.textSecondary}
+              lines={1}
+            >
+              {group.label}
+            </AppText>
+          </View>
+          <View style={styles.items}>
+            {group.items.map(({ task, timeLabel }) => (
+              <View key={task.id} style={[styles.item, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                <View style={styles.timeCol}>
+                  <AppText variant="caption" tone="tertiary" lines={1}>
+                    {timeLabel}
+                  </AppText>
                 </View>
+                <AppText variant="body" lines={1} style={styles.title}>
+                  {task.title}
+                </AppText>
+                <PriorityBadge priority={task.priority} />
               </View>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
       ))}
     </ScrollView>
   );
 }
 
+function timeOf(task: Task): string {
+  if (task.dueAt === null) return "";
+  const d = new Date(task.dueAt);
+  if (d.getHours() === 18 && d.getMinutes() === 0) return "";
+  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
 const styles = StyleSheet.create({
   wrap: {
-    padding: spacing.lg,
-    gap: spacing.lg,
+    padding: space.lg,
+    gap: space.lg,
   },
   group: {
-    gap: spacing.sm,
+    flexDirection: "row",
+    gap: space.md,
   },
-  groupLabel: {
-    fontSize: 16,
-    fontWeight: "700",
+  dateCol: {
+    width: 64,
+    paddingTop: space.sm,
+  },
+  items: {
+    flex: 1,
+    minWidth: 0,
+    gap: space.xs,
   },
   item: {
+    minHeight: 40,
     flexDirection: "row",
-    borderLeftWidth: 2,
-    paddingLeft: spacing.md,
-    paddingVertical: spacing.xs,
-    gap: spacing.sm,
-    alignItems: "flex-start",
+    alignItems: "center",
+    gap: space.sm,
+    paddingHorizontal: space.md,
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginTop: 8,
+  timeCol: {
+    width: 40,
   },
-  itemBody: {
+  title: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    flexWrap: "wrap",
+    minWidth: 0,
   },
-  itemTitle: {
-    fontSize: 16,
-    lineHeight: 24,
-    flexShrink: 1,
-  },
-  itemMeta: {
-    flexDirection: "row",
-    gap: spacing.sm,
+  emptyWrap: {
+    flex: 1,
     alignItems: "center",
+    justifyContent: "center",
+    padding: space.xxl,
   },
 });

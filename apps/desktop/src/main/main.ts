@@ -43,6 +43,15 @@ const APP_SCHEME = "app";
 const APP_HOST = "gtd";
 const isDev = process.argv.includes("--dev");
 const isSmoke = process.argv.includes("--smoke");
+/** 截图模式：--shot=<宽>x<高>,<输出路径>,<路由>  例：--shot=390x844,out.png,today */
+const shotArg = process.argv.find((a) => a.startsWith("--shot="));
+const shotCfg = (() => {
+  if (shotArg === undefined) return null;
+  const [size, out, route] = shotArg.slice("--shot=".length).split(",");
+  const [w, h] = (size ?? "").split("x").map(Number);
+  if (!Number.isFinite(w) || !Number.isFinite(h) || out === undefined) return null;
+  return { width: w, height: h, out, route: route ?? "" };
+})();
 const DEV_URL = process.env.GTD_DEV_URL ?? "http://localhost:8081";
 const rendererRoot = path.resolve(__dirname, "..", "renderer");
 
@@ -451,19 +460,23 @@ function registerDefaultShortcut(): void {
 
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 375,
-    minHeight: 500,
+    width: shotCfg?.width ?? 1280,
+    height: shotCfg?.height ?? 800,
+    minWidth: shotCfg !== null ? undefined : 375,
+    minHeight: shotCfg !== null ? undefined : 500,
     title: "GTD 清单",
     // 冒烟/诊断在后台跑：不显示、不抢焦点（executeJavaScript 不依赖前台）
-    show: !isSmoke && !process.argv.includes("--diag"),
-    focusable: !isSmoke,
+    // 截图模式：窗口移到屏幕外并禁止聚焦，capturePage 仍可用
+    show: shotCfg !== null ? false : !isSmoke && !process.argv.includes("--diag"),
+    focusable: shotCfg !== null ? false : !isSmoke,
+    skipTaskbar: shotCfg !== null,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // 截图模式用离屏渲染：窗口不可见也能抓帧，且绝不会出现在前台
+      ...(shotCfg !== null ? { offscreen: true } : {}),
     },
   });
   win.webContents.on("console-message", (_e, level, message, line, sourceId) => {
@@ -659,6 +672,24 @@ async function runNativeAndSyncE2e(): Promise<void> {
   }
 }
 
+/** 截图：加载指定路由 → 等首屏渲染 → 抓图。窗口在屏幕外，不打断使用者。 */
+async function runShot(win: BrowserWindow): Promise<void> {
+  const cfg = shotCfg;
+  if (cfg === null) return;
+  try {
+    await win.loadURL(`${APP_SCHEME}://${APP_HOST}/${cfg.route}`);
+    // 数据加载 + 字体排版稳定
+    await new Promise((r) => setTimeout(r, 4500));
+    const image = await win.webContents.capturePage();
+    fs.writeFileSync(cfg.out, image.toPNG());
+    console.log(`SHOT_SAVED ${cfg.out} (${cfg.width}x${cfg.height})`);
+    app.exit(0);
+  } catch (err) {
+    console.error("SHOT_FAILED", err instanceof Error ? err.message : String(err));
+    app.exit(1);
+  }
+}
+
 async function runSmoke(win: BrowserWindow): Promise<void> {
   const fail = (msg: string) => {
     console.error(`SMOKE FAIL: ${msg}`);
@@ -747,7 +778,9 @@ void app.whenReady().then(async () => {
   buildAppMenu(menuLang);
   registerDefaultShortcut();
   void setupAutoUpdater();
-  if (isSmoke) {
+  if (shotCfg !== null) {
+    void runShot(mainWindow);
+  } else if (isSmoke) {
     void runSmoke(mainWindow);
   }
 });

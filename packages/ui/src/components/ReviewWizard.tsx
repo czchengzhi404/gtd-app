@@ -1,17 +1,19 @@
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 import type { AppState } from "@gtd/core";
 import { buildReviewSummary, runCommand } from "@gtd/core";
-import { t, useT } from "../i18n";
+
+import { useT } from "../i18n";
 import { useTheme } from "../hooks/useTheme";
-import { useFocusStyle } from "../hooks/useFocusStyle";
-import { radius, spacing } from "../tokens";
+import { AppText } from "../theme/AppText";
+import { Button, Card } from "../theme/primitives";
+import { radius, space } from "../theme/tokens";
 
 export interface ReviewWizardProps {
   state: AppState;
   now: number;
-  /** 跳转到收集箱（处理遗留任务） */
   onGoInbox: () => void;
   onOpenTask: (taskId: string) => void;
   onFinish: () => void;
@@ -26,13 +28,14 @@ const STEP_KEYS = [
   "review.steps.done",
 ] as const;
 
-/** 每周回顾向导（GTD 五步回顾 + 完成落 kv review.lastAt），文案随语言切换 */
+/** 每周回顾向导：6 步，每步一屏，进度条 + 底部导航按钮 */
 export function ReviewWizard({ state, now, onGoInbox, onOpenTask, onFinish }: ReviewWizardProps) {
   const colors = useTheme();
-  const t = useT();
-  const focus = useFocusStyle(radius.sm);
+  const tr = useT();
   const [step, setStep] = useState(0);
   const summary = useMemo(() => buildReviewSummary(state, now), [state, now]);
+
+  const last = step >= STEP_KEYS.length - 1;
 
   const finish = async () => {
     await runCommand("settings.set", { key: "review.lastAt", value: now }).catch(() => undefined);
@@ -40,215 +43,231 @@ export function ReviewWizard({ state, now, onGoInbox, onOpenTask, onFinish }: Re
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View accessibilityRole="tablist" style={styles.stepper}>
-        {STEP_KEYS.map((labelKey, index) => (
+    <View style={styles.root}>
+      <View style={styles.progress}>
+        {STEP_KEYS.map((key, index) => (
           <View
-            key={labelKey}
+            key={key}
             style={[
-              styles.stepDot,
+              styles.progressSegment,
               {
                 backgroundColor: index <= step ? colors.primary : colors.border,
-                opacity: index <= step ? 1 : 0.5,
               },
             ]}
           />
         ))}
       </View>
-      <Text maxFontSizeMultiplier={1.2} accessibilityRole="header" style={[styles.title, { color: colors.text }]}>
-        {step + 1}. {t(STEP_KEYS[step] ?? "review.steps.inbox")}
-      </Text>
 
-      {step === 0 ? (
-        <View style={styles.body}>
-          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>
-            {t("review.inboxBody", { n: summary.inboxCount })}
-          </Text>
-          {summary.inboxSample.map((task) => (
-            <Text maxFontSizeMultiplier={1.2} key={task.id} style={[styles.sample, { color: colors.textSecondary }]}>
-              · {task.title}
-            </Text>
-          ))}
-          {summary.inboxCount > 0 ? (
-            <StepButton label={t("review.goInbox")} onPress={onGoInbox} colors={colors} focus={focus} />
-          ) : (
-            <Text maxFontSizeMultiplier={1.2} style={[styles.okText, { color: colors.success }]}>{t("review.inboxClean")}</Text>
-          )}
-        </View>
-      ) : null}
+      <ScrollView contentContainerStyle={styles.content}>
+        <AppText variant="caption" tone="tertiary" lines={1}>
+          {`${step + 1} / ${STEP_KEYS.length}`}
+        </AppText>
+        <AppText variant="display" lines={2} style={styles.title}>
+          {tr(STEP_KEYS[step] ?? "review.steps.inbox")}
+        </AppText>
 
-      {step === 1 ? (
-        <View style={styles.body}>
-          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>
-            {summary.projectsWithoutNext.length === 0
-              ? t("review.projectsOk")
-              : t("review.projectsBody")}
-          </Text>
-          {summary.projectsWithoutNext.map((p) => (
-            <Text maxFontSizeMultiplier={1.2} key={p.projectId} style={[styles.sample, { color: colors.danger }]}>
-              · {p.name}（{t(p.kind === "sequential" ? "projects.sequential" : "projects.parallel")}）
-            </Text>
-          ))}
-        </View>
-      ) : null}
-
-      {step === 2 ? (
-        <View style={styles.body}>
-          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>
-            {t("review.calendarBody", { completed: summary.completedLastWeek, upcoming: summary.upcomingCount })}
-          </Text>
-        </View>
-      ) : null}
-
-      {step === 3 ? (
-        <View style={styles.body}>
-          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>
-            {t("review.waitingBody", { n: summary.waitingCount })}
-          </Text>
-          {summary.waitingSample.map((task) => (
-            <Pressable
-              key={task.id}
-              accessibilityRole="button"
-              accessibilityLabel={t("task.a11yOpen", { title: task.title })}
-              onPress={() => onOpenTask(task.id)}
-              style={({ pressed }) => [styles.sampleButton, focus, { opacity: pressed ? 0.6 : 1 }]}
-            >
-              <Text maxFontSizeMultiplier={1.2} style={[styles.sample, { color: colors.textSecondary }]}>
-                · {task.title}
-                {task.waitingFor !== null ? `（${t("more.waitingFor", { who: task.waitingFor })}）` : ""}
-              </Text>
-            </Pressable>
-          ))}
-          {summary.waitingCount === 0 ? (
-            <Text maxFontSizeMultiplier={1.2} style={[styles.okText, { color: colors.success }]}>{t("more.waitingEmpty")}</Text>
+        <Card style={styles.card}>
+          {step === 0 ? (
+            <StepInbox summary={summary} tr={tr} onGoInbox={onGoInbox} />
           ) : null}
-        </View>
-      ) : null}
+          {step === 1 ? <StepProjects summary={summary} tr={tr} /> : null}
+          {step === 2 ? <StepCalendar summary={summary} tr={tr} /> : null}
+          {step === 3 ? (
+            <StepWaiting summary={summary} tr={tr} onOpenTask={onOpenTask} />
+          ) : null}
+          {step === 4 ? <StepSomeday summary={summary} tr={tr} /> : null}
+          {step === 5 ? (
+            <View style={styles.stepBody}>
+              <AppText variant="body" lines={4}>
+                {tr("review.finishBody")}
+              </AppText>
+              <Button label={tr("review.finish")} icon="checkmark-circle-outline" variant="primary" onPress={() => void finish()} />
+            </View>
+          ) : null}
+        </Card>
+      </ScrollView>
 
-      {step === 4 ? (
-        <View style={styles.body}>
-          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>
-            {t("review.somedayBody", { n: summary.somedayCount })}
-          </Text>
-        </View>
-      ) : null}
-
-      {step === 5 ? (
-        <View style={styles.body}>
-          <Text maxFontSizeMultiplier={1.2} style={[styles.text, { color: colors.text }]}>{t("review.finishBody")}</Text>
-          <StepButton label={t("review.finish")} onPress={() => void finish()} colors={colors} focus={focus} primary />
-        </View>
-      ) : null}
-
-      <View style={styles.navRow}>
-        <StepButton
-          label={t("review.prev")}
+      <View style={[styles.navRow, { borderTopColor: colors.border, backgroundColor: colors.surface }]}>
+        <Button
+          label={tr("review.prev")}
+          variant="ghost"
           disabled={step === 0}
           onPress={() => setStep((s) => Math.max(0, s - 1))}
-          colors={colors}
-          focus={focus}
         />
-        <StepButton
-          label={t("review.next")}
-          disabled={step >= STEP_KEYS.length - 1}
+        <Button
+          label={tr("review.next")}
+          variant="primary"
+          disabled={last}
           onPress={() => setStep((s) => Math.min(STEP_KEYS.length - 1, s + 1))}
-          colors={colors}
-          focus={focus}
-          primary
         />
       </View>
-    </ScrollView>
+    </View>
   );
 }
 
-function StepButton({
-  label,
-  onPress,
-  disabled,
-  colors,
-  focus,
-  primary,
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  colors: ReturnType<typeof useTheme>;
-  focus: ReturnType<typeof useFocusStyle>;
-  primary?: boolean;
-}) {
+/* ---------------- 各步内容 ---------------- */
+
+interface StepProps {
+  summary: ReturnType<typeof buildReviewSummary>;
+  tr: (key: string, params?: Record<string, string | number>) => string;
+}
+
+function StepInbox({ summary, tr, onGoInbox }: StepProps & { onGoInbox: () => void }) {
+  const colors = useTheme();
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.button,
-        focus,
-        {
-          backgroundColor: primary === true ? colors.primary : colors.surface,
-          opacity: disabled === true ? 0.4 : pressed ? 0.7 : 1,
-        },
-      ]}
-    >
-      <Text maxFontSizeMultiplier={1.2} style={{ color: primary === true ? colors.onPrimary : colors.text, fontSize: 15, fontWeight: "600" }}>
-        {label}
-      </Text>
-    </Pressable>
+    <View style={styles.stepBody}>
+      <AppText variant="body" lines={4}>
+        {tr("review.inboxBody", { n: summary.inboxCount })}
+      </AppText>
+      {summary.inboxSample.map((task) => (
+        <View key={task.id} style={styles.sampleRow}>
+          <Ionicons name="ellipse" size={6} color={colors.textTertiary} />
+          <AppText variant="label" tone="secondary" lines={1} style={styles.sampleText}>
+            {task.title}
+          </AppText>
+        </View>
+      ))}
+      {summary.inboxCount > 0 ? (
+        <Button label={tr("review.goInbox")} icon="arrow-forward" onPress={onGoInbox} />
+      ) : (
+        <OkLine text={tr("review.inboxClean")} />
+      )}
+    </View>
+  );
+}
+
+function StepProjects({ summary, tr }: StepProps) {
+  const colors = useTheme();
+  return (
+    <View style={styles.stepBody}>
+      <AppText variant="body" lines={4}>
+        {summary.projectsWithoutNext.length === 0 ? tr("review.projectsOk") : tr("review.projectsBody")}
+      </AppText>
+      {summary.projectsWithoutNext.map((p) => (
+        <View key={p.projectId} style={styles.sampleRow}>
+          <Ionicons name="alert-circle-outline" size={13} color={colors.warning} />
+          <AppText variant="label" color={colors.warning} lines={1} style={styles.sampleText}>
+            {p.name}
+          </AppText>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function StepCalendar({ summary, tr }: StepProps) {
+  return (
+    <View style={styles.stepBody}>
+      <AppText variant="body" lines={5}>
+        {tr("review.calendarBody", {
+          completed: summary.completedLastWeek,
+          upcoming: summary.upcomingCount,
+        })}
+      </AppText>
+    </View>
+  );
+}
+
+function StepWaiting({ summary, tr, onOpenTask }: StepProps & { onOpenTask: (id: string) => void }) {
+  const colors = useTheme();
+  return (
+    <View style={styles.stepBody}>
+      <AppText variant="body" lines={4}>
+        {tr("review.waitingBody", { n: summary.waitingCount })}
+      </AppText>
+      {summary.waitingSample.map((task) => (
+        <Pressable
+          key={task.id}
+          accessibilityRole="button"
+          accessibilityLabel={tr("task.a11yOpen", { title: task.title })}
+          onPress={() => onOpenTask(task.id)}
+          style={({ pressed }) => [styles.sampleRow, { opacity: pressed ? 0.6 : 1 }]}
+        >
+          <Ionicons name="hourglass-outline" size={12} color={colors.textTertiary} />
+          <AppText variant="label" tone="secondary" lines={1} style={styles.sampleText}>
+            {task.title}
+            {task.waitingFor !== null ? ` · ${task.waitingFor}` : ""}
+          </AppText>
+        </Pressable>
+      ))}
+      {summary.waitingCount === 0 ? <OkLine text={tr("more.waitingEmpty")} /> : null}
+    </View>
+  );
+}
+
+function StepSomeday({ summary, tr }: StepProps) {
+  return (
+    <View style={styles.stepBody}>
+      <AppText variant="body" lines={5}>
+        {tr("review.somedayBody", { n: summary.somedayCount })}
+      </AppText>
+    </View>
+  );
+}
+
+function OkLine({ text }: { text: string }) {
+  const colors = useTheme();
+  return (
+    <View style={styles.okRow}>
+      <Ionicons name="checkmark-circle" size={15} color={colors.success} />
+      <AppText variant="label" color={colors.success} lines={1} style={styles.sampleText}>
+        {text}
+      </AppText>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xl * 2,
-  },
-  stepper: {
-    flexDirection: "row",
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  stepDot: {
+  root: {
     flex: 1,
-    height: 6,
-    borderRadius: 3,
+  },
+  progress: {
+    flexDirection: "row",
+    gap: space.xs,
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
+  },
+  progressSegment: {
+    flex: 1,
+    height: 4,
+    borderRadius: 2,
+  },
+  content: {
+    padding: space.lg,
+    gap: space.sm,
   },
   title: {
-    fontSize: 22,
-    fontWeight: "700",
-    marginBottom: spacing.md,
+    marginBottom: space.sm,
   },
-  body: {
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
+  card: {
+    gap: space.md,
   },
-  text: {
-    fontSize: 16,
-    lineHeight: 26,
+  stepBody: {
+    gap: space.md,
   },
-  sample: {
-    fontSize: 15,
-    lineHeight: 24,
-    paddingHorizontal: spacing.sm,
+  sampleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    minHeight: 28,
   },
-  sampleButton: {
-    borderRadius: radius.sm,
+  sampleText: {
+    flex: 1,
+    minWidth: 0,
   },
-  okText: {
-    fontSize: 15,
-    fontWeight: "600",
-    paddingVertical: spacing.xs,
+  okRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    minHeight: 28,
   },
   navRow: {
     flexDirection: "row",
-    gap: spacing.sm,
-    justifyContent: "space-between",
-  },
-  button: {
-    minHeight: 44,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.md,
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    gap: space.md,
   },
 });

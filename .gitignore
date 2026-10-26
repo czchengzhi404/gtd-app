@@ -20,3 +20,6 @@ apps/desktop/renderer/
 
 # 本地下载的发布产物
 release-local/
+
+# 安全 hook 的基线快照
+.mimosa/

@@ -1,10 +1,15 @@
-import type { ReactNode } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import type { ComponentProps, ReactNode } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
 import { NAV_ITEMS } from "../nav-config";
-import { t, useT } from "../i18n";
+import { t } from "../i18n";
 import { useTheme } from "../hooks/useTheme";
 import { useFocusStyle } from "../hooks/useFocusStyle";
-import { minTouchTarget, radius, spacing } from "../tokens";
+import { AppText } from "../theme/AppText";
+import { hit, radius, space } from "../theme/tokens";
+
+type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
 export interface SidebarProps {
   activeRoute: string;
@@ -13,19 +18,25 @@ export interface SidebarProps {
 }
 
 /**
- * 桌面端左侧导航（≥768 由壳启用）。与移动端底部 Tab 同源于 NAV_ITEMS，
- * 不存在第二套导航定义。文案随语言即时切换。
+ * 桌面端左侧栏（≥768）。与移动端 TabBar 同源于 NAV_ITEMS——
+ * 同一份导航配置，两种呈现，不存在第二套导航定义。
  */
 export function Sidebar({ activeRoute, onSelect, footer }: SidebarProps) {
   const colors = useTheme();
   const focus = useFocusStyle(radius.sm);
-  const brand = t("common.brand");
+
   return (
-    <View style={[styles.wrap, { backgroundColor: colors.surface, borderRightColor: colors.border }]}>
-      <Text maxFontSizeMultiplier={1.2} accessibilityRole="header" style={[styles.brand, { color: colors.text }]}>
-        {brand}
-      </Text>
-      <View accessibilityRole="tablist">
+    <View style={[styles.wrap, { backgroundColor: colors.canvas, borderRightColor: colors.border }]}>
+      <View style={styles.brandRow}>
+        <View style={[styles.logo, { backgroundColor: colors.primary }]}>
+          <Ionicons name="checkmark-done" size={16} color={colors.onPrimary} />
+        </View>
+        <AppText variant="title" lines={1}>
+          {t("common.brand")}
+        </AppText>
+      </View>
+
+      <View accessibilityRole="tablist" style={styles.nav}>
         {NAV_ITEMS.map((item) => {
           const active = item.route === activeRoute;
           const label = t(item.labelKey);
@@ -40,20 +51,29 @@ export function Sidebar({ activeRoute, onSelect, footer }: SidebarProps) {
                 styles.item,
                 focus,
                 {
-                  backgroundColor: active ? colors.bg : pressed ? colors.border : "transparent",
+                  backgroundColor: active ? colors.surface : pressed ? colors.surfaceMuted : "transparent",
                 },
               ]}
             >
-              <View
-                style={[styles.dot, { backgroundColor: active ? colors.primary : "transparent" }]}
+              <Ionicons
+                name={item.icon as IoniconName}
+                size={18}
+                color={active ? colors.primary : colors.textTertiary}
               />
-              <Text maxFontSizeMultiplier={1.2} style={[styles.label, { color: active ? colors.text : colors.textSecondary }]}>
+              <AppText
+                variant="body"
+                weight={active ? "600" : "400"}
+                color={active ? colors.text : colors.textSecondary}
+                lines={1}
+                style={styles.itemLabel}
+              >
                 {label}
-              </Text>
+              </AppText>
             </Pressable>
           );
         })}
       </View>
+
       {footer !== undefined ? <View style={styles.footer}>{footer}</View> : null}
     </View>
   );
@@ -61,36 +81,42 @@ export function Sidebar({ activeRoute, onSelect, footer }: SidebarProps) {
 
 const styles = StyleSheet.create({
   wrap: {
-    width: 220,
+    width: 232,
+    paddingTop: space.lg,
+    paddingHorizontal: space.md,
     borderRightWidth: StyleSheet.hairlineWidth,
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.sm,
   },
-  brand: {
-    fontSize: 17,
-    fontWeight: "700",
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-  },
-  item: {
+  brandRow: {
     flexDirection: "row",
     alignItems: "center",
-    minHeight: minTouchTarget,
+    gap: space.sm,
+    paddingHorizontal: space.sm,
+    paddingBottom: space.lg,
+  },
+  logo: {
+    width: 28,
+    height: 28,
+    borderRadius: radius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  nav: {
+    gap: space.xxs,
+  },
+  item: {
+    minHeight: hit.nav,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    paddingHorizontal: space.md,
     borderRadius: radius.sm,
-    paddingHorizontal: spacing.md,
-    gap: spacing.sm,
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  label: {
-    fontSize: 16,
-    lineHeight: 24,
+  itemLabel: {
+    flex: 1,
+    minWidth: 0,
   },
   footer: {
     marginTop: "auto",
-    padding: spacing.md,
+    paddingVertical: space.md,
   },
 });

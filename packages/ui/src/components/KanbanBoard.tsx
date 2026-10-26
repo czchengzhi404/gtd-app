@@ -1,12 +1,13 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import type { Task } from "@gtd/core";
+
 import { t } from "../i18n";
 import { useTheme } from "../hooks/useTheme";
-import { useFocusStyle } from "../hooks/useFocusStyle";
+import { AppText } from "../theme/AppText";
+import { RowActions, type ActionItem } from "./RowActions";
 import { DueDateChip } from "./DueDateChip";
 import { PriorityBadge } from "./PriorityBadge";
-import { RowActions } from "./RowActions";
-import { radius, spacing } from "../tokens";
+import { radius, space } from "../theme/tokens";
 
 export interface KanbanColumn {
   key: string;
@@ -14,28 +15,22 @@ export interface KanbanColumn {
   tasks: Task[];
 }
 
-export interface KanbanCardAction {
-  key: string;
-  label: string;
-  danger?: boolean;
-  onSelect: (task: Task) => void;
-}
-
 export interface KanbanBoardProps {
   columns: KanbanColumn[];
   now: number;
   onPressTask: (task: Task) => void;
-  /** 卡片更多操作（删除/重命名）；不传则不渲染入口 */
-  actions?: KanbanCardAction[];
+  actions?:
+    | ActionItem[]
+    | { key: string; label: string; danger?: boolean; onSelect: (task: Task) => void }[];
 }
 
 /**
- * 看板视图：GTD 四状态分列（收集箱/下一步/等待中/将来·也许）。
- * 列内点卡片进详情理清（拖拽跨列依赖手势库，v1 用详情页状态流转承担）。
+ * 看板：横向滚动的定宽列（272px），列头固定，列内纵向滚动。
+ * 列宽与卡片高度均由内容上限约束，不会因文字长度改变列宽。
  */
 export function KanbanBoard({ columns, now, onPressTask, actions }: KanbanBoardProps) {
   const colors = useTheme();
-  const focus = useFocusStyle(radius.sm);
+
   return (
     <ScrollView
       horizontal
@@ -46,24 +41,31 @@ export function KanbanBoard({ columns, now, onPressTask, actions }: KanbanBoardP
         <View
           key={column.key}
           accessibilityLabel={`${column.title}: ${column.tasks.length}`}
-          style={[styles.column, { backgroundColor: colors.surface }]}
+          style={[styles.column, { backgroundColor: colors.surfaceMuted }]}
         >
-          <View style={styles.columnHeader}>
-            <Text maxFontSizeMultiplier={1.2} style={[styles.columnTitle, { color: colors.text }]}>{column.title}</Text>
-            <Text maxFontSizeMultiplier={1.2} style={[styles.count, { color: colors.textSecondary }]}>{column.tasks.length}</Text>
+          <View style={styles.columnHead}>
+            <AppText variant="label" weight="700" lines={1} style={styles.columnTitle}>
+              {column.title}
+            </AppText>
+            <View style={[styles.countPill, { backgroundColor: colors.surface }]}>
+              <AppText variant="caption" tone="secondary" lines={1}>
+                {column.tasks.length}
+              </AppText>
+            </View>
           </View>
-          <ScrollView showsVerticalScrollIndicator={false}>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.cards}>
             {column.tasks.map((task) => (
-              <View key={task.id} style={[styles.cardWrap, { backgroundColor: colors.bg }]}>
+              <View key={task.id} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t("task.a11yOpen", { title: task.title })}
                   onPress={() => onPressTask(task)}
-                  style={({ pressed }) => [styles.card, focus, pressed && { opacity: 0.7 }]}
+                  style={({ pressed }) => [styles.cardBody, { opacity: pressed ? 0.7 : 1 }]}
                 >
-                  <Text maxFontSizeMultiplier={1.2} style={[styles.cardTitle, { color: colors.text }]} numberOfLines={2}>
+                  <AppText variant="body" lines={2}>
                     {task.title}
-                  </Text>
+                  </AppText>
                   <View style={styles.cardMeta}>
                     <PriorityBadge priority={task.priority} />
                     <DueDateChip task={task} now={now} />
@@ -72,12 +74,11 @@ export function KanbanBoard({ columns, now, onPressTask, actions }: KanbanBoardP
                 {actions !== undefined && actions.length > 0 ? (
                   <View style={styles.cardActions}>
                     <RowActions
-                      accessibilityLabel={t("common.moreActions")}
                       actions={actions.map((action) => ({
                         key: action.key,
                         label: action.label,
                         danger: action.danger,
-                        onSelect: () => action.onSelect(task),
+                        onSelect: () => (action.onSelect as (task: Task) => void)(task),
                       }))}
                     />
                   </View>
@@ -85,7 +86,9 @@ export function KanbanBoard({ columns, now, onPressTask, actions }: KanbanBoardP
               </View>
             ))}
             {column.tasks.length === 0 ? (
-              <Text maxFontSizeMultiplier={1.2} style={[styles.empty, { color: colors.textSecondary }]}>—</Text>
+              <AppText variant="caption" tone="tertiary" align="center" lines={1} style={styles.empty}>
+                —
+              </AppText>
             ) : null}
           </ScrollView>
         </View>
@@ -96,59 +99,63 @@ export function KanbanBoard({ columns, now, onPressTask, actions }: KanbanBoardP
 
 const styles = StyleSheet.create({
   board: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.xl,
-    gap: spacing.md,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.xl,
+    gap: space.md,
   },
   column: {
-    width: 280,
+    width: 272,
     flexShrink: 0,
-    maxHeight: "100%",
     borderRadius: radius.md,
-    padding: spacing.sm,
+    padding: space.sm,
   },
-  columnHeader: {
+  columnHead: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: space.xs,
+    paddingVertical: space.sm,
+    gap: space.sm,
   },
   columnTitle: {
-    fontSize: 15,
-    fontWeight: "600",
+    flex: 1,
+    minWidth: 0,
   },
-  count: {
-    fontSize: 13,
+  countPill: {
+    minWidth: 22,
+    height: 20,
+    borderRadius: radius.xs,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: space.xs,
   },
-  cardWrap: {
-    borderRadius: radius.sm,
-    marginBottom: spacing.sm,
-    flexDirection: "row",
-    alignItems: "flex-start",
+  cards: {
+    paddingBottom: space.xs,
   },
   card: {
-    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
     borderRadius: radius.sm,
-    padding: spacing.sm + 2,
-    gap: 4,
+    borderWidth: StyleSheet.hairlineWidth,
+    marginBottom: space.sm,
   },
-  cardActions: {
-    alignSelf: "center",
-    paddingRight: 2,
-  },
-  cardTitle: {
-    fontSize: 15,
-    lineHeight: 22,
+  cardBody: {
+    flex: 1,
+    minWidth: 0,
+    padding: space.md,
+    gap: space.xs,
   },
   cardMeta: {
     flexDirection: "row",
-    gap: spacing.sm,
     alignItems: "center",
+    gap: space.sm,
+    overflow: "hidden",
+  },
+  cardActions: {
+    paddingTop: space.xs,
+    paddingRight: space.xxs,
   },
   empty: {
-    textAlign: "center",
-    paddingVertical: spacing.lg,
-    fontSize: 14,
+    paddingVertical: space.lg,
   },
 });

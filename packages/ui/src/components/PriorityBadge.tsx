@@ -1,44 +1,44 @@
-import { StyleSheet, Text, View } from "react-native";
-import { t } from "../i18n";
+import { StyleSheet, View } from "react-native";
 import { useTheme } from "../hooks/useTheme";
-import { radius } from "../tokens";
+import { AppText } from "../theme/AppText";
+import { radius, space } from "../theme/tokens";
+import { t } from "../i18n";
 
 export type PriorityLevel = 0 | 1 | 2 | 3;
 
-const LABELS: Record<PriorityLevel, string> = {
-  0: "",
-  1: "P1",
-  2: "P2",
-  3: "P3",
-};
-
-/** 优先级徽标：0 不渲染；3 最高（danger 色） */
+/** 优先级：小色点 + P 编号（不抢任务标题的视觉层级） */
 export function PriorityBadge({ priority }: { priority: PriorityLevel }) {
   const colors = useTheme();
   if (priority === 0) return null;
-  const bg = priority === 3 ? colors.danger : colors.surface;
-  const fg = priority === 3 ? "#FFFFFF" : colors.textSecondary;
+
+  const dot = priority === 3 ? colors.danger : priority === 2 ? colors.warning : colors.textTertiary;
+
   return (
     <View
       accessibilityRole="text"
       accessibilityLabel={t("task.priorityA11y", { n: priority })}
-      style={[styles.badge, { backgroundColor: bg }]}
+      style={styles.wrap}
     >
-      <Text maxFontSizeMultiplier={1.2} style={[styles.label, { color: fg }]}>{LABELS[priority]}</Text>
+      <View style={[styles.dot, { backgroundColor: dot }]} />
+      <AppText variant="caption" tone="secondary" lines={1}>
+        P{priority}
+      </AppText>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  badge: {
-    minHeight: 22,
-    paddingHorizontal: 8,
-    borderRadius: radius.sm,
+  wrap: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: space.xxs,
+    height: 20,
+    paddingRight: space.xxs,
+    borderRadius: radius.xs,
   },
-  label: {
-    fontSize: 12,
-    fontWeight: "700",
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
 });

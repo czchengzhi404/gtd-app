@@ -1,14 +1,35 @@
-import { StyleSheet, Text, View } from "react-native";
-import { useTheme } from "../hooks/useTheme";
-import { spacing } from "../tokens";
+import { StyleSheet, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import type { ComponentProps } from "react";
 
-/** 列表空态：图标/说明居中，正文 ≥16px */
-export function EmptyState({ title, hint }: { title: string; hint?: string }) {
+import { useTheme } from "../hooks/useTheme";
+import { AppText } from "../theme/AppText";
+import { space } from "../theme/tokens";
+
+type IoniconName = ComponentProps<typeof Ionicons>["name"];
+
+export interface EmptyStateProps {
+  title: string;
+  hint?: string;
+  icon?: IoniconName;
+}
+
+/** 空态：轻量、留白充足，不占用交互焦点 */
+export function EmptyState({ title, hint, icon = "checkmark-done-outline" }: EmptyStateProps) {
   const colors = useTheme();
   return (
     <View style={styles.wrap} accessibilityRole="text" accessibilityLabel={`${title}。${hint ?? ""}`}>
-      <Text maxFontSizeMultiplier={1.2} style={[styles.title, { color: colors.text }]}>{title}</Text>
-      {hint ? <Text maxFontSizeMultiplier={1.2} style={[styles.hint, { color: colors.textSecondary }]}>{hint}</Text> : null}
+      <View style={[styles.iconWrap, { backgroundColor: colors.surfaceMuted }]}>
+        <Ionicons name={icon} size={26} color={colors.textTertiary} />
+      </View>
+      <AppText variant="bodyStrong" lines={2} align="center" style={styles.title}>
+        {title}
+      </AppText>
+      {hint !== undefined ? (
+        <AppText variant="label" tone="tertiary" lines={3} align="center" style={styles.hint}>
+          {hint}
+        </AppText>
+      ) : null}
     </View>
   );
 }
@@ -18,16 +39,22 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
-    padding: spacing.xl,
+    paddingHorizontal: space.xxxl,
+    paddingVertical: space.xxl,
+    gap: space.sm,
+  },
+  iconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: space.xs,
   },
   title: {
-    fontSize: 17,
-    fontWeight: "600",
+    maxWidth: 260,
   },
   hint: {
-    fontSize: 16,
-    lineHeight: 24,
-    textAlign: "center",
+    maxWidth: 280,
   },
 });

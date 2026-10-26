@@ -1,39 +1,43 @@
-import { StyleSheet, Text } from "react-native";
+import { Pressable, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+
 import { useTheme } from "../hooks/useTheme";
-import { radius, spacing } from "../tokens";
+import { elevation } from "../theme/tokens";
 
 export interface FabProps {
   onPress: () => void;
   label?: string;
+  icon?: "add" | "create-outline";
 }
 
-/** 悬浮新建按钮。触控目标 ≥48px；accessibilityRole=button。 */
-export function Fab({ onPress, label = "新建任务" }: FabProps) {
+/** 悬浮新建按钮（56×56，主色，浮起阴影）。仅在有明确"新建"动作的页面使用。 */
+export function Fab({ onPress, label = "新建", icon = "add" }: FabProps) {
   const colors = useTheme();
   return (
-    <Text maxFontSizeMultiplier={1.2}
+    <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      style={[styles.fab, { backgroundColor: colors.primary, color: colors.onPrimary }]}
+      style={({ pressed }) => [
+        styles.fab,
+        elevation.float,
+        { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
+      ]}
     >
-      ＋
-    </Text>
+      <Ionicons name={icon} size={26} color={colors.onPrimary} />
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   fab: {
     position: "absolute",
-    right: spacing.lg,
-    bottom: spacing.xl,
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    textAlign: "center",
-    textAlignVertical: "center",
-    fontSize: 28,
-    lineHeight: 52,
-    fontWeight: "600",
+    right: 20,
+    bottom: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
