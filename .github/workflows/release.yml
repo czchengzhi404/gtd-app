@@ -155,6 +155,8 @@ jobs:
   desktop-macos:
     name: macOS dmg (unsigned)
     runs-on: macos-latest
+    # 串行化：并发创建同一 Release 会 422
+    needs: [desktop-windows, desktop-linux]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
