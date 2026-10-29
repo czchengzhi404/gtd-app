@@ -17,6 +17,13 @@ import { t } from "@gtd/ui";
 import { gtd } from "./gtd-api";
 import { isDesktop } from "./env";
 
+/** 敏感字段加密（桌面端 safeStorage，OS 级加密） */
+async function encryptSecret(plaintext: string): Promise<string> {
+  if (!isDesktop()) return plaintext;
+  return gtd().secret.encrypt(plaintext);
+}
+
+
 export interface SyncOutcome {
   ok: boolean;
   message: string;
@@ -51,11 +58,18 @@ export async function runManualSync(): Promise<SyncOutcome> {
 export async function saveSyncConfig(config: SyncConfig): Promise<void> {
   let final = config;
   if (config.kind === "folder" && isDesktop()) {
-    // 主进程注册 fs 白名单根并归一化路径
     const root = await gtd().sync.setFolderRoot(config.endpoint);
     final = { ...config, endpoint: root };
   }
-  await runCommand("settings.set", { key: "sync.config", value: JSON.stringify(final) });
+  // 敏感字段（密码/密钥）在存储前加密
+  const encrypted = { ...final };
+  if (encrypted.password !== undefined && encrypted.password.length > 0) {
+    encrypted.password = await encryptSecret(encrypted.password);
+  }
+  if (encrypted.secretAccessKey !== undefined && encrypted.secretAccessKey.length > 0) {
+    encrypted.secretAccessKey = await encryptSecret(encrypted.secretAccessKey);
+  }
+  await runCommand("settings.set", { key: "sync.config", value: JSON.stringify(encrypted) });
 }
 
 /* ---------------- 本地备份 ---------------- */
@@ -125,4 +139,11 @@ export async function importFromFile(): Promise<string> {
   }
   await bootstrapStore();
   return t("sync.merged", { n: records.length });
+}
+
+
+/** 敏感字段解密（桌面端 safeStorage，OS 级加密） */
+export async function decryptSecret(ciphertext: string): Promise<string> {
+  if (!isDesktop()) return ciphertext;
+  return gtd().secret.decrypt(ciphertext);
 }

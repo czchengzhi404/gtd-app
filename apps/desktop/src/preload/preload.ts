@@ -49,6 +49,10 @@ const api = {
     list: () => ipcRenderer.invoke("backup:list"),
     restore: () => ipcRenderer.invoke("backup:restore"),
   },
+  secret: {
+    encrypt: (plaintext: string) => ipcRenderer.invoke("secret:encrypt", plaintext),
+    decrypt: (ciphertext: string) => ipcRenderer.invoke("secret:decrypt", ciphertext),
+  },
   menu: {
     /** 弹出系统原生右键菜单，返回被选中项的 id（取消为 null） */
     context: (items: { id: string; label: string; enabled?: boolean; type?: "separator" }[], pos?: { x: number; y: number }) =>

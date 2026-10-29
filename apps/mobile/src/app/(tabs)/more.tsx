@@ -19,6 +19,7 @@ import type { SyncConfig } from "@gtd/core";
 import {
   backupCount,
   backupNow,
+  decryptSecret,
   exportAllToFile,
   importFromFile,
   pickSyncFolder,
@@ -100,7 +101,14 @@ export default function MoreScreen() {
   useEffect(() => {
     void (async () => {
       const saved = await getSyncConfig(getSqliteExecutor());
-      if (saved !== null) setConfig(saved);
+      if (saved !== null) {
+        // 解密敏感字段（桌面端 safeStorage）
+        if (isDesktop()) {
+          if (saved.password) saved.password = await decryptSecret(saved.password);
+          if (saved.secretAccessKey) saved.secretAccessKey = await decryptSecret(saved.secretAccessKey);
+        }
+        setConfig(saved);
+      }
       setBackups(await backupCount());
     })();
   }, []);

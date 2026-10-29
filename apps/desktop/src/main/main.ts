@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, protocol, net, Tray, Menu, Notification, globalShortcut, dialog, nativeImage } from "electron";
+import { app, BrowserWindow, ipcMain, protocol, net, Tray, Menu, Notification, globalShortcut, dialog, nativeImage, safeStorage } from "electron";
 import { pathToFileURL } from "node:url";
 import fs from "node:fs";
 import os from "node:os";
@@ -219,6 +219,28 @@ function registerIpc(): void {
     allowedRoots.add(resolved);
     return resolved;
   });
+
+  /* ---- 敏感凭据加密：safeStorage（Windows DPAPI / macOS Keychain / Linux libsecret） ---- */
+  ipcMain.handle("secret:encrypt", (_event, plaintext: unknown) => {
+    if (typeof plaintext !== "string") throw new Error("plaintext 必须是字符串");
+    if (!safeStorage.isEncryptionAvailable()) {
+      console.warn("[secret] 系统加密不可用，降级为 base64");
+      return "b64:" + Buffer.from(plaintext, "utf-8").toString("base64");
+    }
+    return "enc:" + safeStorage.encryptString(plaintext).toString("base64");
+  });
+  ipcMain.handle("secret:decrypt", (_event, ciphertext: unknown) => {
+    if (typeof ciphertext !== "string") throw new Error("ciphertext 必须是字符串");
+    if (ciphertext.startsWith("b64:")) {
+      return Buffer.from(ciphertext.slice(4), "base64").toString("utf-8");
+    }
+    if (ciphertext.startsWith("enc:")) {
+      return safeStorage.decryptString(Buffer.from(ciphertext.slice(4), "base64"));
+    }
+    // 未加密旧数据：原样返回（首次读取后会被重新加密写回）
+    return ciphertext;
+  });
+
   /**
    * 原生右键菜单：渲染端传菜单项（id/label/enabled），主进程用 Menu.popup 弹系统菜单，
    * 选中后回传 id。菜单内容由渲染端决定（那里知道当前任务状态），主进程只负责展示。

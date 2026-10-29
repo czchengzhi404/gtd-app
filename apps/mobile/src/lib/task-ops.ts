@@ -4,6 +4,17 @@ import { showUndo, t } from "@gtd/ui";
 import { gtd } from "@/platform/gtd-api";
 import { isDesktop } from "@/platform/env";
 
+/** 敏感字段加密（桌面端 safeStorage，OS 级加密） */
+export async function encryptSecret(plaintext: string): Promise<string> {
+  if (!isDesktop()) return plaintext;
+  return gtd().secret.encrypt(plaintext);
+}
+
+export async function decryptSecret(ciphertext: string): Promise<string> {
+  if (!isDesktop()) return ciphertext;
+  return gtd().secret.decrypt(ciphertext);
+}
+
 /** 完成任务：可撤销（uncomplete） */
 export async function completeTaskWithUndo(task: Task): Promise<void> {
   await runCommand("task.complete", { id: task.id }).catch(() => undefined);

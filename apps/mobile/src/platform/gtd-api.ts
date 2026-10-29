@@ -22,6 +22,10 @@ export interface GtdApi {
     list(): Promise<{ count: number; latest: string | null }>;
     restore(): Promise<{ ok: boolean; file?: string; error?: string }>;
   };
+  secret: {
+    encrypt(plaintext: string): Promise<string>;
+    decrypt(ciphertext: string): Promise<string>;
+  };
   menu: {
     context(
       items: { id: string; label: string; enabled?: boolean; type?: "separator" }[],
