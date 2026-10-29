@@ -96,11 +96,20 @@ jobs:
           BT="$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)"
           "$BT/apksigner" verify --print-certs "$APK" | head -4
           "$BT/aapt" dump badging "$APK" | grep -E "^package|^application-label:|launchable-activity" | head -4
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          name: gtd-android-apk
-          path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
+      # 直接挂到 Release（不经制品存储：Actions 制品配额有限）
+      - name: Upload APK to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          APK="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
+          cp "$APK" "GTD-${GITHUB_REF_NAME}-android.apk"
+          gh release view "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" \
+              --title "GTD 清单 ${GITHUB_REF_NAME}" \
+              --notes "CI 构建。Android 为签名 release 包；macOS dmg 未签名（首次打开需右键 → 打开）。"
+          gh release upload "${GITHUB_REF_NAME}" "GTD-${GITHUB_REF_NAME}-android.apk" \
+            --repo "$GITHUB_REPOSITORY" --clobber
 
   desktop-windows:
     name: Windows installer
@@ -178,24 +187,3 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-
-  # 桌面三平台已自行 publish 到 Release；本 job 只补挂 Android APK
-  release:
-    name: Attach APK to release
-    runs-on: ubuntu-latest
-    needs: [android-apk, desktop-windows, desktop-linux, desktop-macos]
-    steps:
-      - name: Download APK
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
-        with:
-          name: gtd-android-apk
-          path: apk
-      - name: Rename APK
-        run: mv apk/app-release.apk "apk/GTD-${GITHUB_REF_NAME}-android.apk"
-      - name: Attach APK to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          gh release upload "${GITHUB_REF_NAME}" apk/*.apk \
-            --repo "$GITHUB_REPOSITORY" --clobber
