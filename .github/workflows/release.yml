@@ -99,7 +99,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          retention-days: 1
           name: gtd-android-apk
           path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
 
@@ -121,17 +120,13 @@ jobs:
       - name: Build electron main
         run: bun run build
         working-directory: apps/desktop
-      - name: Build installer (no publish)
-        run: bunx electron-builder --win --publish never
+      # 直接发布到 Release（不经 Actions 制品存储，规避配额限制）
+      - name: Build and publish installer
+        run: bunx electron-builder --win --publish always
         working-directory: apps/desktop
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          retention-days: 1
-          name: gtd-windows
-          path: |
-            apps/desktop/release/*.exe
-            apps/desktop/release/*.blockmap
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ELECTRON_MIRROR: https://npmmirror.com/mirrors/electron/
 
   desktop-linux:
     name: Linux AppImage
@@ -151,15 +146,11 @@ jobs:
       - name: Build electron main
         run: bun run build
         working-directory: apps/desktop
-      - name: Build AppImage (no publish)
-        run: bunx electron-builder --linux --publish never
+      - name: Build AppImage and publish
+        run: bunx electron-builder --linux --publish always
         working-directory: apps/desktop
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          retention-days: 1
-          name: gtd-linux
-          path: apps/desktop/release/*.AppImage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   desktop-macos:
     name: macOS dmg (unsigned)
@@ -179,44 +170,30 @@ jobs:
       - name: Build electron main
         run: bun run build
         working-directory: apps/desktop
-      - name: Build dmg (no publish)
-        run: bunx electron-builder --mac --publish never
+      - name: Build dmg and publish
+        run: bunx electron-builder --mac --publish always
         working-directory: apps/desktop
         env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-      - name: Upload artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
-        with:
-          retention-days: 1
-          name: gtd-macos
-          path: |
-            apps/desktop/release/*.dmg
-            apps/desktop/release/*.blockmap
 
+  # 桌面三平台已自行 publish 到 Release；本 job 只补挂 Android APK
   release:
-    name: Create release with all artifacts
+    name: Attach APK to release
     runs-on: ubuntu-latest
     needs: [android-apk, desktop-windows, desktop-linux, desktop-macos]
     steps:
-      - name: Download all artifacts
+      - name: Download APK
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
-          path: artifacts
-      - name: Rename for clarity
-        run: |
-          mv artifacts/gtd-android-apk/app-release.apk "artifacts/gtd-android-apk/GTD-${GITHUB_REF_NAME}-android.apk" || true
-      - name: Create release with all installers
+          name: gtd-android-apk
+          path: apk
+      - name: Rename APK
+        run: mv apk/app-release.apk "apk/GTD-${GITHUB_REF_NAME}-android.apk"
+      - name: Attach APK to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          shopt -s globstar nullglob
-          FILES=()
-          for f in artifacts/**/*; do
-            if [ -f "$f" ]; then FILES+=("$f"); fi
-          done
-          gh release create "${GITHUB_REF_NAME}" \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "GTD 清单 ${GITHUB_REF_NAME}" \
-            --notes "安装包由 CI 构建。Android 为签名 release 包（如曾装过旧 debug 版请先卸载）；macOS dmg 未签名（首次打开需右键 → 打开）。" \
-            "${FILES[@]}"
+          gh release upload "${GITHUB_REF_NAME}" apk/*.apk \
+            --repo "$GITHUB_REPOSITORY" --clobber
