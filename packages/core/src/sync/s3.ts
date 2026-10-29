@@ -64,6 +64,9 @@ interface SigV4Result {
   payloadHash: string;
 }
 
+/** 导出供测试使用（AWS SigV4 签名是纯计算，不含网络 IO） */
+export { signRequest };
+
 async function signRequest(
   method: string,
   url: URL,

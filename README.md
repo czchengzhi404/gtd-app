@@ -22,6 +22,12 @@
 
 **入口**：深层链接 `gtd://add?title=买牛奶` 一键捕获。
 
+## 同步接入指南
+
+支持任何 WebDAV 服务和 S3 兼容存储。坚果云/群晖/Nextcloud 开箱即用，百度网盘/阿里云盘可通过 [Alist](https://alist.nn.ci) 桥接。
+
+详见 [docs/sync-providers.md](docs/sync-providers.md)。
+
 ## 结构
 
 - `packages/core` — 数据模型、命令表、quick-add 解析、重复规则、同步合并、存储端口（纯 TS，无 React/RN 依赖，可在 Electron 主进程运行）
