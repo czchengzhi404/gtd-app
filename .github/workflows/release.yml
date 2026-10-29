@@ -99,6 +99,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
+          retention-days: 1
           name: gtd-android-apk
           path: apps/mobile/android/app/build/outputs/apk/release/app-release.apk
 
@@ -126,6 +127,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
+          retention-days: 1
           name: gtd-windows
           path: |
             apps/desktop/release/*.exe
@@ -155,6 +157,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
+          retention-days: 1
           name: gtd-linux
           path: apps/desktop/release/*.AppImage
 
@@ -184,6 +187,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
+          retention-days: 1
           name: gtd-macos
           path: |
             apps/desktop/release/*.dmg
