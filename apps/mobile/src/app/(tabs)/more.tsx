@@ -25,13 +25,28 @@ import {
   restoreLatestBackup,
   runManualSync,
   saveSyncConfig,
+  testSyncConnection,
 } from "@/platform/desktop-actions";
 import { isDesktop } from "@/platform/env";
 
-const KIND_KEYS: { kind: SyncConfig["kind"]; labelKey: string }[] = [
-  { kind: "webdav", labelKey: "more.kind.webdav" },
-  { kind: "http", labelKey: "more.kind.http" },
-  { kind: "folder", labelKey: "more.kind.folder" },
+/** 同步预设：坚果云/WebDAV/S3/本地文件夹（坚果云本质走 WebDAV，endpoint 已预填） */
+interface SyncPreset {
+  key: string;
+  /** SyncConfig.kind */
+  kind: SyncConfig["kind"];
+  labelKey: string;
+  hintKey: string;
+  endpointTemplate?: string;
+  desktopOnly?: boolean;
+  showBucket?: boolean;
+  showRegion?: boolean;
+}
+
+const SYNC_PRESETS: SyncPreset[] = [
+  { key: "nutstore", kind: "webdav", labelKey: "preset.nutstore", hintKey: "preset.nutstoreHint", endpointTemplate: "https://dav.jianguoyun.com/dav/" },
+  { key: "webdav", kind: "webdav", labelKey: "preset.customWebdav", hintKey: "preset.customWebdavHint" },
+  { key: "s3", kind: "s3", labelKey: "preset.s3", hintKey: "preset.s3Hint", showBucket: true, showRegion: true },
+  { key: "folder", kind: "folder", labelKey: "preset.folder", hintKey: "preset.folderHint", desktopOnly: true },
 ];
 
 /** 更多：等待中/将来也许预览、语言、每周回顾入口、同步设置、数据导入导出 */
@@ -49,11 +64,17 @@ export default function MoreScreen() {
     username: "",
     password: "",
     enabled: false,
+    bucket: "",
+    region: "",
+    accessKeyId: "",
+    secretAccessKey: "",
   });
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [lang, setLangUi] = useState(getLang());
   const [backups, setBackups] = useState(0);
+  const [selectedPreset, setSelectedPreset] = useState("nutstore");
+  const [testing, setTesting] = useState(false);
 
   const syncLog = useMemo(() => {
     const raw = kv["sync.log"];
@@ -155,6 +176,18 @@ export default function MoreScreen() {
         },
       },
     ]);
+  };
+
+  const onTestConnection = async () => {
+    setTesting(true);
+    try {
+      const outcome = await testSyncConnection(config);
+      setStatus(outcome.message);
+    } catch (err) {
+      setStatus(t("sync.testFailed") + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setTesting(false);
+    }
   };
 
   const onExport = async () => {
@@ -263,19 +296,30 @@ export default function MoreScreen() {
         {/* 同步 */}
         <SectionHeader title={t("more.syncSection")} />
         <Card style={styles.block}>
+          {/* 预设选择 */}
           <View style={styles.inlineRow}>
-            {KIND_KEYS.map(({ kind, labelKey }) => (
+            {SYNC_PRESETS.map((preset) => (
               <SegPill
-                key={kind}
-                label={t(labelKey)}
-                selected={config.kind === kind}
-                disabled={kind === "folder" && !isDesktop()}
-                onPress={() => update({ kind })}
+                key={preset.key}
+                label={t(preset.labelKey)}
+                selected={selectedPreset === preset.key}
+                disabled={preset.desktopOnly === true && !isDesktop()}
+                onPress={() => {
+                  setSelectedPreset(preset.key);
+                  update({
+                    kind: preset.kind,
+                    ...(preset.endpointTemplate !== undefined ? { endpoint: preset.endpointTemplate } : {}),
+                  });
+                }}
               />
             ))}
           </View>
+          <AppText variant="caption" tone="tertiary" lines={3} style={styles.hintText}>
+            {t(SYNC_PRESETS.find((p) => p.key === selectedPreset)?.hintKey ?? "preset.nutstoreHint")}
+          </AppText>
 
-          {config.kind === "folder" ? (
+          {/* 字段 */}
+          {selectedPreset === "folder" ? (
             <Button
               label={t("more.pickFolder")}
               icon="folder-open-outline"
@@ -289,22 +333,35 @@ export default function MoreScreen() {
                 label={t("more.server")}
                 value={config.endpoint}
                 onChangeText={(text) => update({ endpoint: text })}
-                placeholder="https://dav.example.com/gtd/"
+                placeholder={selectedPreset === "s3" ? "https://oss-cn-hangzhou.aliyuncs.com" : "https://dav.example.com/gtd/"}
               />
-              <Field
-                label={t("more.username")}
-                value={config.username ?? ""}
-                onChangeText={(text) => update({ username: text })}
-              />
-              <Field
-                label={t("more.password")}
-                value={config.password ?? ""}
-                onChangeText={(text) => update({ password: text })}
-                secureTextEntry
-              />
+              {selectedPreset === "s3" ? (
+                <>
+                  <Field label={t("sync.bucket")} value={config.bucket ?? ""} onChangeText={(text) => update({ bucket: text })} />
+                  <Field label={t("sync.region")} value={config.region ?? ""} onChangeText={(text) => update({ region: text })} />
+                  <Field label={t("sync.accessKeyId")} value={config.accessKeyId ?? ""} onChangeText={(text) => update({ accessKeyId: text })} />
+                  <Field
+                    label={t("sync.secretAccessKey")}
+                    value={config.secretAccessKey ?? ""}
+                    onChangeText={(text) => update({ secretAccessKey: text })}
+                    secureTextEntry
+                  />
+                </>
+              ) : (
+                <>
+                  <Field label={t("more.username")} value={config.username ?? ""} onChangeText={(text) => update({ username: text })} />
+                  <Field
+                    label={t("more.password")}
+                    value={config.password ?? ""}
+                    onChangeText={(text) => update({ password: text })}
+                    secureTextEntry
+                  />
+                </>
+              )}
             </>
           )}
 
+          {/* 操作 */}
           <View style={styles.inlineRow}>
             <SegPill
               label={config.enabled ? t("more.enabled") : t("more.disabled")}
@@ -313,6 +370,12 @@ export default function MoreScreen() {
             />
             <Button label={t("more.saveConfig")} disabled={busy} onPress={() => void onSave()} />
             <Button label={t("more.syncNow")} variant="primary" disabled={busy} onPress={() => void onSyncNow()} />
+            <Button
+              label={testing ? t("sync.testing") : t("sync.testConnection")}
+              icon="wifi-outline"
+              disabled={busy}
+              onPress={() => void onTestConnection()}
+            />
           </View>
 
           <AppText variant="caption" tone="tertiary" lines={1}>
@@ -568,6 +631,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 12,
     fontSize: 15,
+  },
+  hintText: {
+    fontSize: 12,
+    lineHeight: 17,
+    paddingHorizontal: 4,
   },
   status: {
     paddingHorizontal: 16,

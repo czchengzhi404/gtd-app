@@ -1,6 +1,6 @@
 {
   "name": "@gtd/desktop",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "本地优先的 GTD 任务清单应用（桌面端）",
   "author": "GTD 清单",
   "private": true,

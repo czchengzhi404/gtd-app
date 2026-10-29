@@ -87,6 +87,15 @@ export async function restoreLatestBackup(): Promise<BackupOutcome> {
     : { ok: false, message: result.error ?? "failed" };
 }
 
+export async function testSyncConnection(config: SyncConfig): Promise<BackupOutcome> {
+  const executor = getSqliteExecutor();
+  const deviceId = await getOrCreateDeviceId(executor);
+  const provider = createProvider(config, getFilesPort() ?? undefined);
+  // 只拉 manifest 列表验证连通性（不做全量同步）
+  const devices = await provider.listDevices();
+  return { ok: true, message: `${devices.length + 1} 台设备（含本机）` };
+}
+
 export async function pickSyncFolder(): Promise<string | null> {
   if (!isDesktop()) return null;
   return gtd().dialog.open({ directory: true });

@@ -17,6 +17,7 @@ export * from "./db/coerce";
 export * from "./sync/types";
 export * from "./sync/merge";
 export * from "./sync/providers";
+export * from "./sync/s3";
 export * from "./sync/service";
 export * from "./store/app-store";
 export * from "./store/selectors";

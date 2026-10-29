@@ -2,6 +2,7 @@ import type { Manifest, SyncProvider, SyncConfig } from "./types";
 import { SYNC_FILE_LAYOUT } from "./types";
 import type { FilesPort } from "../platform/ports";
 import type { TaggedRecord } from "../models/commands";
+import { createS3Provider } from "./s3";
 
 /**
  * 三种 Provider 共用同一文件布局（devices/<deviceId>/{manifest.json, records.json}）。
@@ -175,6 +176,17 @@ export function createProvider(config: SyncConfig, files?: FilesPort): SyncProvi
   if (config.kind === "folder") {
     if (!files) throw new Error("文件夹同步需要 FilesPort（仅桌面端支持）");
     return createFolderProvider(config, files);
+  }
+  if (config.kind === "s3") {
+    // S3 需要 bucket/region/credentials，由 UI 层收集后传入
+    return createS3Provider({
+      ...config,
+      kind: "s3",
+      bucket: config.bucket ?? "",
+      region: config.region ?? "us-east-1",
+      accessKeyId: config.accessKeyId ?? "",
+      secretAccessKey: config.secretAccessKey ?? "",
+    });
   }
   if (config.kind === "http") return createHttpProvider(config);
   return createWebDavProvider(config);

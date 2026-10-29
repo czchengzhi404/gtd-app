@@ -91,3 +91,37 @@ primary / primaryMuted / onPrimary / border / danger / success / warning / overl
 ## 10. 已知未做
 
 - 看板列内排序（拖拽仅跨列改状态，列内顺序仍用列表视图的上移/下移）
+
+## 11. v0.6.0 实测打磨（Pre-Delivery Checklist）
+
+### 自动化审计（进入测试套件，防止回归）
+
+| 审计 | 文件 | 覆盖 |
+|---|---|---|
+| WCAG 对比度 | `packages/ui/src/__tests__/contrast.test.ts` | 亮/暗各 8 组正文组合 ≥4.5:1、3 组次要文本 ≥3:1、边框可辨识度；含计算器自检（黑白=21:1） |
+| 可访问性静态扫描 | `packages/ui/src/__tests__/a11y-audit.test.ts` | 图标按钮必带 label、组件不得绕过 AppText 直接用 Text、可点元素必有 role/label |
+
+### 审计发现并修复的真实缺陷
+
+| 问题 | 原值 | 修复后 | 比率变化 |
+|---|---|---|---|
+| 亮色次要文本对比不足 | `#8A9099` | `#616B7A` | 3.35:1 → 4.99:1（canvas）/ 4.73:1（surfaceMuted） |
+| 亮色边框不可辨识 | `#E2E5EA` | `#CFD4DC` | 1.27:1 → 1.49:1 |
+| 暗色边框不可辨识 | `#2A2F37` | `#363D46` | 1.27:1 → 1.56:1 |
+
+### 四组视口实测
+
+截图工具支持 `--shot=WxH,out.png,route?dark=1&fontScale=2`：
+
+| 场景 | 尺寸 | 结果 |
+|---|---|---|
+| 小屏手机 | 375×812 | 通过：单列布局、底部 Tab、无横向滚动 |
+| 横屏 | 812×375 | 通过：内容区可滚动，Tab 栏不遮挡内容 |
+| 暗色模式 | 390×844（prefers-color-scheme: dark） | 通过：全部语义 token 切换，无残留亮色块 |
+| 大字号（2× 缩放） | 390×844（deviceScaleFactor=2） | 通过：文字不溢出容器、不重叠 |
+
+### 真机验证的边界（如实说明）
+
+以上为桌面 Electron 渲染同一套 React Native Web 组件的结果。**Android 真机的系统 fontScale 行为无法在本机验证**（本机无 Android SDK），
+已通过三层防御（AppText 锁定 + 全局 installFontScaleOverride + 原生 attachBaseContext fontScale=1.0）覆盖，
+仍需在真机确认。

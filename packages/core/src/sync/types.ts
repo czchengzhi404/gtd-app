@@ -29,13 +29,68 @@ export const SYNC_FILE_LAYOUT = {
 } as const;
 
 export interface SyncConfig {
-  kind: "webdav" | "http" | "folder";
-  /** WebDAV/HTTP：服务端根地址；folder：本地目录（仅桌面端） */
+  kind: "webdav" | "http" | "folder" | "s3";
+  /** WebDAV/HTTP：服务端根地址；folder：本地目录；s3：服务端根地址（如 https://oss-cn-hangzhou.aliyuncs.com） */
   endpoint: string;
   username?: string;
   password?: string;
   enabled: boolean;
+  /** S3 专用字段 */
+  bucket?: string;
+  region?: string;
+  accessKeyId?: string;
+  secretAccessKey?: string;
 }
+
+/** 预设：一键填充常见网盘/存储服务的同步配置 */
+export type SyncPresetKind = "nutstore" | "webdav" | "s3" | "folder";
+
+export interface SyncPreset {
+  kind: SyncPresetKind;
+  labelKey: string;
+  icon: string;
+  /** 预填的 endpoint 模板（{username} 占位符会被替换） */
+  endpointTemplate?: string;
+  /** 需要填写的字段 */
+  fields: ("username" | "password" | "endpoint" | "bucket" | "region" | "accessKeyId" | "secretAccessKey")[];
+  /** 桌面端限定 */
+  desktopOnly?: boolean;
+  /** 说明文字 */
+  hintKey: string;
+}
+
+export const SYNC_PRESETS: SyncPreset[] = [
+  {
+    kind: "nutstore",
+    labelKey: "preset.nutstore",
+    icon: "cloud-outline",
+    endpointTemplate: "https://dav.jianguoyun.com/dav/",
+    fields: ["username", "password"],
+    hintKey: "preset.nutstoreHint",
+  },
+  {
+    kind: "webdav",
+    labelKey: "preset.customWebdav",
+    icon: "globe-outline",
+    fields: ["endpoint", "username", "password"],
+    hintKey: "preset.customWebdavHint",
+  },
+  {
+    kind: "s3",
+    labelKey: "preset.s3",
+    icon: "server-outline",
+    fields: ["endpoint", "bucket", "region", "accessKeyId", "secretAccessKey"],
+    hintKey: "preset.s3Hint",
+  },
+  {
+    kind: "folder",
+    labelKey: "preset.folder",
+    icon: "folder-outline",
+    fields: ["endpoint"],
+    desktopOnly: true,
+    hintKey: "preset.folderHint",
+  },
+];
 
 export interface SyncReport {
   deviceId: string;
