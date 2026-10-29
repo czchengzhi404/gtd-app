@@ -61,3 +61,20 @@ primary / primaryMuted / onPrimary / border / danger / success / warning / overl
 
 `bunx electron . --shot=390x844,<输出路径>,<路由>` 可离屏截图（窗口不显示、不抢焦点），
 用于本地验证移动端布局与桌面端宽度表现。
+
+## 8. v0.4.0 新增组件
+
+| 组件 | 作用 | 关键约束 |
+|---|---|---|
+| `FilterBar` | 关键词 + 情境芯片 + 只看逾期 | 情境芯片单行溢出裁切，筛选区高度不随数据变化 |
+| `ChecklistEditor` | 子项勾选/新增/删除 + 进度 | 子项行 40 高，标题单行省略 |
+| `AttachmentList` | 附件元数据列表 | 二进制不入库，仅存路径 |
+| `Pomodoro` | 番茄钟 | 用目标时间戳计算剩余，避免定时器漂移 |
+| `UndoHost` / `showUndo()` | 全局撤销条 | 单例宿主挂在根布局，保留最近一次操作 |
+| `ProjectDetailContent` | 项目详情 | section 分组、下一步行动左侧色条高亮 |
+
+## 9. 已知未做
+
+- 桌面端右键任务菜单：未实现（快捷键 + 行尾动作面板已覆盖同等能力）。
+  若后续要做，方案是 Electron `context-menu` 事件 + 渲染端 `nativeID` 命中测试。
+- 看板拖拽跨列：用详情页状态流转替代；如需拖拽需引入 gesture-handler 手势层。

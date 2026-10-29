@@ -49,6 +49,11 @@ const api = {
     list: () => ipcRenderer.invoke("backup:list"),
     restore: () => ipcRenderer.invoke("backup:restore"),
   },
+  menu: {
+    /** 弹出系统原生右键菜单，返回被选中项的 id（取消为 null） */
+    context: (items: { id: string; label: string; enabled?: boolean; type?: "separator" }[], pos?: { x: number; y: number }) =>
+      ipcRenderer.invoke("menu:context", { items, x: pos?.x, y: pos?.y }),
+  },
   app: {
     getInfo: () => ipcRenderer.invoke("app:getInfo"),
     quit: () => ipcRenderer.invoke("app:quit"),

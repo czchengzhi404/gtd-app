@@ -5,6 +5,7 @@ import { View } from "react-native";
 import { Pomodoro, SectionHeader, TaskList, useAppStore, useT } from "@gtd/ui";
 import { getTodayTasks, selectContexts } from "@gtd/core";
 import { useTaskActions } from "@/hooks/useRowActions";
+import { openTaskContextMenu } from "@/lib/context-menu";
 import { completeTaskWithUndo } from "@/lib/task-ops";
 
 /** 专注：番茄钟 + 已选中的下一步行动 + 今日到期 */
@@ -37,6 +38,7 @@ export default function FocusScreen() {
         now={Date.now()}
         contextNameById={contextNameById}
         actions={actions}
+        onContextMenuTask={(task, position) => openTaskContextMenu(task, position)}
         onToggleTask={(task) => void completeTaskWithUndo(task)}
         onPressTask={(task) => router.push(`/task/${task.id}`)}
         emptyTitle={t("focus.emptyStarred")}
@@ -48,6 +50,7 @@ export default function FocusScreen() {
         now={Date.now()}
         contextNameById={contextNameById}
         actions={actions}
+        onContextMenuTask={(task, position) => openTaskContextMenu(task, position)}
         onToggleTask={(task) => void completeTaskWithUndo(task)}
         onPressTask={(task) => router.push(`/task/${task.id}`)}
         emptyTitle={t("focus.emptyToday")}

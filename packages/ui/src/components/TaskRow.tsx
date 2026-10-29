@@ -20,6 +20,11 @@ export interface TaskRowProps {
   /** 行尾更多操作（删除/重命名） */
   actions?: ActionItem[];
   onLongPress?: () => void;
+  /**
+   * 桌面端右键：返回 true 表示已由原生菜单处理。
+   * web 端挂到外层 View 的 onContextMenu（RNW 透传 DOM 事件）。
+   */
+  onContextMenu?: (position: { x: number; y: number }) => Promise<boolean>;
 }
 
 /**
@@ -35,12 +40,27 @@ export function TaskRow({
   meta,
   actions,
   onLongPress,
+  onContextMenu,
 }: TaskRowProps) {
   const colors = useTheme();
   const focus = useFocusStyle(radius.sm);
 
+  // RNW 会把 onContextMenu 透传到 DOM；native 上该 prop 被忽略
+  const webContextProps =
+    onContextMenu !== undefined
+      ? {
+          onContextMenu: (event: { nativeEvent?: { pageX?: number; pageY?: number }; preventDefault?: () => void }) => {
+            event.preventDefault?.();
+            void onContextMenu({
+              x: event.nativeEvent?.pageX ?? 0,
+              y: event.nativeEvent?.pageY ?? 0,
+            });
+          },
+        }
+      : {};
+
   return (
-    <View style={styles.row}>
+    <View style={styles.row} {...(webContextProps as object)}>
       <Pressable
         accessibilityRole="checkbox"
         accessibilityState={{ checked: done }}

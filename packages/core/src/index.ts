@@ -12,6 +12,7 @@ export * from "./features/recurrence";
 export * from "./features/quick-add";
 export * from "./features/due-scan";
 export * from "./features/review";
+export * from "./features/kanban-dnd";
 export * from "./db/coerce";
 export * from "./sync/types";
 export * from "./sync/merge";

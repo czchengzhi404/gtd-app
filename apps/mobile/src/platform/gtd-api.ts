@@ -22,7 +22,18 @@ export interface GtdApi {
     list(): Promise<{ count: number; latest: string | null }>;
     restore(): Promise<{ ok: boolean; file?: string; error?: string }>;
   };
+  menu: {
+    context(
+      items: { id: string; label: string; enabled?: boolean; type?: "separator" }[],
+      pos?: { x: number; y: number },
+    ): Promise<string | null>;
+  };
   on(channel: string, listener: (...args: unknown[]) => void): () => void;
+}
+
+/** 是否运行在 Electron 渲染进程中（存在 preload 桥） */
+export function hasDesktopBridge(): boolean {
+  return typeof globalThis !== "undefined" && (globalThis as { gtd?: unknown }).gtd !== undefined;
 }
 
 export function gtd(): GtdApi {

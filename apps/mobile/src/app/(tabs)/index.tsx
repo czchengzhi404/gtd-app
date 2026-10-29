@@ -17,9 +17,11 @@ import {
   getTasksByStatus,
   parseQuickAdd,
   quickAdd,
+  runCommand,
   selectContexts,
 } from "@gtd/core";
 import { useOrderedTaskActions } from "@/hooks/useRowActions";
+import { openTaskContextMenu } from "@/lib/context-menu";
 import { completeTaskWithUndo, uncompleteTask } from "@/lib/task-ops";
 
 type InboxView = "list" | "kanban";
@@ -122,6 +124,7 @@ export default function InboxScreen() {
           now={Date.now()}
           contextNameById={contextNameById}
           actions={actions}
+          onContextMenuTask={(task, position) => openTaskContextMenu(task, position)}
           onToggleTask={(task) =>
             void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
           }
@@ -134,11 +137,14 @@ export default function InboxScreen() {
           now={Date.now()}
           actions={actions}
           columns={[
-            { key: "inbox", title: t("detail.status.inbox"), tasks: filtered },
-            { key: "next", title: t("detail.status.next"), tasks: nextTasks },
-            { key: "waiting", title: t("detail.status.waiting"), tasks: waitingTasks },
-            { key: "someday", title: t("detail.status.someday"), tasks: somedayTasks },
+            { key: "inbox", title: t("detail.status.inbox"), status: "inbox", tasks: filtered },
+            { key: "next", title: t("detail.status.next"), status: "next", tasks: nextTasks },
+            { key: "waiting", title: t("detail.status.waiting"), status: "waiting", tasks: waitingTasks },
+            { key: "someday", title: t("detail.status.someday"), status: "someday", tasks: somedayTasks },
           ]}
+          onMoveTask={(task, status) =>
+            void runCommand("task.moveStatus", { id: task.id, status }).catch(() => undefined)
+          }
           onPressTask={(task) => router.push(`/task/${task.id}`)}
         />
       )}

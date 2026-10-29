@@ -27,6 +27,8 @@ export interface TaskListProps {
   onPressTask: (task: Task) => void;
   /** 行尾更多操作 */
   actions?: TaskRowAction[];
+  /** 桌面端原生右键菜单（返回 true = 已处理） */
+  onContextMenuTask?: (task: Task, position: { x: number; y: number }) => Promise<boolean>;
   emptyTitle?: string;
   emptyHint?: string;
   /** 卡片化容器（列表页默认开；嵌在其他卡片内时可关） */
@@ -44,6 +46,7 @@ export function TaskList({
   onToggleTask,
   onPressTask,
   actions,
+  onContextMenuTask,
   emptyTitle,
   emptyHint,
   carded = true,
@@ -60,6 +63,15 @@ export function TaskList({
       done={item.status === "done"}
       onToggle={() => onToggleTask(item)}
       onPress={() => onPressTask(item)}
+      onContextMenu={
+        onContextMenuTask !== undefined
+          ? async (position) => {
+              const handled = await onContextMenuTask(item, position);
+              if (!handled) onPressTask(item);
+              return handled;
+            }
+          : undefined
+      }
       actions={actions?.map((action) => ({
         key: action.key,
         label: action.label,

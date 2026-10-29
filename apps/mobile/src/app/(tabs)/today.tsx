@@ -14,6 +14,7 @@ import {
 } from "@gtd/ui";
 import { applyListFilter, getTodayTasks, selectContexts } from "@gtd/core";
 import { useOrderedTaskActions } from "@/hooks/useRowActions";
+import { openTaskContextMenu } from "@/lib/context-menu";
 import { completeTaskWithUndo, uncompleteTask } from "@/lib/task-ops";
 
 type TodayView = "list" | "calendar" | "timeline";
@@ -75,6 +76,7 @@ export default function TodayScreen() {
           now={Date.now()}
           contextNameById={contextNameById}
           actions={actions}
+          onContextMenuTask={(task, position) => openTaskContextMenu(task, position)}
           onToggleTask={(task) =>
             void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
           }

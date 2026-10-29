@@ -152,6 +152,11 @@ const zh: Dict = {
   "project.nextAction": "下一步行动",
   "project.doneSection": "已完成",
   // 排序
+  "task.ctxOpen": "打开详情",
+  "task.ctxStar": "选入专注",
+  "task.ctxUnstar": "移出专注",
+  "task.ctxComplete": "标记完成",
+  "task.ctxDelete": "删除任务",
   "task.moveUp": "上移",
   "task.moveDown": "下移",
   // 备份 / 日志 / 统计
@@ -372,6 +377,11 @@ const en: Dict = {
   "project.groupEmpty": "Nothing in this section",
   "project.nextAction": "Next action",
   "project.doneSection": "Completed",
+  "task.ctxOpen": "Open",
+  "task.ctxStar": "Star for Focus",
+  "task.ctxUnstar": "Remove from Focus",
+  "task.ctxComplete": "Mark complete",
+  "task.ctxDelete": "Delete task",
   "task.moveUp": "Move up",
   "task.moveDown": "Move down",
   "more.backupSection": "Local backup",

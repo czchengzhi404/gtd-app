@@ -219,6 +219,62 @@ function registerIpc(): void {
     allowedRoots.add(resolved);
     return resolved;
   });
+  /**
+   * 原生右键菜单：渲染端传菜单项（id/label/enabled），主进程用 Menu.popup 弹系统菜单，
+   * 选中后回传 id。菜单内容由渲染端决定（那里知道当前任务状态），主进程只负责展示。
+   */
+  ipcMain.handle("menu:context", async (event, payload: unknown) => {
+    const p = payload as {
+      items?: { id?: unknown; label?: unknown; enabled?: unknown; type?: unknown }[];
+      x?: unknown;
+      y?: unknown;
+    };
+    if (!Array.isArray(p?.items) || p.items.length === 0) return null;
+
+    const sanitize = (value: unknown, max: number) =>
+      typeof value === "string" ? value.slice(0, max) : "";
+
+    return new Promise<string | null>((resolve) => {
+      let settled = false;
+      const finish = (id: string | null) => {
+        if (settled) return;
+        settled = true;
+        resolve(id);
+      };
+
+      const template: Electron.MenuItemConstructorOptions[] = [];
+      for (const raw of p.items ?? []) {
+        if (raw?.type === "separator") {
+          template.push({ type: "separator" });
+          continue;
+        }
+        const id = sanitize(raw?.id, 64);
+        const label = sanitize(raw?.label, 120);
+        if (id.length === 0 || label.length === 0) continue;
+        template.push({
+          id,
+          label,
+          enabled: raw?.enabled !== false,
+          click: () => finish(id),
+        });
+      }
+      if (template.length === 0) {
+        finish(null);
+        return;
+      }
+
+      const win = BrowserWindow.fromWebContents(event.sender) ?? mainWindow;
+      const menu = Menu.buildFromTemplate(template);
+      menu.popup({
+        window: win ?? undefined,
+        x: typeof p.x === "number" ? Math.round(p.x) : undefined,
+        y: typeof p.y === "number" ? Math.round(p.y) : undefined,
+        // 点击空白关闭时也要 resolve，否则渲染端 await 悬挂
+        callback: () => finish(null),
+      });
+    });
+  });
+
   /* ---- 本地备份：VACUUM INTO 快照（一致性快照，无需停库） ---- */
   ipcMain.handle("backup:now", () =>
     enqueueDb(async () => {
@@ -861,6 +917,13 @@ async function runSmoke(win: BrowserWindow): Promise<void> {
     if (zhLabel !== MENU_I18N.zh.tasks) {
       return fail(`切回后菜单语言应为「${MENU_I18N.zh.tasks}」，实际「${String(zhLabel)}」`);
     }
+
+    // 6) 右键菜单 IPC 可用性（不真正弹窗：只校验 preload 暴露与主进程注册）
+    const contextMenuReady = await win.webContents.executeJavaScript(
+      `typeof window.gtd.menu?.context === "function"`,
+      true,
+    );
+    if (contextMenuReady !== true) return fail("右键菜单 IPC 未暴露");
 
     await runNativeAndSyncE2e();
 
