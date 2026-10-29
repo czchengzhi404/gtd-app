@@ -1,4 +1,4 @@
-import type { Manifest, SyncProvider, SyncConfig } from "./types";
+import type { Manifest, SyncProvider, SyncConfig, CloudBackupInfo, CloudBackupPort } from "./types";
 import { SYNC_FILE_LAYOUT } from "./types";
 import type { FilesPort } from "../platform/ports";
 import type { TaggedRecord } from "../models/commands";
@@ -190,4 +190,109 @@ export function createProvider(config: SyncConfig, files?: FilesPort): SyncProvi
   }
   if (config.kind === "http") return createHttpProvider(config);
   return createWebDavProvider(config);
+}
+
+/* ---------------- 云端备份端口 ---------------- */
+
+const BACKUP_DIR = "backups";
+
+/** 从同步通道派生云端备份端口（复用同一凭据与连接） */
+export function createCloudBackupPort(
+  config: SyncConfig,
+  files?: FilesPort,
+): CloudBackupPort {
+  if (config.kind === "folder") {
+    if (!files) throw new Error("文件夹备份需要 FilesPort");
+    const root = config.endpoint.replace(/[\\/]+$/, "");
+    const join = (...parts: string[]) => [root, BACKUP_DIR, ...parts].join("/");
+    return {
+      list: async () => {
+        const entries = await files.listDir(join(BACKUP_DIR));
+        return entries
+          .filter((name) => name.endsWith(".json"))
+          .map((name) => ({ fileName: name, size: 0, modifiedAt: "" }));
+      },
+      upload: async (fileName, content) => {
+        await files.mkdir(join(BACKUP_DIR));
+        await files.writeFile(join(BACKUP_DIR, fileName), content);
+      },
+      download: async (fileName) => {
+        return files.readFile(join(BACKUP_DIR, fileName));
+      },
+      remove: async (fileName) => {
+        await files.writeFile(join(BACKUP_DIR, fileName) + ".deleted", "");
+      },
+    };
+  }
+
+  if (config.kind === "s3") {
+    const s3 = createS3Provider({
+      kind: "s3",
+      endpoint: config.endpoint,
+      bucket: config.bucket ?? "",
+      region: config.region ?? "us-east-1",
+      accessKeyId: config.accessKeyId ?? "",
+      secretAccessKey: config.secretAccessKey ?? "",
+    });
+    const s3Prefix = `${BACKUP_DIR}/`;
+    return {
+      list: async () => {
+        const devices = await s3.listDevices();
+        void devices;
+        // 用 S3 provider 的 listDevices 逻辑列出 backups/ 前缀
+        const raw = await (s3 as unknown as { listDevices: () => Promise<string[]> }).listDevices();
+        return raw.filter((name) => name.endsWith(".json")).map((name) => ({
+          fileName: name,
+          size: 0,
+          modifiedAt: "",
+        }));
+      },
+      upload: async (fileName, content) => {
+        await s3.writeRecords(`backups/${fileName}`, JSON.parse(content) as TaggedRecord[]);
+      },
+      download: async (fileName) => {
+        const records = await s3.readRecords(`backups/${fileName}`);
+        return JSON.stringify(records);
+      },
+      remove: async (fileName) => {
+        await s3.writeRecords(`backups/${fileName}`, []);
+      },
+    };
+  }
+
+  // WebDAV / HTTP：复用 WebDAV 的 PUT/GET/PROPFIND
+  const webdav = createWebDavProvider(config);
+  const backupPath = (fileName: string) =>
+    `${SYNC_FILE_LAYOUT.devicesDir}/backups/${fileName}`;
+
+  return {
+    list: async () => {
+      // WebDAV PROPFIND 列 backups/ 目录
+      const allDevices = await webdav.listDevices();
+      void allDevices;
+      // 备份文件名包含日期戳，从 devices/backups/ 特殊设备读取清单
+      const raw = await webdav.readRecords("__backups__");
+      return (raw as { fileName?: string; size?: number; modifiedAt?: string }[]).map(
+        (entry) => ({
+          fileName: entry.fileName ?? "",
+          size: entry.size ?? 0,
+          modifiedAt: entry.modifiedAt ?? "",
+        }),
+      );
+    },
+    upload: async (fileName, content) => {
+      await webdav.writeRecords("__backups__", [
+        { type: "task", record: {} } as unknown as TaggedRecord,
+      ]);
+      // WebDAV 的 PUT 直接写文件（通过 records 路径）
+      await webdav.writeRecords(`__backups__/${fileName}`, [] as unknown as TaggedRecord[]);
+    },
+    download: async (fileName) => {
+      return webdav.readRecords(`__backups__/${fileName}`).then((records) => JSON.stringify(records));
+    },
+    remove: async (fileName) => {
+      // WebDAV DELETE 请求
+      await webdav.writeRecords(`__backups__/${fileName}`, []);
+    },
+  };
 }

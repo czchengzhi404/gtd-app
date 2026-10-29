@@ -118,6 +118,21 @@ export interface SyncProvider {
   writeRecords(deviceId: string, records: TaggedRecord[]): Promise<void>;
 }
 
+/** 云端备份文件信息 */
+export interface CloudBackupInfo {
+  fileName: string;
+  size: number;
+  modifiedAt: string;
+}
+
+/** 云端备份端口：在同步通道上读写备份文件（独立于同步数据的 /backups/ 目录） */
+export interface CloudBackupPort {
+  list(): Promise<CloudBackupInfo[]>;
+  upload(fileName: string, content: string): Promise<void>;
+  download(fileName: string): Promise<string | null>;
+  remove(fileName: string): Promise<void>;
+}
+
 /** 分批：每批一个独立 immediate 事务（端口契约：默认 200–500 条/批） */
 export function chunkRecords<T>(records: T[], batchSize: number): T[][] {
   const size = Math.max(1, Math.trunc(batchSize));
