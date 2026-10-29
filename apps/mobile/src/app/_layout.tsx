@@ -2,26 +2,27 @@ import { useEffect, useState } from "react";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
-import { useColorScheme } from "react-native";
 
-import { Screen, ThemeProvider, UndoHost, useTheme, setLang, useT } from "@gtd/ui";
-
-function setLangFromKv(lang: "zh" | "en"): void {
-  setLang(lang);
-}
+import { Screen, ThemeProvider, useTheme, useT } from "@gtd/ui";
 import { appStore, bootstrapStore } from "@gtd/core";
 import { initPlatform } from "@/platform/bootstrap";
 import { installFontScaleOverride } from "@/platform/font-scale";
+import * as Font from "expo-font";
+
+/** 加载内置霞鹜文楷字体（app 层负责，因为字体文件在 mobile assets 里） */
+async function loadBuiltinFont(): Promise<void> {
+  await Font.loadAsync({
+    LXGWWenKai: require("../../assets/fonts/LXGWWenKai-Regular.ttf"),
+  }).catch(() => undefined);
+}
 
 installFontScaleOverride();
 
 /**
- * 根布局：注入平台端口（Electron→IPC / 原生→expo-sqlite）→ 迁移（原生）→
- * 种子（幂等）→ bootstrap 全量加载（含 kv.lang 应用）→ 事件/通知接线。
+ * 根布局：注入平台端口 → 迁移（原生）→ 种子 → bootstrap → 事件/通知接线。
+ * 主题（日夜/字体）由 ThemeProvider 从 kv 读取，设置页修改后即时生效。
  */
 export default function RootLayout() {
-  const scheme = useColorScheme();
-  const t = useT();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,12 +32,8 @@ export default function RootLayout() {
       try {
         const result = await initPlatform();
         cleanup = result.cleanup;
+        await loadBuiltinFont();
         await bootstrapStore();
-        // 语言持久化：bootstrap 后应用 kv 里的设置
-        const saved = appStore.getState().kv["lang"];
-        if (saved === "en" || saved === "zh") {
-          setLangFromKv(saved);
-        }
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : String(err);
@@ -52,24 +49,29 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <ThemeProvider scheme={scheme}>
+    <ThemeProvider>
       <StatusBar style="auto" />
       {error !== null ? (
         <BootError message={error} />
       ) : (
-        <>
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="task/[id]" options={{ title: t("detail.title") }} />
-            <Stack.Screen name="project/[id]" options={{ title: t("nav.projects") }} />
-            <Stack.Screen name="review" options={{ title: t("review.title") }} />
-            <Stack.Screen name="add" options={{ title: t("nav.inbox"), headerShown: false }} />
-            <Stack.Screen name="about" options={{ title: t("more.about") }} />
-          </Stack>
-          <UndoHost />
-        </>
+        <StackScreens />
       )}
     </ThemeProvider>
+  );
+}
+
+/** Stack 路由标题使用 useT 以随语言/字体切换 */
+function StackScreens() {
+  const t = useT();
+  return (
+    <Stack>
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="task/[id]" options={{ title: t("detail.title") }} />
+      <Stack.Screen name="project/[id]" options={{ title: t("nav.projects") }} />
+      <Stack.Screen name="review" options={{ title: t("review.title") }} />
+      <Stack.Screen name="add" options={{ title: t("nav.inbox"), headerShown: false }} />
+      <Stack.Screen name="about" options={{ title: t("more.about") }} />
+    </Stack>
   );
 }
 
@@ -79,8 +81,8 @@ function BootError({ message }: { message: string }) {
   return (
     <Screen>
       <View style={styles.errorWrap}>
-        <Text maxFontSizeMultiplier={1.2} style={[styles.errorTitle, { color: colors.danger }]}>{t("boot.error")}</Text>
-        <Text maxFontSizeMultiplier={1.2} style={[styles.errorBody, { color: colors.text }]}>{message}</Text>
+        <Text style={[styles.errorTitle, { color: colors.danger }]}>{t("boot.error")}</Text>
+        <Text style={[styles.errorBody, { color: colors.text }]}>{message}</Text>
       </View>
     </Screen>
   );

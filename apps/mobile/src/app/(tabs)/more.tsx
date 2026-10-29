@@ -282,6 +282,21 @@ export default function MoreScreen() {
           <SegPill label={t("more.lang.en")} selected={lang === "en"} onPress={() => onSwitchLang("en")} />
         </View>
 
+        {/* 主题 */}
+        <SectionHeader title={t("more.themeSection")} />
+        <View style={styles.inlineRow}>
+          <SegPill label={t("more.theme.system")} selected={(kv["theme.mode"] ?? "system") === "system"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "system" }).catch(() => undefined)} />
+          <SegPill label={t("more.theme.light")} selected={kv["theme.mode"] === "light"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "light" }).catch(() => undefined)} />
+          <SegPill label={t("more.theme.dark")} selected={kv["theme.mode"] === "dark"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "dark" }).catch(() => undefined)} />
+        </View>
+
+        {/* 字体 */}
+        <SectionHeader title={t("more.fontSection")} />
+        <View style={styles.inlineRow}>
+          <SegPill label={t("more.font.wenkai")} selected={(kv["font.family"] ?? "LXGWWenKai") === "LXGWWenKai"} onPress={() => void runCommand("settings.set", { key: "font.family", value: "LXGWWenKai" }).catch(() => undefined)} />
+          <SegPill label={t("more.font.system")} selected={kv["font.family"] === "system"} onPress={() => void runCommand("settings.set", { key: "font.family", value: "system" }).catch(() => undefined)} />
+        </View>
+
         {/* 每周回顾 */}
         <SectionHeader
           title={t("more.reviewSection")}

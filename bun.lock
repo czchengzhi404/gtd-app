@@ -11,7 +11,7 @@
     },
     "apps/desktop": {
       "name": "@gtd/desktop",
-      "version": "0.2.1",
+      "version": "0.7.0",
       "dependencies": {
         "better-sqlite3": "13.0.3",
         "electron-updater": "^6.8.11",
@@ -26,13 +26,14 @@
     },
     "apps/mobile": {
       "name": "@gtd/mobile",
-      "version": "0.2.1",
+      "version": "0.7.0",
       "dependencies": {
         "@expo/metro-runtime": "~57.0.17",
         "@gtd/core": "workspace:*",
         "@gtd/ui": "workspace:*",
         "expo": "~57.0.31",
         "expo-constants": "~57.0.22",
+        "expo-font": "~57.0.4",
         "expo-linking": "~57.0.13",
         "expo-notifications": "~57.0.24",
         "expo-router": "~57.0.29",

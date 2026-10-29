@@ -1,5 +1,6 @@
 import { Text, type TextProps, type TextStyle } from "react-native";
 import { useTheme } from "../hooks/useTheme";
+import { useThemeSettings } from "../hooks/useTheme";
 import { type as typeScale, type TypeVariant } from "./tokens";
 
 export type TextTone = "primary" | "secondary" | "tertiary" | "accent" | "danger" | "success" | "warning" | "onPrimary";
@@ -41,6 +42,7 @@ export function AppText({
   ...rest
 }: AppTextProps) {
   const colors = useTheme();
+  const { fontFamily } = useThemeSettings();
   const scale = typeScale[variant];
 
   const toneColor: Record<TextTone, string> = {
@@ -68,6 +70,7 @@ export function AppText({
           fontWeight: weight ?? scale.fontWeight,
           color: color ?? (tone !== undefined ? toneColor[tone] : colors.text),
           textAlign: align,
+          fontFamily: fontFamily === "LXGWWenKai" ? "LXGWWenKai" : undefined,
         },
         style,
       ]}
