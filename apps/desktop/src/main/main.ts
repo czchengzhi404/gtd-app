@@ -853,12 +853,44 @@ async function runShot(win: BrowserWindow): Promise<void> {
   const cfg = shotCfg;
   if (cfg === null) return;
   try {
-    await win.loadURL(`${APP_SCHEME}://${APP_HOST}/${cfg.route}`);
+    // --shot 的 route 段支持 `route?dark=1&fontScale=2` 形式的实测参数：
+    // dark 强制暗色（模拟系统深色模式），fontScale 放大系统字体（验证大字号不破版）
+    // route 段形如 `today?dark=1`；首个 ? 之后都是查询参数
+    const rawRoute = cfg.route ?? "";
+    const qIndex = rawRoute.indexOf("?");
+    const routePath = qIndex === -1 ? rawRoute : rawRoute.slice(0, qIndex);
+    const search = qIndex === -1 ? "" : rawRoute.slice(qIndex + 1);
+    const query = new URLSearchParams(search);
+    const dark = query.get("dark") === "1";
+    const fontScale = Number(query.get("fontScale") ?? "1");
+
+    // 先加载页面，再应用媒体/尺寸模拟（提前执行会让首次导航被 abort）
+    await win.loadURL(`${APP_SCHEME}://${APP_HOST}/${routePath ?? ""}`);
+
+    try {
+      win.webContents.debugger.attach("1.3");
+      await win.webContents.debugger.sendCommand("Emulation.setEmulatedMedia", {
+        features: [{ name: "prefers-color-scheme", value: dark ? "dark" : "light" }],
+      });
+      if (Number.isFinite(fontScale) && fontScale !== 1) {
+        await win.webContents.debugger.sendCommand("Emulation.setDeviceMetricsOverride", {
+          width: cfg.width ?? 390,
+          height: cfg.height ?? 844,
+          deviceScaleFactor: fontScale,
+          mobile: (cfg.width ?? 390) < 768,
+        });
+      }
+    } catch {
+      /* 模拟失败不影响截图 */
+    }
+
     // 数据加载 + 字体排版稳定
     await new Promise((r) => setTimeout(r, 4500));
     const image = await win.webContents.capturePage();
     fs.writeFileSync(cfg.out, image.toPNG());
-    console.log(`SHOT_SAVED ${cfg.out} (${cfg.width}x${cfg.height})`);
+    console.log(
+      `SHOT_SAVED ${cfg.out} (${cfg.width}x${cfg.height}${dark ? " dark" : ""}${fontScale !== 1 ? ` fontScale=${fontScale}` : ""})`,
+    );
     app.exit(0);
   } catch (err) {
     console.error("SHOT_FAILED", err instanceof Error ? err.message : String(err));

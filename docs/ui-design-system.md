@@ -73,8 +73,21 @@ primary / primaryMuted / onPrimary / border / danger / success / warning / overl
 | `UndoHost` / `showUndo()` | 全局撤销条 | 单例宿主挂在根布局，保留最近一次操作 |
 | `ProjectDetailContent` | 项目详情 | section 分组、下一步行动左侧色条高亮 |
 
-## 9. 已知未做
+## 9. v0.5.0：拖拽与原生右键菜单
 
-- 桌面端右键任务菜单：未实现（快捷键 + 行尾动作面板已覆盖同等能力）。
-  若后续要做，方案是 Electron `context-menu` 事件 + 渲染端 `nativeID` 命中测试。
-- 看板拖拽跨列：用详情页状态流转替代；如需拖拽需引入 gesture-handler 手势层。
+**看板跨列拖拽**（`KanbanBoard`）
+- 长按卡片 220ms 进入拖拽（`PanResponder`），位移 >6px 才真正开始，避免误触
+- 拖拽中显示浮层卡片跟随手指，原位置保留占位（列表不跳动），列横向滚动临时禁用
+- 落点判定用卡片中心点命中列区间（`packages/core/src/features/kanban-dnd.ts` 纯函数，7 项单测覆盖边界/空隙/同列）
+- 悬停目标列高亮描边；松手后调用 `task.moveStatus`
+- 未传 `onMoveTask` 时自动降级为只读看板
+
+**桌面原生右键菜单**（`menu:context`）
+- 渲染端构造菜单项（知道任务当前状态），主进程 `Menu.popup` 展示系统菜单并回传选中 id
+- 菜单内容：打开详情 / 四个状态（当前状态置灰）/ 选入或移出专注 / 标记完成 / 删除
+- 主进程对 label/id 做长度与类型校验；点击空白关闭也会 resolve，避免渲染端 await 悬挂
+- 仅在 Electron 渲染进程生效（`hasDesktopBridge()`），移动端沿用长按 → 底部动作面板
+
+## 10. 已知未做
+
+- 看板列内排序（拖拽仅跨列改状态，列内顺序仍用列表视图的上移/下移）
