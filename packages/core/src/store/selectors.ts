@@ -180,24 +180,40 @@ export function selectAreas(state: AppState): Area[] {
     .sort((a, b) => (a.orderKey < b.orderKey ? -1 : 1));
 }
 
-/** 按区域分组的活跃项目；未归类的进 null 组 */
-export function selectProjectsByArea(
-  state: AppState,
+/**
+ * 按区域分组活跃项目；未归类的进 null 组（殿后）。
+ * 纯数组入参版：React 侧应配 useMemo 使用（见下 selectProjectsByArea 的注意）。
+ */
+export function groupProjectsByArea(
+  areas: Area[],
+  projects: Project[],
+  allAreas: Record<string, Area>,
 ): { area: Area | null; projects: Project[] }[] {
-  const active = selectActiveProjects(state);
-  const groups = selectAreas(state).map((area) => ({
+  const groups = areas.map((area) => ({
     area,
-    projects: active.filter((project) => project.areaId === area.id),
+    projects: projects.filter((project) => project.areaId === area.id),
   }));
-  const loose = active.filter((project) => {
+  const loose = projects.filter((project) => {
     if (project.areaId === null) return true;
-    const area = state.areas[project.areaId];
+    const area = allAreas[project.areaId];
     // 区域被删（墓碑）或缺失时，项目回落未分组，不能凭空消失
     return area === undefined || area.deletedAt !== null;
   });
   return [...groups, { area: null, projects: loose }].filter(
     (group) => group.projects.length > 0 || group.area !== null,
   );
+}
+
+/**
+ * 按区域分组的活跃项目（state 版，测试/一次性调用用）。
+ * ⚠️ 不要直接传给 useAppStore/useShallow：每次调用都返回新的分组对象，
+ * 浅比较恒不相等会触发 React "Maximum update depth exceeded"（#185）。
+ * React 里请用 selectAreas + selectActiveProjects + groupProjectsByArea + useMemo。
+ */
+export function selectProjectsByArea(
+  state: AppState,
+): { area: Area | null; projects: Project[] }[] {
+  return groupProjectsByArea(selectAreas(state), selectActiveProjects(state), state.areas);
 }
 
 /** 对任意任务集合应用搜索 + 情境 + 逾期筛选（纯函数） */

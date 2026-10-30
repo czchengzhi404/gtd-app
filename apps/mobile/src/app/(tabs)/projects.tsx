@@ -17,10 +17,11 @@ import {
   appStore,
   getProjectNextAction,
   getProjectTasks,
+  groupProjectsByArea,
   quickAdd,
   runCommand,
+  selectActiveProjects,
   selectAreas,
-  selectProjectsByArea,
 } from "@gtd/core";
 import type { Area, Project } from "@gtd/core";
 import { useProjectActions } from "@/hooks/useRowActions";
@@ -40,13 +41,20 @@ interface Group {
 
 /** 项目列表：按区域分组（未分组殿后），区域可新建/重命名/删除 */
 export default function ProjectsScreen() {
-  const grouped = useAppStore(selectProjectsByArea);
   const areas = useAppStore(selectAreas);
+  const activeProjects = useAppStore(selectActiveProjects);
   const loaded = useAppStore((s) => s.loaded);
   const t = useT();
   const actions = useProjectActions();
   const [creating, setCreating] = useState(false);
   const [areaSheet, setAreaSheet] = useState<Area | null>(null);
+
+  // 分组对象每次新建，不能直接做 store selector（React #185）；这里以
+  // 元素稳定的 areas/projects 数组为依赖在渲染期计算
+  const grouped = useMemo(
+    () => groupProjectsByArea(areas, activeProjects, appStore.getState().areas),
+    [areas, activeProjects],
+  );
 
   const sections = useMemo<Group[]>(() => {
     const state = appStore.getState();
