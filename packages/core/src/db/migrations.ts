@@ -104,6 +104,16 @@ const MIGRATIONS: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    version: 2,
+    statements: [
+      // 开始日期（defer）：到点前任务不出现在可执行视图
+      `ALTER TABLE tasks ADD COLUMN defer_until INTEGER`,
+      // 项目回顾周期
+      `ALTER TABLE projects ADD COLUMN review_interval_days INTEGER NOT NULL DEFAULT 7`,
+      `ALTER TABLE projects ADD COLUMN last_reviewed_at INTEGER`,
+    ],
+  },
 ];
 
 export async function migrate(executor: SqliteExecutor): Promise<number> {

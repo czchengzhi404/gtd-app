@@ -30,6 +30,8 @@ export interface TaskDetailContentProps {
   onToggleStar: () => void;
   onDelete: () => void;
   onSetPriority: (priority: 0 | 1 | 2 | 3) => void;
+  /** 设置开始日期（defer）：null = 立即 */
+  onSetDefer?: (until: number | null) => void;
   /** 清单子项 */
   onToggleChecklist?: (itemId: string) => void;
   onAddChecklist?: (title: string) => void;
@@ -51,6 +53,7 @@ export function TaskDetailContent({
   onToggleStar,
   onDelete,
   onSetPriority,
+  onSetDefer,
   onToggleChecklist,
   onAddChecklist,
   onRemoveChecklist,
@@ -112,6 +115,51 @@ export function TaskDetailContent({
           />
         ))}
       </View>
+
+      {onSetDefer !== undefined ? (
+        <>
+          <SectionHeader title={t("detail.defer")} />
+          <View style={styles.chipRow}>
+            {(
+              [
+                { key: "none", offsetDays: null, labelKey: "detail.defer.none" },
+                { key: "tomorrow", offsetDays: 1, labelKey: "detail.defer.tomorrow" },
+                { key: "week", offsetDays: 7, labelKey: "detail.defer.nextWeek" },
+              ] as const
+            ).map((option) => {
+              const target =
+                option.offsetDays === null
+                  ? null
+                  : (() => {
+                      const d = new Date(now);
+                      d.setHours(8, 0, 0, 0);
+                      d.setDate(d.getDate() + option.offsetDays);
+                      return d.getTime();
+                    })();
+              // 选中判定：无开始日期 / 已推迟到今天之后（"明天"/"下周"用范围近似，避免精确时刻比较）
+              const selected =
+                target === null
+                  ? task.deferUntil === null
+                  : task.deferUntil !== null &&
+                    Math.abs(task.deferUntil - target) < 12 * 60 * 60 * 1000;
+              return (
+                <Chip
+                  key={option.key}
+                  label={t(option.labelKey)}
+                  selected={selected}
+                  onPress={() => onSetDefer(target)}
+                />
+              );
+            })}
+            {task.deferUntil !== null ? (
+              <AppText variant="caption" tone="tertiary" lines={1}>
+                {t("detail.deferred")}：
+                {new Date(task.deferUntil).toLocaleDateString()}
+              </AppText>
+            ) : null}
+          </View>
+        </>
+      ) : null}
 
       <SectionHeader title={t("detail.actions")} />
       <View style={styles.buttonRow}>

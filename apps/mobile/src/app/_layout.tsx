@@ -69,6 +69,7 @@ function StackScreens() {
       <Stack.Screen name="task/[id]" options={{ title: t("detail.title") }} />
       <Stack.Screen name="project/[id]" options={{ title: t("nav.projects") }} />
       <Stack.Screen name="review" options={{ title: t("review.title") }} />
+      <Stack.Screen name="completed" options={{ title: t("completed.title") }} />
       <Stack.Screen name="add" options={{ title: t("nav.inbox"), headerShown: false }} />
       <Stack.Screen name="about" options={{ title: t("more.about") }} />
     </Stack>

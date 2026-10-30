@@ -53,6 +53,7 @@ const FIXTURES: { [K in keyof CommandMap]: CommandMap[K] } = {
     color: null,
   },
   "project.softDelete": { id: "p1" },
+  "project.markReviewed": { id: "p1" },
   "context.upsert": { name: "电脑", color: null, icon: null },
   "section.create": { projectId: "p1", name: "设计" },
   "attachment.add": {
@@ -107,6 +108,7 @@ const SCHEMAS = {
   "task.restore": idOnlyPayloadSchema,
   "project.upsert": projectUpsertPayloadSchema,
   "project.softDelete": idOnlyPayloadSchema,
+  "project.markReviewed": idOnlyPayloadSchema,
   "context.upsert": contextUpsertPayloadSchema,
   "section.create": sectionCreatePayloadSchema,
   "attachment.add": attachmentAddPayloadSchema,

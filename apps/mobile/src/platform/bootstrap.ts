@@ -13,6 +13,7 @@ import {
   appStore,
   runCommand,
   pickDueNotifications,
+  pickTimedNotifications,
 } from "@gtd/core";
 import type { SqliteExecutor, CommandPort, CommandResult } from "@gtd/core";
 import { t } from "@gtd/ui";
@@ -81,17 +82,17 @@ export function startDueNotifier(): () => void {
         .filter((k) => k.startsWith(prefix))
         .map((k) => k.slice(prefix.length)),
     );
-    const { due, newKeys } = pickDueNotifications(
-      Object.values(state.tasks),
-      Date.now(),
-      notifiedKeys,
-    );
-    for (const d of due) {
+    // 1) 每日概览（今天到期/逾期）
+    const daily = pickDueNotifications(Object.values(state.tasks), Date.now(), notifiedKeys);
+    // 2) 任务级时间提醒（精确到时刻，如"下午 3 点提醒我打电话"）
+    const timed = pickTimedNotifications(Object.values(state.tasks), Date.now(), notifiedKeys);
+
+    for (const d of [...timed.due, ...daily.due]) {
       await port
         .show({ title: t("notify.dueTitle"), body: d.title, taskId: d.taskId })
         .catch(() => undefined);
     }
-    for (const key of newKeys) {
+    for (const key of [...timed.newKeys, ...daily.newKeys]) {
       await runCommand("settings.set", { key: `${prefix}${key}`, value: 1 }).catch(() => undefined);
     }
   };

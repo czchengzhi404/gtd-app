@@ -20,18 +20,24 @@ function liveTasks(state: AppState): Task[] {
   return Object.values(state.tasks).filter((t) => t.deletedAt === null);
 }
 
+/** 是否尚未到开始日期（defer）：到了之前不该出现在任何"可执行"视图 */
+export function isDeferred(task: Task, now: number): boolean {
+  return task.deferUntil !== null && task.deferUntil > now;
+}
+
 export function getTasksByStatus(state: AppState, status: TaskStatus): Task[] {
   return liveTasks(state)
     .filter((t) => t.status === status)
     .sort(byOrder);
 }
 
-export function getInboxTasks(state: AppState): Task[] {
-  return getTasksByStatus(state, "inbox");
+/** 收集箱：未到开始日期的任务不显示（避免"现在还不该看到"的干扰） */
+export function getInboxTasks(state: AppState, now: number = Date.now()): Task[] {
+  return getTasksByStatus(state, "inbox").filter((task) => !isDeferred(task, now));
 }
 
-export function getWaitingTasks(state: AppState): Task[] {
-  return getTasksByStatus(state, "waiting");
+export function getWaitingTasks(state: AppState, now: number = Date.now()): Task[] {
+  return getTasksByStatus(state, "waiting").filter((task) => !isDeferred(task, now));
 }
 
 export function getSomedayTasks(state: AppState): Task[] {
@@ -41,16 +47,62 @@ export function getSomedayTasks(state: AppState): Task[] {
 export function getTodayTasks(state: AppState, now: number): Task[] {
   const end = endOfDayOf(now);
   return liveTasks(state)
-    .filter((t) => t.status !== "done" && t.dueAt !== null && t.dueAt <= end)
+    .filter(
+      (t) =>
+        t.status !== "done" &&
+        t.dueAt !== null &&
+        t.dueAt <= end &&
+        !isDeferred(t, now),
+    )
     .sort((a, b) => (a.dueAt ?? 0) - (b.dueAt ?? 0));
+}
+
+/* ---------------- 未来视图（Upcoming） ---------------- */
+
+export interface UpcomingGroup {
+  key: string;
+  /** 天起点（毫秒），用于显示与排序 */
+  dayStart: number;
+  tasks: Task[];
+}
+
+/**
+ * 未来 N 天按日分组的到期任务（不含今天之前、不含已完成、不含未到开始日期的）。
+ * 与日历/Timeline 的区别：不依赖月视图或宽屏，任何时候都能用。
+ */
+export function getUpcomingGroups(state: AppState, now: number, days = 14): UpcomingGroup[] {
+  const today = startOfDayOf(now);
+  const horizon = today + days * 86400000;
+  const buckets = new Map<number, Task[]>();
+
+  for (const task of liveTasks(state)) {
+    if (task.status === "done" || task.dueAt === null) continue;
+    if (task.dueAt < today + 86400000) continue; // 今天的在"今天"视图
+    if (task.dueAt >= horizon) continue;
+    if (isDeferred(task, now)) continue;
+    const dayStart = startOfDayOf(task.dueAt);
+    const list = buckets.get(dayStart) ?? [];
+    list.push(task);
+    buckets.set(dayStart, list);
+  }
+
+  return [...buckets.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([dayStart, tasks]) => ({
+      key: String(dayStart),
+      dayStart,
+      tasks: tasks.sort((a, b) => (a.dueAt ?? 0) - (b.dueAt ?? 0)),
+    }));
 }
 
 export function getFocusTasks(state: AppState, now: number): Task[] {
   const end = endOfDayOf(now);
   const today = liveTasks(state).filter(
-    (t) => t.status !== "done" && t.dueAt !== null && t.dueAt <= end,
+    (t) => t.status !== "done" && t.dueAt !== null && t.dueAt <= end && !isDeferred(t, now),
   );
-  const starred = liveTasks(state).filter((t) => t.starred && t.status !== "done");
+  const starred = liveTasks(state).filter(
+    (t) => t.starred && t.status !== "done" && !isDeferred(t, now),
+  );
   const seen = new Set<string>();
   const merged: Task[] = [];
   for (const t of [...starred.sort(byOrder), ...today.sort(byOrder)]) {
@@ -61,9 +113,10 @@ export function getFocusTasks(state: AppState, now: number): Task[] {
   return merged;
 }
 
-export function getProjectTasks(state: AppState, projectId: string): Task[] {
+export function getProjectTasks(state: AppState, projectId: string, now: number = Date.now()): Task[] {
   return liveTasks(state)
     .filter((t) => t.projectId === projectId)
+    .filter((t) => t.status === "done" || !isDeferred(t, now))
     .sort(byOrder);
 }
 

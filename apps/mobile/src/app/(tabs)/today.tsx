@@ -7,21 +7,23 @@ import {
   FilterBar,
   TaskList,
   TimelineView,
+  UpcomingView,
   ViewToggle,
   useAppStore,
   useBreakpoint,
   useT,
 } from "@gtd/ui";
-import { applyListFilter, getTodayTasks, selectContexts } from "@gtd/core";
+import { applyListFilter, getTodayTasks, getUpcomingGroups, selectContexts } from "@gtd/core";
 import { useOrderedTaskActions } from "@/hooks/useRowActions";
 import { openTaskContextMenu } from "@/lib/context-menu";
 import { completeTaskWithUndo, uncompleteTask } from "@/lib/task-ops";
 
-type TodayView = "list" | "calendar" | "timeline";
+type TodayView = "list" | "upcoming" | "calendar" | "timeline";
 
 /** 今天：今日到期 + 逾期；列表 / 日历 / Timeline（≥1440） */
 export default function TodayScreen() {
   const tasks = useAppStore((s) => getTodayTasks(s, Date.now()));
+  const upcomingGroups = useAppStore((s) => getUpcomingGroups(s, Date.now()));
   const allTasks = useAppStore((s) => Object.values(s.tasks));
   const contexts = useAppStore(selectContexts);
   const loaded = useAppStore((s) => s.loaded);
@@ -65,6 +67,7 @@ export default function TodayScreen() {
         onChange={setView}
         options={[
           { key: "list", label: t("view.list") },
+          { key: "upcoming", label: t("view.upcoming") },
           { key: "calendar", label: t("view.calendar") },
           { key: "timeline", label: t("view.timeline"), disabled: !isWideUp },
         ]}
@@ -83,6 +86,15 @@ export default function TodayScreen() {
           onPressTask={(task) => router.push(`/task/${task.id}`)}
           emptyTitle={t("today.emptyTitle")}
           emptyHint={t("today.emptyHint")}
+        />
+      ) : view === "upcoming" ? (
+        <UpcomingView
+          groups={upcomingGroups}
+          now={Date.now()}
+          onToggleTask={(task) =>
+            void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
+          }
+          onPressTask={(task) => router.push(`/task/${task.id}`)}
         />
       ) : view === "calendar" ? (
         <CalendarView

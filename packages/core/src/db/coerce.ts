@@ -97,6 +97,7 @@ export function coerceTask(obj: Record<string, unknown>): Task | null {
     priority: (PRIORITIES as readonly number[]).includes(priority)
       ? (priority as Task["priority"])
       : 0,
+    deferUntil: asNumber(obj.deferUntil),
     dueAt: asNumber(obj.dueAt),
     completedAt: asNumber(obj.completedAt),
     lastCompletedAt: asNumber(obj.lastCompletedAt),
@@ -123,6 +124,8 @@ export function coerceProject(obj: Record<string, unknown>): Project | null {
     kind: kind === "sequential" ? "sequential" : "parallel",
     status: status === "onHold" ? "onHold" : status === "done" ? "done" : "active",
     color: asStringNull(obj.color),
+    reviewIntervalDays: Math.max(1, Math.trunc(asNumber(obj.reviewIntervalDays) ?? 7)),
+    lastReviewedAt: asNumber(obj.lastReviewedAt),
   };
 }
 

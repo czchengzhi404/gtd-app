@@ -471,6 +471,17 @@ export default function MoreScreen() {
           </>
         ) : null}
 
+        {/* 完成记录 */}
+        <SectionHeader title={t("completed.title")} />
+        <View style={styles.block}>
+          <Button
+            label={t("more.completedEntry")}
+            icon="checkmark-done-outline"
+            block
+            onPress={() => router.push("/completed")}
+          />
+        </View>
+
         {/* 数据 */}
         <SectionHeader title={t("more.dataSection")} />
         <View style={styles.block}>

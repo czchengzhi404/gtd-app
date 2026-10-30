@@ -152,6 +152,41 @@ function StepProjects({ summary, tr }: StepProps) {
         </View>
       ))}
 
+      {/* 按各自回顾周期到期的项目：可直接标记已回顾 */}
+      {summary.projectsDueForReview.length > 0 ? (
+        <>
+          <AppText variant="caption" tone="tertiary" lines={1}>
+            {tr("review.dueSection")}
+          </AppText>
+          {summary.projectsDueForReview.map((project) => (
+            <View key={project.projectId} style={styles.dueRow}>
+              <Ionicons name="time-outline" size={13} color={colors.primary} />
+              <AppText variant="label" tone="secondary" lines={1} style={styles.sampleText}>
+                {tr("review.dueItem", {
+                  name: project.name,
+                  days: project.daysSinceReview,
+                  interval: project.intervalDays,
+                })}
+              </AppText>
+              <AppText
+                variant="caption"
+                color={colors.primary}
+                lines={1}
+                accessibilityRole="button"
+                accessibilityLabel={tr("review.marked")}
+                onPress={() =>
+                  void runCommand("project.markReviewed", { id: project.projectId }).catch(
+                    () => undefined,
+                  )
+                }
+              >
+                {tr("review.marked")}
+              </AppText>
+            </View>
+          ))}
+        </>
+      ) : null}
+
       {summary.staleProjects.length > 0 ? (
         <>
           <AppText variant="caption" tone="tertiary" lines={1}>
@@ -297,6 +332,12 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: space.sm,
     minHeight: 28,
+  },
+  dueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    minHeight: 32,
   },
   sampleText: {
     flex: 1,

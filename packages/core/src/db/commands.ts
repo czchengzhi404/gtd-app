@@ -81,29 +81,29 @@ async function getTaskRow(tx: SqliteExecutor, id: string): Promise<Task | null> 
 }
 
 const SQL_INSERT_TASK =
-  "INSERT INTO tasks (id, title, notes, status, priority, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  "INSERT INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 const SQL_UPDATE_TASK =
-  "UPDATE tasks SET title = ?, notes = ?, status = ?, priority = ?, due_at = ?, completed_at = ?, last_completed_at = ?, project_id = ?, section_id = ?, context_ids = ?, waiting_for = ?, starred = ?, recurrence = ?, checklist = ?, order_key = ?, updated_at = ?, revision = ?, deleted_at = ? WHERE id = ?";
+  "UPDATE tasks SET title = ?, notes = ?, status = ?, priority = ?, defer_until = ?, due_at = ?, completed_at = ?, last_completed_at = ?, project_id = ?, section_id = ?, context_ids = ?, waiting_for = ?, starred = ?, recurrence = ?, checklist = ?, order_key = ?, updated_at = ?, revision = ?, deleted_at = ? WHERE id = ?";
 
 function taskUpdateParams(task: Task): unknown[] {
-  // 与 SQL_UPDATE_TASK 列序一致（不含 id；id 作 WHERE 参数）
-  const full = taskToParams(task);
+  // 与 SQL_UPDATE_TASK 列序一一对应（不使用索引偏移，避免加列时错位）
   return [
-    full[1],
-    full[2],
-    full[3],
-    full[4],
-    full[5],
-    full[6],
-    full[7],
-    full[8],
-    full[9],
-    full[10],
-    full[11],
-    full[12],
-    full[13],
-    full[14],
-    full[15],
+    task.title,
+    task.notes,
+    task.status,
+    task.priority,
+    task.deferUntil,
+    task.dueAt,
+    task.completedAt,
+    task.lastCompletedAt,
+    task.projectId,
+    task.sectionId,
+    JSON.stringify(task.contextIds),
+    task.waitingFor,
+    task.starred ? 1 : 0,
+    task.recurrence ? JSON.stringify(task.recurrence) : null,
+    JSON.stringify(task.checklist),
+    task.orderKey,
     task.updatedAt,
     task.revision,
     task.deletedAt,
@@ -151,13 +151,13 @@ async function writeRawRecord(tx: SqliteExecutor, tagged: TaggedRecordType): Pro
   switch (type) {
     case "task":
       await tx.run(
-        "INSERT OR REPLACE INTO tasks (id, title, notes, status, priority, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         taskToParams(record as Parameters<typeof taskToParams>[0]),
       );
       return;
     case "project":
       await tx.run(
-        "INSERT OR REPLACE INTO projects (id, name, description, kind, status, color, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO projects (id, name, description, kind, status, color, review_interval_days, last_reviewed_at, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         projectToParams(record as Parameters<typeof projectToParams>[0]),
       );
       return;
@@ -214,6 +214,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
       notes: payload.notes ?? "",
       status: payload.status ?? "inbox",
       priority: payload.priority ?? 0,
+      deferUntil: payload.deferUntil ?? null,
       dueAt: payload.dueAt ?? null,
       completedAt: null,
       lastCompletedAt: null,
@@ -243,6 +244,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
       title: patch.title ?? existing.title,
       notes: patch.notes ?? existing.notes,
       priority: patch.priority ?? existing.priority,
+      deferUntil: patch.deferUntil !== undefined ? patch.deferUntil : existing.deferUntil,
       dueAt: patch.dueAt !== undefined ? patch.dueAt : existing.dueAt,
       projectId: patch.projectId !== undefined ? patch.projectId : existing.projectId,
       sectionId: patch.sectionId !== undefined ? patch.sectionId : existing.sectionId,
@@ -394,6 +396,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
           kind: payload.kind ?? existing.kind,
           status: payload.status ?? existing.status,
           color: payload.color !== undefined ? payload.color : existing.color,
+          reviewIntervalDays: payload.reviewIntervalDays ?? existing.reviewIntervalDays,
           updatedAt: now,
           revision: existing.revision + 1,
         }
@@ -404,6 +407,8 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
           kind: payload.kind ?? "parallel",
           status: payload.status ?? "active",
           color: payload.color ?? null,
+          reviewIntervalDays: payload.reviewIntervalDays ?? 7,
+          lastReviewedAt: null,
           createdAt: now,
           updatedAt: now,
           revision: 1,
@@ -411,13 +416,15 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
         };
     if (existing) {
       await tx.run(
-        "UPDATE projects SET name = ?, description = ?, kind = ?, status = ?, color = ?, updated_at = ?, revision = ?, deleted_at = ? WHERE id = ?",
+        "UPDATE projects SET name = ?, description = ?, kind = ?, status = ?, color = ?, review_interval_days = ?, last_reviewed_at = ?, updated_at = ?, revision = ?, deleted_at = ? WHERE id = ?",
         [
           project.name,
           project.description,
           project.kind,
           project.status,
           project.color,
+          project.reviewIntervalDays,
+          project.lastReviewedAt,
           project.updatedAt,
           project.revision,
           project.deletedAt,
@@ -426,10 +433,30 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
       );
     } else {
       await tx.run(
-        "INSERT INTO projects (id, name, description, kind, status, color, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO projects (id, name, description, kind, status, color, review_interval_days, last_reviewed_at, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         projectToParams(project),
       );
     }
+    return [{ type: "project", record: project }];
+  },
+
+  "project.markReviewed": async (tx, payload, ctx) => {
+    const rows = await tx.query<SqliteRow>(
+      "SELECT * FROM projects WHERE id = ? AND deleted_at IS NULL",
+      [payload.id],
+    );
+    if (rows.length === 0) throw new Error(`project not found: ${payload.id}`);
+    const now = ctx.now();
+    const project: Project = {
+      ...projectFromRow(rows[0] as SqliteRow),
+      lastReviewedAt: now,
+      updatedAt: now,
+      revision: (projectFromRow(rows[0] as SqliteRow).revision ?? 0) + 1,
+    };
+    await tx.run(
+      "UPDATE projects SET last_reviewed_at = ?, updated_at = ?, revision = ? WHERE id = ?",
+      [project.lastReviewedAt, project.updatedAt, project.revision, project.id],
+    );
     return [{ type: "project", record: project }];
   },
 
@@ -580,6 +607,7 @@ const SCHEMAS: { [K in CommandOp]: z.ZodType<CommandMap[K]> } = {
   "task.restore": idOnlyPayloadSchema,
   "project.upsert": projectUpsertPayloadSchema,
   "project.softDelete": idOnlyPayloadSchema,
+  "project.markReviewed": idOnlyPayloadSchema,
   "context.upsert": contextUpsertPayloadSchema,
   "section.create": sectionCreatePayloadSchema,
   "attachment.add": attachmentAddPayloadSchema,

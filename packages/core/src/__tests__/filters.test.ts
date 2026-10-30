@@ -11,6 +11,7 @@ function task(partial: Partial<Task> & { id: string }): Task {
     notes: "",
     status: "inbox",
     priority: 0,
+    deferUntil: null,
     dueAt: null,
     completedAt: null,
     lastCompletedAt: null,

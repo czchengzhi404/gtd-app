@@ -21,6 +21,8 @@ export const taskCreatePayloadSchema = z.object({
   notes: z.string().max(100_000).optional(),
   status: statusInputSchema.optional(),
   priority: prioritySchema.optional(),
+  /** 开始日期：到点前不出现在可执行视图 */
+  deferUntil: timestampSchema.nullable().optional(),
   dueAt: timestampSchema.nullable().optional(),
   projectId: idSchema.nullable().optional(),
   sectionId: idSchema.nullable().optional(),
@@ -56,6 +58,7 @@ export const taskUpdatePayloadSchema = z.object({
     title: z.string().min(1).max(2000).optional(),
     notes: z.string().max(100_000).optional(),
     priority: prioritySchema.optional(),
+    deferUntil: timestampSchema.nullable().optional(),
     dueAt: timestampSchema.nullable().optional(),
     projectId: idSchema.nullable().optional(),
     sectionId: idSchema.nullable().optional(),
@@ -110,6 +113,8 @@ export const projectUpsertPayloadSchema = z.object({
   kind: z.enum(["sequential", "parallel"]).optional(),
   status: z.enum(["active", "onHold", "done"]).optional(),
   color: z.string().max(32).nullable().optional(),
+  /** 回顾周期（天） */
+  reviewIntervalDays: z.number().int().min(1).max(365).optional(),
 });
 export type ProjectUpsertPayload = z.infer<typeof projectUpsertPayloadSchema>;
 
@@ -173,6 +178,8 @@ export interface CommandMap {
   "task.restore": IdOnlyPayload;
   "project.upsert": ProjectUpsertPayload;
   "project.softDelete": IdOnlyPayload;
+  /** 标记项目已回顾（周回顾向导调用） */
+  "project.markReviewed": IdOnlyPayload;
   "context.upsert": ContextUpsertPayload;
   "section.create": SectionCreatePayload;
   "attachment.add": AttachmentAddPayload;

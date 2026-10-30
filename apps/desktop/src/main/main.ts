@@ -81,6 +81,7 @@ const COMMAND_OP_FLAG: { [K in CommandOp]: true } = {
   "task.restore": true,
   "project.upsert": true,
   "project.softDelete": true,
+  "project.markReviewed": true,
   "context.upsert": true,
   "section.create": true,
   "attachment.add": true,

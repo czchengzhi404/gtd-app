@@ -29,6 +29,13 @@ export interface ReviewSummary {
   weeklyCompletion: number[];
   /** 超过 14 天没有任何任务变动的活跃项目 */
   staleProjects: { projectId: string; name: string; days: number }[];
+  /** 按回顾周期计算已到期该回顾的项目（按超期天数降序） */
+  projectsDueForReview: {
+    projectId: string;
+    name: string;
+    daysSinceReview: number;
+    intervalDays: number;
+  }[];
   /** 已完成 / 总任务（不含墓碑） */
   doneCount: number;
   openCount: number;
@@ -87,6 +94,22 @@ export function buildReviewSummary(state: AppState, now: number): ReviewSummary 
     if (days >= 14) staleProjects.push({ projectId: project.id, name: project.name, days });
   }
 
+  // 按各自回顾周期判断哪些项目该回顾了（超期越久越靠前）
+  const projectsDueForReview = selectActiveProjects(state)
+    .map((project) => {
+      const since = project.lastReviewedAt ?? project.createdAt;
+      const daysSinceReview = Math.floor((now - since) / 86400000);
+      return {
+        projectId: project.id,
+        name: project.name,
+        daysSinceReview,
+        intervalDays: project.reviewIntervalDays,
+      };
+    })
+    .filter((entry) => entry.daysSinceReview >= entry.intervalDays)
+    .sort((a, b) => b.daysSinceReview - a.daysSinceReview)
+    .slice(0, 10);
+
   let doneCount = 0;
   let openCount = 0;
   for (const task of Object.values(state.tasks)) {
@@ -106,6 +129,7 @@ export function buildReviewSummary(state: AppState, now: number): ReviewSummary 
     somedayCount: someday.length,
     weeklyCompletion,
     staleProjects: staleProjects.slice(0, 5),
+    projectsDueForReview,
     doneCount,
     openCount,
   };

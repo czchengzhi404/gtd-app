@@ -81,6 +81,11 @@ export default function TaskDetailScreen() {
           onSetPriority={(priority) =>
             void runCommand("task.update", { id: task.id, patch: { priority } }).catch(() => undefined)
           }
+          onSetDefer={(until) =>
+            void runCommand("task.update", { id: task.id, patch: { deferUntil: until } }).catch(
+              () => undefined,
+            )
+          }
           onDelete={confirmDelete}
           onToggleChecklist={(itemId) => void toggleChecklistItem(task, itemId)}
           onAddChecklist={(title) => void addChecklistItem(task, title)}

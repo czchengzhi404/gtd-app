@@ -32,6 +32,7 @@ export * from "./components/ProjectDetailContent";
 export * from "./components/CalendarView";
 export * from "./components/KanbanBoard";
 export * from "./components/TimelineView";
+export * from "./components/UpcomingView";
 export * from "./components/ReviewWizard";
 export * from "./hooks/useFocusStyle";
 export * from "./platform/useKeyboardShortcuts";

@@ -33,6 +33,8 @@ export interface Task extends BaseRecord {
   status: TaskStatus;
   /** 0=无 1=低 2=中 3=高 */
   priority: 0 | 1 | 2 | 3;
+  /** 开始日期（defer）：早于此刻的任务不出现在任何"可执行"视图里 */
+  deferUntil: number | null;
   dueAt: number | null;
   completedAt: number | null;
   /** 重复任务最近一次完成时间；完成时推进 dueAt 后保留 */
@@ -60,6 +62,10 @@ export interface Project extends BaseRecord {
   kind: ProjectKind;
   status: ProjectStatus;
   color: string | null;
+  /** 回顾周期（天）：距上次回顾超过该天数即视为待回顾 */
+  reviewIntervalDays: number;
+  /** 上次回顾时间；null 表示从未回顾 */
+  lastReviewedAt: number | null;
 }
 
 export interface Section extends BaseRecord {
