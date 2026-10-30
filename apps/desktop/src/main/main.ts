@@ -84,6 +84,8 @@ const COMMAND_OP_FLAG: { [K in CommandOp]: true } = {
   "project.markReviewed": true,
   "context.upsert": true,
   "section.create": true,
+  "area.upsert": true,
+  "area.softDelete": true,
   "attachment.add": true,
   "attachment.remove": true,
   "settings.set": true,
@@ -420,6 +422,7 @@ type MenuLang = "zh" | "en";
 interface MenuStrings {
   tasks: string;
   newTask: string;
+  palette: string;
   quickCapture: string;
   syncNow: string;
   weeklyReview: string;
@@ -453,6 +456,7 @@ const MENU_I18N: Record<MenuLang, MenuStrings> = {
   zh: {
     tasks: "任务",
     newTask: "新建任务",
+    palette: "命令面板",
     quickCapture: "快速收集",
     syncNow: "立即同步",
     weeklyReview: "每周回顾",
@@ -484,6 +488,7 @@ const MENU_I18N: Record<MenuLang, MenuStrings> = {
   en: {
     tasks: "Tasks",
     newTask: "New Task",
+    palette: "Command Palette",
     quickCapture: "Quick Capture",
     syncNow: "Sync Now",
     weeklyReview: "Weekly Review",
@@ -569,8 +574,13 @@ function buildAppMenu(lang: MenuLang): void {
           click: () => { mainWindow?.show(); sendToRenderer("menu:action", { action: "new-task" }); },
         },
         {
-          label: m.quickCapture,
+          label: m.palette,
           accelerator: "CmdOrCtrl+K",
+          click: () => { mainWindow?.show(); sendToRenderer("menu:action", { action: "palette" }); },
+        },
+        {
+          label: m.quickCapture,
+          accelerator: "CmdOrCtrl+Shift+K",
           click: () => { mainWindow?.show(); sendToRenderer("tray:quick-add"); },
         },
         {

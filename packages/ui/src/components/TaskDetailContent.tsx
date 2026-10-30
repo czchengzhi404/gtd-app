@@ -8,6 +8,8 @@ import { DueDateChip } from "./DueDateChip";
 import { PriorityBadge } from "./PriorityBadge";
 import { ChecklistEditor } from "./ChecklistEditor";
 import { AttachmentList } from "./AttachmentList";
+import { MarkdownView } from "./MarkdownView";
+import { TagEditor } from "./TagEditor";
 import { Button, Divider } from "../theme/primitives";
 import { AppText } from "../theme/AppText";
 import { useTheme } from "../hooks/useTheme";
@@ -41,6 +43,10 @@ export interface TaskDetailContentProps {
   onAddAttachment?: () => void;
   onRemoveAttachment?: (id: string) => void;
   onOpenAttachment?: (item: AttachmentMeta) => void;
+  /** 标签编辑（不传则只展示） */
+  onSetTags?: (tags: string[]) => void;
+  /** 常用标签建议（来自全库在用标签） */
+  tagSuggestions?: string[];
 }
 
 /** 任务详情（移动全屏 / 桌面右栏复用） */
@@ -61,6 +67,8 @@ export function TaskDetailContent({
   onAddAttachment,
   onRemoveAttachment,
   onOpenAttachment,
+  onSetTags,
+  tagSuggestions = [],
 }: TaskDetailContentProps) {
   const colors = useTheme();
   const t = useT();
@@ -89,8 +97,25 @@ export function TaskDetailContent({
           {contextNames.map((name) => (
             <Chip key={name} label={name} />
           ))}
+          {task.tags.map((name) => (
+            <Chip key={`tag-${name}`} label={name} prefix="#" />
+          ))}
         </View>
       </View>
+
+      {onSetTags !== undefined || task.tags.length > 0 ? (
+        <>
+          <SectionHeader title={t("tag.section")} />
+          <View style={styles.sectionBlock}>
+            <TagEditor
+              tags={task.tags}
+              suggestions={tagSuggestions}
+              editable={onSetTags !== undefined}
+              onChange={(tags) => onSetTags?.(tags)}
+            />
+          </View>
+        </>
+      ) : null}
 
       <SectionHeader title={t("detail.clarify")} />
       <View style={styles.chipRow}>
@@ -206,9 +231,7 @@ export function TaskDetailContent({
         <>
           <SectionHeader title={t("detail.notes")} />
           <View style={[styles.notesCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <AppText variant="mono" lines={200} style={styles.notes}>
-              {task.notes}
-            </AppText>
+            <MarkdownView source={task.notes} />
           </View>
         </>
       ) : null}

@@ -2,16 +2,17 @@ import { useLocalSearchParams, router } from "expo-router";
 import { View } from "react-native";
 
 import { ProjectDetailContent, Screen, useAppStore } from "@gtd/ui";
-import { appStore, getProjectNextAction } from "@gtd/core";
+import { appStore, getProjectNextAction, runCommand, selectAreas } from "@gtd/core";
 import { completeTaskWithUndo, uncompleteTask } from "@/lib/task-ops";
 
-/** 项目详情：进度、按 section 分组的任务、下一步行动高亮 */
+/** 项目详情：进度、所属区域、按 section 分组的任务、下一步行动高亮 */
 export default function ProjectDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const projectId = typeof id === "string" ? id : "";
   const project = useAppStore((s) => s.projects[projectId]);
   const allTasks = useAppStore((s) => s.tasks);
   const allSections = useAppStore((s) => s.sections);
+  const areas = useAppStore(selectAreas);
 
   if (project === undefined || project.deletedAt !== null) {
     return (
@@ -41,6 +42,14 @@ export default function ProjectDetailScreen() {
           void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
         }
         onPressTask={(task) => router.push(`/task/${task.id}`)}
+        areas={areas}
+        onSetArea={(areaId) =>
+          void runCommand("project.upsert", {
+            id: project.id,
+            name: project.name,
+            areaId,
+          }).catch(() => undefined)
+        }
       />
     </Screen>
   );

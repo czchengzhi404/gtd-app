@@ -11,7 +11,7 @@
     },
     "apps/desktop": {
       "name": "@gtd/desktop",
-      "version": "0.7.0",
+      "version": "0.9.0",
       "dependencies": {
         "better-sqlite3": "13.0.3",
         "electron-updater": "^6.8.11",
@@ -26,13 +26,15 @@
     },
     "apps/mobile": {
       "name": "@gtd/mobile",
-      "version": "0.7.0",
+      "version": "0.9.0",
       "dependencies": {
         "@expo/metro-runtime": "~57.0.17",
         "@gtd/core": "workspace:*",
         "@gtd/ui": "workspace:*",
         "expo": "~57.0.31",
         "expo-constants": "~57.0.22",
+        "expo-document-picker": "~57.0.3",
+        "expo-file-system": "~57.0.7",
         "expo-font": "~57.0.4",
         "expo-linking": "~57.0.13",
         "expo-notifications": "~57.0.24",
@@ -50,6 +52,7 @@
         "react-native-screens": "~4.26.0",
         "react-native-web": "~0.21.0",
         "react-native-worklets": "0.10.1",
+        "zustand": "^5.0.16",
       },
       "devDependencies": {
         "@types/react": "~19.2.2",
@@ -800,6 +803,8 @@
     "expo-asset": ["expo-asset@57.0.20", "https://registry.npmmirror.com/expo-asset/-/expo-asset-57.0.20.tgz", { "dependencies": { "@expo/image-utils": "^0.11.6", "expo-constants": "~57.0.22" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-xm1p3Squ/dCzipISO1TE5+kDsIFEUc6DxEtRe2rRgPMDLPi6AumLlrNorFxetiP6zrvxK23xzVlNng/g7o/+aA=="],
 
     "expo-constants": ["expo-constants@57.0.22", "https://registry.npmmirror.com/expo-constants/-/expo-constants-57.0.22.tgz", { "dependencies": { "@expo/env": "~2.4.3" }, "peerDependencies": { "expo": "*", "react-native": "*" } }, "sha512-+mBjnzMWMKIrQa7BP7LTDRC0W7cI+q12/sZns4HzVQJGzgGoAdRJSTEKiObxIw/3EswKXlESkRob8upiL95Q4A=="],
+
+    "expo-document-picker": ["expo-document-picker@57.0.3", "https://registry.npmmirror.com/expo-document-picker/-/expo-document-picker-57.0.3.tgz", { "peerDependencies": { "expo": "*" } }, "sha512-XlxdZ0zzv44JRD8O15DISgIO8FTaZ581oc4kQp6MJoR7vdahjcY+2qCuDt5k1J8/lc0YR+bXon/v81norciuxw=="],
 
     "expo-file-system": ["expo-file-system@57.0.7", "https://registry.npmmirror.com/expo-file-system/-/expo-file-system-57.0.7.tgz", { "peerDependencies": { "expo": "*", "react-native": "*" } }, "sha512-1vkZRadOsIputFDBcclqBa1pO3iXOO6iIsdqJipQWw4V5TSnWgmRTuOF7ro8IzrVue+PHbum++KCG3Tawem4cg=="],
 

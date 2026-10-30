@@ -90,7 +90,7 @@ async function updateChecklist(task: Task, items: ChecklistItem[]): Promise<void
   );
 }
 
-/* ---------------- 附件（仅桌面端可选取文件） ---------------- */
+/* ---------------- 附件（桌面端 dialog / 移动端 document-picker） ---------------- */
 
 export async function addAttachmentFromDialog(task: Task): Promise<boolean> {
   if (!isDesktop()) return false;
@@ -101,6 +101,36 @@ export async function addAttachmentFromDialog(task: Task): Promise<boolean> {
     taskId: task.id,
     fileName,
     storagePath: picked,
+  }).catch(() => undefined);
+  return true;
+}
+
+/**
+ * 移动端附件：DocumentPicker 选取 → 复制进应用文档目录 → 只存元数据。
+ *
+ * 为什么不直接存 content:// URI：Android 的 content:// 授权是临时的，
+ * 重启后失效；复制一份到 documentDirectory 才能长期打开。
+ */
+export async function addAttachmentFromPicker(task: Task): Promise<boolean> {
+  const picker = await import("expo-document-picker");
+  const result = await picker.getDocumentAsync({ copyToCacheDirectory: true, multiple: false });
+  if (result.canceled) return false;
+  const asset = result.assets[0];
+  if (asset === undefined) return false;
+
+  const fs = await import("expo-file-system/legacy");
+  const dir = `${fs.documentDirectory ?? ""}attachments`;
+  await fs.makeDirectoryAsync(dir, { intermediates: true }).catch(() => undefined);
+  const safeName = asset.name.replace(/[^\w.\-\u4e00-\u9fff]+/gu, "_");
+  const target = `${dir}/${Date.now().toString(36)}-${safeName}`;
+  await fs.copyAsync({ from: asset.uri, to: target });
+
+  await runCommand("attachment.add", {
+    taskId: task.id,
+    fileName: asset.name,
+    mimeType: asset.mimeType ?? undefined,
+    size: asset.size ?? undefined,
+    storagePath: target,
   }).catch(() => undefined);
   return true;
 }

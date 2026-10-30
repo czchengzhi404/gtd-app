@@ -1,4 +1,5 @@
 import type {
+  Area,
   AttachmentMeta,
   Context,
   Project,
@@ -6,6 +7,7 @@ import type {
   Task,
 } from "../models/task";
 import {
+  areaFromRow,
   attachmentFromRow,
   contextFromRow,
   projectFromRow,
@@ -124,6 +126,13 @@ export async function getSections(
   return rows.map(sectionFromRow);
 }
 
+export async function getAreas(executor: SqliteExecutor): Promise<Area[]> {
+  const rows = await executor.query<SqliteRow>(
+    "SELECT * FROM areas WHERE deleted_at IS NULL ORDER BY order_key ASC, created_at ASC",
+  );
+  return rows.map(areaFromRow);
+}
+
 export async function getContexts(executor: SqliteExecutor): Promise<Context[]> {
   const rows = await executor.query<SqliteRow>(
     "SELECT * FROM contexts WHERE deleted_at IS NULL ORDER BY created_at ASC",
@@ -181,16 +190,18 @@ export interface BootstrapData {
   projects: Project[];
   sections: Section[];
   contexts: Context[];
+  areas: Area[];
   kv: Record<string, string>;
 }
 
 export async function loadBootstrapData(executor: SqliteExecutor): Promise<BootstrapData> {
-  const [tasks, projects, sections, contexts, kv] = await Promise.all([
+  const [tasks, projects, sections, contexts, areas, kv] = await Promise.all([
     getTasks(executor, { includeDone: true }),
     getProjects(executor),
     getSections(executor),
     getContexts(executor),
+    getAreas(executor),
     getKv(executor),
   ]);
-  return { tasks, projects, sections, contexts, kv };
+  return { tasks, projects, sections, contexts, areas, kv };
 }

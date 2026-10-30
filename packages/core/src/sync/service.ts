@@ -3,7 +3,14 @@ import { getCommandPort, getSqliteExecutor } from "../platform/ports";
 import { executeCommand } from "../db/commands";
 import type { CommandContext } from "../db/commands";
 import { getKvValue } from "../db/queries";
-import { getTasks, getProjects, getSections, getContexts, getAttachmentsForTask } from "../db/queries";
+import {
+  getTasks,
+  getProjects,
+  getSections,
+  getContexts,
+  getAreas,
+  getAttachmentsForTask,
+} from "../db/queries";
 import type { TaggedRecord } from "../models/commands";
 import type { SqliteExecutor } from "../platform/executor";
 import { idsToFetch, pickRecords } from "./merge";
@@ -38,17 +45,19 @@ export function buildLocalManifest(executor: SqliteExecutor): Promise<Manifest> 
 
 /** 本地全量记录（含墓碑）——附件元数据随任务分批查询 */
 export async function collectLocalRecords(executor: SqliteExecutor): Promise<TaggedRecord[]> {
-  const [tasks, projects, sections, contexts] = await Promise.all([
+  const [tasks, projects, sections, contexts, areas] = await Promise.all([
     getTasks(executor, { includeDone: true }),
     getProjects(executor),
     getSections(executor),
     getContexts(executor),
+    getAreas(executor),
   ]);
   const records: TaggedRecord[] = [
     ...tasks.map((record) => ({ type: "task", record }) as TaggedRecord),
     ...projects.map((record) => ({ type: "project", record }) as TaggedRecord),
     ...sections.map((record) => ({ type: "section", record }) as TaggedRecord),
     ...contexts.map((record) => ({ type: "context", record }) as TaggedRecord),
+    ...areas.map((record) => ({ type: "area", record }) as TaggedRecord),
   ];
   // 墓碑任务不在 getTasks 结果里：附件只挂活跃任务，元数据量小，按任务逐个查
   for (const task of tasks) {
@@ -65,7 +74,7 @@ export async function collectLocalRecords(executor: SqliteExecutor): Promise<Tag
 
 /** 查询各表墓碑（deleted_at IS NOT NULL）——getTasks 系列默认排除墓碑 */
 async function queryTombstones(executor: SqliteExecutor): Promise<TaggedRecord[]> {
-  const { taskFromRow, projectFromRow, sectionFromRow, contextFromRow, attachmentFromRow } =
+  const { taskFromRow, projectFromRow, sectionFromRow, contextFromRow, areaFromRow, attachmentFromRow } =
     await import("../db/mappers");
   const rowsOf = async (sql: string) => executor.query<Record<string, unknown>>(sql);
   const records: TaggedRecord[] = [];
@@ -80,6 +89,9 @@ async function queryTombstones(executor: SqliteExecutor): Promise<TaggedRecord[]
   }
   for (const row of await rowsOf("SELECT * FROM contexts WHERE deleted_at IS NOT NULL")) {
     records.push({ type: "context", record: contextFromRow(row) });
+  }
+  for (const row of await rowsOf("SELECT * FROM areas WHERE deleted_at IS NOT NULL")) {
+    records.push({ type: "area", record: areaFromRow(row) });
   }
   for (const row of await rowsOf("SELECT * FROM attachments WHERE deleted_at IS NOT NULL")) {
     records.push({ type: "attachment", record: attachmentFromRow(row) });

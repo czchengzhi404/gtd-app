@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { AttachmentMeta, Context, Project, Section, Task } from "./task";
+import type { Area, AttachmentMeta, Context, Project, Section, Task } from "./task";
 
 /**
  * 命令表 payload schema。
@@ -16,6 +16,16 @@ const timestampSchema = z.number().int().nonnegative();
 const prioritySchema = z.union([z.literal(0), z.literal(1), z.literal(2), z.literal(3)]);
 const statusInputSchema = z.enum(["inbox", "next", "waiting", "someday"]);
 
+/** 重复规则（create 与 update 共用） */
+const recurrenceSchema = z.object({
+  freq: z.enum(["daily", "weekly", "monthly", "yearly", "weekdays", "afterCompletion"]),
+  interval: z.number().int().min(1).max(999),
+  byWeekday: z.array(z.number().int().min(0).max(6)).optional(),
+  lastWeekday: z.boolean().optional(),
+  remainingCount: z.number().int().min(0).nullable().optional(),
+  until: timestampSchema.nullable().optional(),
+});
+
 export const taskCreatePayloadSchema = z.object({
   title: z.string().min(1).max(2000),
   notes: z.string().max(100_000).optional(),
@@ -27,17 +37,10 @@ export const taskCreatePayloadSchema = z.object({
   projectId: idSchema.nullable().optional(),
   sectionId: idSchema.nullable().optional(),
   contextIds: z.array(idSchema).optional(),
+  tags: z.array(z.string().min(1).max(60)).optional(),
   waitingFor: z.string().max(500).nullable().optional(),
   starred: z.boolean().optional(),
-  recurrence: z
-    .object({
-      freq: z.enum(["daily", "weekly", "monthly", "yearly"]),
-      interval: z.number().int().min(1).max(999),
-      byWeekday: z.array(z.number().int().min(0).max(6)).optional(),
-      until: timestampSchema.nullable().optional(),
-    })
-    .nullable()
-    .optional(),
+  recurrence: recurrenceSchema.nullable().optional(),
   checklist: z
     .array(
       z.object({
@@ -63,6 +66,7 @@ export const taskUpdatePayloadSchema = z.object({
     projectId: idSchema.nullable().optional(),
     sectionId: idSchema.nullable().optional(),
     contextIds: z.array(idSchema).optional(),
+    tags: z.array(z.string().min(1).max(60)).optional(),
     waitingFor: z.string().max(500).nullable().optional(),
     starred: z.boolean().optional(),
     checklist: z
@@ -75,16 +79,7 @@ export const taskUpdatePayloadSchema = z.object({
         }),
       )
       .optional(),
-    recurrence: z
-      .object({
-        freq: z.enum(["daily", "weekly", "monthly", "yearly"]),
-        interval: z.number().int().min(1).max(999),
-        byWeekday: z.array(z.number().int().min(0).max(6)).optional(),
-        lastWeekday: z.boolean().optional(),
-        until: timestampSchema.nullable().optional(),
-      })
-      .nullable()
-      .optional(),
+    recurrence: recurrenceSchema.nullable().optional(),
   }),
 });
 export type TaskUpdatePayload = z.infer<typeof taskUpdatePayloadSchema>;
@@ -113,9 +108,19 @@ export const projectUpsertPayloadSchema = z.object({
   kind: z.enum(["sequential", "parallel"]).optional(),
   status: z.enum(["active", "onHold", "done"]).optional(),
   color: z.string().max(32).nullable().optional(),
+  /** 所属区域 */
+  areaId: idSchema.nullable().optional(),
   /** 回顾周期（天） */
   reviewIntervalDays: z.number().int().min(1).max(365).optional(),
 });
+
+/** 区域 upsert（按名 find-or-create） */
+export const areaUpsertPayloadSchema = z.object({
+  id: idSchema.optional(),
+  name: z.string().min(1).max(200),
+  color: z.string().max(32).nullable().optional(),
+});
+export type AreaUpsertPayload = z.infer<typeof areaUpsertPayloadSchema>;
 export type ProjectUpsertPayload = z.infer<typeof projectUpsertPayloadSchema>;
 
 export const settingsSetPayloadSchema = z.object({
@@ -153,12 +158,12 @@ export const attachmentAddPayloadSchema = z.object({
 export type AttachmentAddPayload = z.infer<typeof attachmentAddPayloadSchema>;
 
 export const recordsApplyPayloadSchema = z.object({
-  records: z.array(
-    z.object({
-      type: z.enum(["task", "project", "section", "context", "attachment"]),
-      record: z.record(z.string(), z.unknown()),
-    }),
-  ),
+      records: z.array(
+        z.object({
+          type: z.enum(["task", "project", "section", "context", "area", "attachment"]),
+          record: z.record(z.string(), z.unknown()),
+        }),
+      ),
 });
 export type RecordsApplyPayload = z.infer<typeof recordsApplyPayloadSchema>;
 
@@ -182,6 +187,8 @@ export interface CommandMap {
   "project.markReviewed": IdOnlyPayload;
   "context.upsert": ContextUpsertPayload;
   "section.create": SectionCreatePayload;
+  "area.upsert": AreaUpsertPayload;
+  "area.softDelete": IdOnlyPayload;
   "attachment.add": AttachmentAddPayload;
   "attachment.remove": IdOnlyPayload;
   "settings.set": SettingsSetPayload;
@@ -199,11 +206,11 @@ export interface Command<K extends CommandOp = CommandOp> {
 }
 
 /** 变更记录的类型标签，渲染进程据此合并进对应状态切片 */
-export type RecordType = "task" | "project" | "section" | "context" | "attachment";
+export type RecordType = "task" | "project" | "section" | "context" | "area" | "attachment";
 
 export interface TaggedRecord {
   type: RecordType;
-  record: Task | Project | Section | Context | AttachmentMeta;
+  record: Task | Project | Section | Context | Area | AttachmentMeta;
 }
 
 /** IPC/命令结果：返回受影响记录的完整快照（可克隆数据），渲染进程据此 reconcile */

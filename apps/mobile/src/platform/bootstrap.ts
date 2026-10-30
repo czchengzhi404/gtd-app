@@ -137,9 +137,10 @@ function wireDesktop(): () => void {
         case "review":
           router.push("/review");
           break;
+        case "palette":
         case "search":
-          // 搜索框在收集箱/今天页顶部，跳到收集箱即可直接输入
-          router.navigate("/");
+          // 命令面板同时承担搜索（任务/项目模糊匹配 + 直接新建）
+          void import("./palette-store").then((m) => m.togglePalette());
           break;
         case "focus":
           router.navigate("/focus");

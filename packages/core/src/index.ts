@@ -10,6 +10,7 @@ export * from "./db/queries";
 export * from "./db/commands";
 export * from "./features/recurrence";
 export * from "./features/quick-add";
+export * from "./features/tags";
 export * from "./features/due-scan";
 export * from "./features/review";
 export * from "./features/kanban-dnd";

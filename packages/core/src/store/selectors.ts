@@ -1,4 +1,4 @@
-import type { Task, TaskStatus } from "../models/task";
+import type { Area, Project, Task, TaskStatus } from "../models/task";
 import type { AppState } from "./app-store";
 
 /**
@@ -151,12 +151,53 @@ export function selectTaskById(state: AppState, id: string): Task | null {
 /* ---------------- 搜索与筛选 ---------------- */
 
 export interface ListFilter {
-  /** 关键词（标题/笔记，忽略大小写） */
+  /** 关键词（标题/笔记/标签，忽略大小写） */
   query?: string;
   /** 情境筛选（null/undefined = 不限） */
   contextId?: string | null;
+  /** 标签筛选 */
+  tag?: string | null;
   /** 只看逾期 */
   overdueOnly?: boolean;
+}
+
+/** 所有在用标签（去重、排序）；大小写视作同一标签，保留首见写法 */
+export function getAllTags(state: AppState): string[] {
+  const seen = new Map<string, string>();
+  for (const task of liveTasks(state)) {
+    for (const tag of task.tags) {
+      const key = tag.toLowerCase();
+      if (!seen.has(key)) seen.set(key, tag);
+    }
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b, "zh-Hans-CN"));
+}
+
+/** 区域列表 */
+export function selectAreas(state: AppState): Area[] {
+  return Object.values(state.areas)
+    .filter((area) => area.deletedAt === null)
+    .sort((a, b) => (a.orderKey < b.orderKey ? -1 : 1));
+}
+
+/** 按区域分组的活跃项目；未归类的进 null 组 */
+export function selectProjectsByArea(
+  state: AppState,
+): { area: Area | null; projects: Project[] }[] {
+  const active = selectActiveProjects(state);
+  const groups = selectAreas(state).map((area) => ({
+    area,
+    projects: active.filter((project) => project.areaId === area.id),
+  }));
+  const loose = active.filter((project) => {
+    if (project.areaId === null) return true;
+    const area = state.areas[project.areaId];
+    // 区域被删（墓碑）或缺失时，项目回落未分组，不能凭空消失
+    return area === undefined || area.deletedAt !== null;
+  });
+  return [...groups, { area: null, projects: loose }].filter(
+    (group) => group.projects.length > 0 || group.area !== null,
+  );
 }
 
 /** 对任意任务集合应用搜索 + 情境 + 逾期筛选（纯函数） */
@@ -165,11 +206,14 @@ export function applyListFilter(tasks: Task[], filter: ListFilter, now: number):
   const dayStart = startOfDayOf(now);
   return tasks.filter((task) => {
     if (q.length > 0) {
-      const hay = `${task.title}\n${task.notes}`.toLowerCase();
+      const hay = `${task.title}\n${task.notes}\n${task.tags.join(" ")}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     if (filter.contextId !== undefined && filter.contextId !== null) {
       if (!task.contextIds.includes(filter.contextId)) return false;
+    }
+    if (filter.tag !== undefined && filter.tag !== null) {
+      if (!task.tags.includes(filter.tag)) return false;
     }
     if (filter.overdueOnly === true) {
       if (task.dueAt === null || task.dueAt >= dayStart || task.status === "done") return false;

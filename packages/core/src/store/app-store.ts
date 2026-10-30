@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import type { CommandMap, CommandOp, CommandResult, TaggedRecord } from "../models/commands";
-import type { Context, Project, Section, Task } from "../models/task";
+import type { Area, Context, Project, Section, Task } from "../models/task";
 import { executeCommand, type CommandContext } from "../db/commands";
 import { loadBootstrapData } from "../db/queries";
 import { getCommandPort, getSqliteExecutor } from "../platform/ports";
@@ -21,6 +21,7 @@ export interface AppState {
   projects: Record<string, Project>;
   sections: Record<string, Section>;
   contexts: Record<string, Context>;
+  areas: Record<string, Area>;
   /** 设置（不参与同步） */
   kv: Record<string, string>;
   lastError: string | null;
@@ -32,6 +33,7 @@ export const appStore = createStore<AppState>(() => ({
   projects: {},
   sections: {},
   contexts: {},
+  areas: {},
   kv: {},
   lastError: null,
 }));
@@ -51,6 +53,7 @@ export function applyRecords(records: TaggedRecord[]): void {
     const projects = { ...state.projects };
     const sections = { ...state.sections };
     const contexts = { ...state.contexts };
+    const areas = { ...state.areas };
     for (const { type, record } of records) {
       switch (type) {
         case "task":
@@ -81,12 +84,19 @@ export function applyRecords(records: TaggedRecord[]): void {
             contexts[record.id] = record as Context;
           }
           break;
+        case "area":
+          if (record.deletedAt !== null) {
+            delete areas[record.id];
+          } else {
+            areas[record.id] = record as Area;
+          }
+          break;
         case "attachment":
           // 附件元数据由详情页按需查询，暂不进全局状态
           break;
       }
     }
-    return { tasks, projects, sections, contexts };
+    return { tasks, projects, sections, contexts, areas };
   });
 }
 
@@ -98,6 +108,7 @@ export async function bootstrapStore(): Promise<void> {
     projects: indexById(data.projects),
     sections: indexById(data.sections),
     contexts: indexById(data.contexts),
+    areas: indexById(data.areas),
     kv: data.kv,
     lastError: null,
   });
@@ -183,6 +194,7 @@ export async function quickAdd(rawInput: string, now: number): Promise<QuickAddO
     dueAt: parsed.dueAt ?? null,
     projectId: projectId ?? null,
     contextIds,
+    tags: parsed.tags,
     waitingFor: parsed.waitingFor ?? null,
     recurrence: (parsed.recurrence ?? null) as RecurrenceRule | null,
   });

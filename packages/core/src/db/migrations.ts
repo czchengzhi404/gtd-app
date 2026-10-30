@@ -114,6 +114,26 @@ const MIGRATIONS: readonly Migration[] = [
       `ALTER TABLE projects ADD COLUMN last_reviewed_at INTEGER`,
     ],
   },
+  {
+    version: 3,
+    statements: [
+      // 标签（多维检索）：记录内嵌数组
+      `ALTER TABLE tasks ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'`,
+      // 区域：项目的上层归类
+      `CREATE TABLE IF NOT EXISTS areas (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        color TEXT,
+        order_key TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        revision INTEGER NOT NULL DEFAULT 1,
+        deleted_at INTEGER
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_areas_name ON areas(name)`,
+      `ALTER TABLE projects ADD COLUMN area_id TEXT`,
+    ],
+  },
 ];
 
 export async function migrate(executor: SqliteExecutor): Promise<number> {

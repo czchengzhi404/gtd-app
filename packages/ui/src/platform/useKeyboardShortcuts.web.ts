@@ -3,6 +3,9 @@ import { useEffect } from "react";
 /**
  * web/桌面实现：window keydown 监听。仅桌面增强使用；移动端走同路径的
  * .ts 基线 no-op 实现。
+ *
+ * modifier: "ctrl" 表示 CmdOrCtrl（Windows/Linux 用 Ctrl，macOS 用 Cmd），
+ * 与 Electron globalShortcut 的 CommandOrControl 语义保持一致。
  */
 export interface ShortcutSpec {
   key: string;
@@ -15,12 +18,21 @@ export function useKeyboardShortcuts(
 ): void {
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      const held = { ctrl: e.ctrlKey, shift: e.shiftKey, alt: e.altKey, meta: e.metaKey };
-      const match = shortcuts.find(
-        (s) =>
-          e.key.toLowerCase() === s.key.toLowerCase() &&
-          (!s.modifier || held[s.modifier]),
-      );
+      const match = shortcuts.find((s) => {
+        if (e.key.toLowerCase() !== s.key.toLowerCase()) return false;
+        switch (s.modifier) {
+          case undefined:
+            return true;
+          case "ctrl":
+            return e.ctrlKey || e.metaKey;
+          case "meta":
+            return e.metaKey;
+          case "shift":
+            return e.shiftKey;
+          case "alt":
+            return e.altKey;
+        }
+      });
       if (match) {
         e.preventDefault();
         handler(match.key);

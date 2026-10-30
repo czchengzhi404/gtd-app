@@ -18,6 +18,7 @@ function task(partial: Partial<Task> & { id: string }): Task {
     projectId: null,
     sectionId: null,
     contextIds: [],
+    tags: [],
     waitingFor: null,
     starred: false,
     recurrence: null,

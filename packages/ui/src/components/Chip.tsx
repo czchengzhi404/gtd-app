@@ -10,6 +10,11 @@ export interface ChipProps {
   color?: string;
   selected?: boolean;
   onPress?: () => void;
+  /**
+   * 前缀：省略 = 情境（只读态自动补 "@"，可点态保持原样，兼容已有筛选 chip）；
+   * null = 不加前缀；"#" = 标签。
+   */
+  prefix?: string | null;
 }
 
 /**
@@ -17,17 +22,18 @@ export interface ChipProps {
  * - 只读态：高 20，用于行内元信息
  * - 可点态：高 34，用于筛选/切换
  */
-export function Chip({ label, color, selected = false, onPress }: ChipProps) {
+export function Chip({ label, color, selected = false, onPress, prefix }: ChipProps) {
   const colors = useTheme();
   const focus = useFocusStyle(radius.pill);
   const accent = color ?? colors.primary;
-  const display = label.startsWith("@") ? label : `@${label}`;
+  const prefixed = prefix === undefined ? (label.startsWith("@") ? label : `@${label}`) : prefix === null ? label : `${prefix}${label}`;
+  const interactiveLabel = prefix === undefined ? label : prefixed;
 
   if (onPress === undefined) {
     return (
       <View style={[styles.readonly, { backgroundColor: colors.surfaceMuted }]}>
         <AppText variant="caption" tone="secondary" lines={1}>
-          {display}
+          {prefixed}
         </AppText>
       </View>
     );
@@ -36,7 +42,7 @@ export function Chip({ label, color, selected = false, onPress }: ChipProps) {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
+      accessibilityLabel={interactiveLabel}
       accessibilityState={{ selected }}
       onPress={onPress}
       style={({ pressed }) => [
@@ -55,7 +61,7 @@ export function Chip({ label, color, selected = false, onPress }: ChipProps) {
         color={selected ? colors.onPrimary : colors.textSecondary}
         lines={1}
       >
-        {label}
+        {interactiveLabel}
       </AppText>
     </Pressable>
   );

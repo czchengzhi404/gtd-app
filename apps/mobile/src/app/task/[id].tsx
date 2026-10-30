@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useLocalSearchParams, router } from "expo-router";
-import { Alert, View } from "react-native";
+import { View } from "react-native";
 
-import { Screen, TaskDetailContent, useAppStore, useT } from "@gtd/ui";
+import { Screen, TaskDetailContent, showConfirm, useAppStore, useT } from "@gtd/ui";
 import {
+  getAllTags,
   getAttachmentsForTask,
   getSqliteExecutor,
   selectActiveProjects,
@@ -14,6 +15,7 @@ import {
 import type { AttachmentMeta, TaskStatusInput } from "@gtd/core";
 import {
   addAttachmentFromDialog,
+  addAttachmentFromPicker,
   addChecklistItem,
   deleteTaskWithUndo,
   removeChecklistItem,
@@ -21,22 +23,25 @@ import {
 } from "@/lib/task-ops";
 import { isDesktop } from "@/platform/env";
 
-/** 任务详情：状态流转、优先级、专注、清单子项、附件、删除（可撤销） */
+/** 任务详情：状态流转、优先级、标签、专注、清单子项、附件、删除（可撤销） */
 export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const taskId = typeof id === "string" ? id : "";
   const task = useAppStore((s) => selectTaskById(s, taskId));
   const contexts = useAppStore(selectContexts);
   const projects = useAppStore(selectActiveProjects);
+  const tagSuggestions = useAppStore(getAllTags);
   const t = useT();
   const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
 
+  const reloadAttachments = async (targetId: string) => {
+    const list = await getAttachmentsForTask(getSqliteExecutor(), targetId).catch(() => []);
+    setAttachments(list);
+  };
+
   useEffect(() => {
     if (taskId.length === 0) return;
-    void (async () => {
-      const list = await getAttachmentsForTask(getSqliteExecutor(), taskId).catch(() => []);
-      setAttachments(list);
-    })();
+    void reloadAttachments(taskId);
   }, [taskId, task?.revision]);
 
   if (task === null) return <Screen>{null}</Screen>;
@@ -46,19 +51,24 @@ export default function TaskDetailScreen() {
     .filter((n): n is string => n !== undefined);
   const projectName = projects.find((p) => p.id === task.projectId)?.name;
 
-  const confirmDelete = () => {
-    Alert.alert(t("detail.deleteConfirm"), t("detail.deleteConfirmBody", { title: task.title }), [
-      { text: t("common.cancel"), style: "cancel" },
-      {
-        text: t("common.delete"),
-        style: "destructive",
-        onPress: () => {
-          void deleteTaskWithUndo(task).then(() => {
-            if (router.canGoBack()) router.back();
-          });
-        },
-      },
-    ]);
+  const confirmDelete = async () => {
+    const ok = await showConfirm({
+      title: t("detail.deleteConfirm"),
+      message: t("detail.deleteConfirmBody", { title: task.title }),
+      confirmLabel: t("common.delete"),
+    });
+    if (!ok) return;
+    await deleteTaskWithUndo(task);
+    if (router.canGoBack()) router.back();
+  };
+
+  const pickAttachment = async () => {
+    if (isDesktop()) {
+      await addAttachmentFromDialog(task);
+    } else {
+      await addAttachmentFromPicker(task);
+    }
+    await reloadAttachments(task.id);
   };
 
   return (
@@ -69,6 +79,7 @@ export default function TaskDetailScreen() {
           now={Date.now()}
           projectName={projectName}
           contextNames={contextNames}
+          tagSuggestions={tagSuggestions}
           onMoveStatus={(status: TaskStatusInput) =>
             void runCommand("task.moveStatus", { id: task.id, status }).catch(() => undefined)
           }
@@ -86,24 +97,18 @@ export default function TaskDetailScreen() {
               () => undefined,
             )
           }
-          onDelete={confirmDelete}
+          onSetTags={(tags) =>
+            void runCommand("task.update", { id: task.id, patch: { tags } }).catch(() => undefined)
+          }
+          onDelete={() => void confirmDelete()}
           onToggleChecklist={(itemId) => void toggleChecklistItem(task, itemId)}
           onAddChecklist={(title) => void addChecklistItem(task, title)}
           onRemoveChecklist={(itemId) => void removeChecklistItem(task, itemId)}
           attachments={attachments}
-          onAddAttachment={
-            isDesktop()
-              ? () =>
-                  void addAttachmentFromDialog(task).then(async () => {
-                    setAttachments(await getAttachmentsForTask(getSqliteExecutor(), task.id));
-                  })
-              : undefined
-          }
+          onAddAttachment={() => void pickAttachment()}
           onRemoveAttachment={(attachmentId) =>
             void runCommand("attachment.remove", { id: attachmentId })
-              .then(async () => {
-                setAttachments(await getAttachmentsForTask(getSqliteExecutor(), task.id));
-              })
+              .then(() => reloadAttachments(task.id))
               .catch(() => undefined)
           }
         />

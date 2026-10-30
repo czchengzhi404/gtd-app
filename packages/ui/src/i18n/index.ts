@@ -303,6 +303,63 @@ const zh: Dict = {
   "platform.webUnsupported": "纯浏览器模式未接存储：请在桌面应用或移动端运行",
   // 通知
   "notify.dueTitle": "任务到期",
+
+  // 命令面板
+  "palette.placeholder": "搜索任务、项目，或直接输入新任务…",
+  "palette.task": "任务",
+  "palette.project": "项目",
+  "palette.create": "新建任务：{title}",
+  "palette.noResult": "没有匹配结果",
+  "palette.close": "关闭搜索",
+  "palette.hint": "↑↓ 选择 · Enter 打开 · Esc 关闭",
+
+  // 批量操作
+  "bulk.enter": "多选",
+  "bulk.selected": "已选 {n} 项",
+  "bulk.selectAll": "全选",
+  "bulk.clear": "取消选择",
+  "bulk.complete": "完成",
+  "bulk.delete": "删除",
+  "bulk.moveTo": "移动到…",
+  "bulk.exit": "退出多选",
+  "bulk.selectOne": "选择：{title}",
+  "bulk.deleted": "已删除 {n} 个任务",
+  "bulk.completed": "已完成 {n} 个任务",
+  "bulk.moved": "已移动 {n} 个任务",
+
+  // 滑动操作
+  "swipe.complete": "完成",
+  "swipe.delete": "删除",
+  "swipe.defer": "明天",
+
+  // 拖拽
+  "task.dragHandle": "拖动排序",
+
+  // 标签
+  "tag.section": "标签",
+  "tag.add": "＋ 添加标签",
+  "tag.placeholder": "输入标签后回车",
+  "tag.remove": "移除标签 {tag}",
+  "tag.filterAll": "全部标签",
+  "tag.none": "暂无标签",
+
+  // 区域
+  "area.section": "区域",
+  "area.none": "未分组",
+  "area.create": "＋ 新建区域",
+  "area.namePlaceholder": "区域名称",
+  "area.assign": "归属区域",
+  "area.deleteConfirm": "删除区域",
+  "area.deleteConfirmBody": "确定删除区域「{name}」吗？区域内的项目会变为未分组。",
+
+  // 保存的筛选器
+  "perspective.section": "保存的筛选",
+  "perspective.save": "保存当前筛选",
+  "perspective.namePlaceholder": "筛选名称",
+  "perspective.empty": "还没有保存的筛选",
+  "perspective.apply": "应用筛选：{name}",
+  "perspective.delete": "删除筛选：{name}",
+  "perspective.saved": "已保存筛选「{name}」",
 };
 
 const en: Dict = {
@@ -572,6 +629,56 @@ const en: Dict = {
   "boot.error": "Startup failed",
   "platform.webUnsupported": "Storage isn't available in a plain browser — run the desktop or mobile app",
   "notify.dueTitle": "Task due",
+
+  "palette.placeholder": "Search tasks and projects, or type a new task…",
+  "palette.task": "Task",
+  "palette.project": "Project",
+  "palette.create": "Create task: {title}",
+  "palette.noResult": "No matches",
+  "palette.close": "Close search",
+  "palette.hint": "↑↓ select · Enter open · Esc close",
+
+  "bulk.enter": "Select",
+  "bulk.selected": "{n} selected",
+  "bulk.selectAll": "Select all",
+  "bulk.clear": "Clear",
+  "bulk.complete": "Complete",
+  "bulk.delete": "Delete",
+  "bulk.moveTo": "Move to…",
+  "bulk.exit": "Exit select",
+  "bulk.selectOne": "Select: {title}",
+  "bulk.deleted": "Deleted {n} tasks",
+  "bulk.completed": "Completed {n} tasks",
+  "bulk.moved": "Moved {n} tasks",
+
+  "swipe.complete": "Complete",
+  "swipe.delete": "Delete",
+  "swipe.defer": "Tomorrow",
+
+  "task.dragHandle": "Drag to reorder",
+
+  "tag.section": "Tags",
+  "tag.add": "＋ Add tag",
+  "tag.placeholder": "Type a tag and press enter",
+  "tag.remove": "Remove tag {tag}",
+  "tag.filterAll": "All tags",
+  "tag.none": "No tags",
+
+  "area.section": "Areas",
+  "area.none": "Ungrouped",
+  "area.create": "＋ New area",
+  "area.namePlaceholder": "Area name",
+  "area.assign": "Area",
+  "area.deleteConfirm": "Delete area",
+  "area.deleteConfirmBody": "Delete area \"{name}\"? Projects in it become ungrouped.",
+
+  "perspective.section": "Saved filters",
+  "perspective.save": "Save current filter",
+  "perspective.namePlaceholder": "Filter name",
+  "perspective.empty": "No saved filters yet",
+  "perspective.apply": "Apply filter: {name}",
+  "perspective.delete": "Delete filter: {name}",
+  "perspective.saved": "Saved filter \"{name}\"",
 };
 
 const DICTS: Record<Lang, Dict> = { zh, en };

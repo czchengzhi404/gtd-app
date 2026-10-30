@@ -1,5 +1,6 @@
 import type { CommandMap, CommandOp, CommandResult, TaggedRecord } from "../models/commands";
 import type {
+  Area,
   AttachmentMeta,
   ChecklistItem,
   Context,
@@ -11,6 +12,8 @@ import type {
 } from "../models/task";
 import { uuidv7 } from "./ids";
 import {
+  areaFromRow,
+  areaToParams,
   attachmentFromRow,
   attachmentToParams,
   contextToParams,
@@ -29,6 +32,7 @@ import { nextOccurrence } from "../features/recurrence";
 import { findContextByName, findProjectByName, getTaskById } from "./queries";
 import type { SqliteExecutor, SqliteRow } from "../platform/executor";
 import {
+  areaUpsertPayloadSchema,
   attachmentAddPayloadSchema,
   contextUpsertPayloadSchema,
   idOnlyPayloadSchema,
@@ -81,9 +85,9 @@ async function getTaskRow(tx: SqliteExecutor, id: string): Promise<Task | null> 
 }
 
 const SQL_INSERT_TASK =
-  "INSERT INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  "INSERT INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, tags, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 const SQL_UPDATE_TASK =
-  "UPDATE tasks SET title = ?, notes = ?, status = ?, priority = ?, defer_until = ?, due_at = ?, completed_at = ?, last_completed_at = ?, project_id = ?, section_id = ?, context_ids = ?, waiting_for = ?, starred = ?, recurrence = ?, checklist = ?, order_key = ?, updated_at = ?, revision = ?, deleted_at = ? WHERE id = ?";
+  "UPDATE tasks SET title = ?, notes = ?, status = ?, priority = ?, defer_until = ?, due_at = ?, completed_at = ?, last_completed_at = ?, project_id = ?, section_id = ?, context_ids = ?, tags = ?, waiting_for = ?, starred = ?, recurrence = ?, checklist = ?, order_key = ?, updated_at = ?, revision = ?, deleted_at = ? WHERE id = ?";
 
 function taskUpdateParams(task: Task): unknown[] {
   // 与 SQL_UPDATE_TASK 列序一一对应（不使用索引偏移，避免加列时错位）
@@ -99,6 +103,7 @@ function taskUpdateParams(task: Task): unknown[] {
     task.projectId,
     task.sectionId,
     JSON.stringify(task.contextIds),
+    JSON.stringify(task.tags),
     task.waitingFor,
     task.starred ? 1 : 0,
     task.recurrence ? JSON.stringify(task.recurrence) : null,
@@ -126,6 +131,8 @@ async function readAnyRecord(
     rows = await tx.query<SqliteRow>("SELECT * FROM sections WHERE id = ?", [id]);
   } else if (type === "context") {
     rows = await tx.query<SqliteRow>("SELECT * FROM contexts WHERE id = ?", [id]);
+  } else if (type === "area") {
+    rows = await tx.query<SqliteRow>("SELECT * FROM areas WHERE id = ?", [id]);
   } else {
     rows = await tx.query<SqliteRow>("SELECT * FROM attachments WHERE id = ?", [id]);
   }
@@ -140,6 +147,8 @@ async function readAnyRecord(
       return { type, record: sectionFromRow(row) };
     case "context":
       return { type, record: contextFromRow(row) };
+    case "area":
+      return { type, record: areaFromRow(row) };
     case "attachment":
       return { type, record: attachmentFromRow(row) };
   }
@@ -151,14 +160,20 @@ async function writeRawRecord(tx: SqliteExecutor, tagged: TaggedRecordType): Pro
   switch (type) {
     case "task":
       await tx.run(
-        "INSERT OR REPLACE INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, tags, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         taskToParams(record as Parameters<typeof taskToParams>[0]),
       );
       return;
     case "project":
       await tx.run(
-        "INSERT OR REPLACE INTO projects (id, name, description, kind, status, color, review_interval_days, last_reviewed_at, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO projects (id, name, description, kind, status, color, area_id, review_interval_days, last_reviewed_at, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         projectToParams(record as Parameters<typeof projectToParams>[0]),
+      );
+      return;
+    case "area":
+      await tx.run(
+        "INSERT OR REPLACE INTO areas (id, name, color, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        areaToParams(record as Parameters<typeof areaToParams>[0]),
       );
       return;
     case "section":
@@ -225,6 +240,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
       starred: payload.starred ?? false,
       recurrence: payload.recurrence ?? null,
       checklist: payload.checklist ?? [],
+      tags: payload.tags ?? [],
       orderKey: padOrderKey(now),
       createdAt: now,
       updatedAt: now,
@@ -252,6 +268,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
       waitingFor: patch.waitingFor !== undefined ? patch.waitingFor : existing.waitingFor,
       starred: patch.starred ?? existing.starred,
       checklist: (patch.checklist as ChecklistItem[] | undefined) ?? existing.checklist,
+      tags: patch.tags ?? existing.tags,
       recurrence:
         patch.recurrence !== undefined ? (patch.recurrence as RecurrenceRule | null) : existing.recurrence,
       updatedAt: ctx.now(),
@@ -300,7 +317,15 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
     let task: Task;
     const rule = existing.recurrence;
     if (rule) {
-      const next = nextOccurrence(existing.dueAt ?? now, rule, now);
+      // 剩余次数：本次完成即消耗一次，归零后任务结束
+      const remaining =
+        rule.remainingCount === null || rule.remainingCount === undefined
+          ? null
+          : rule.remainingCount - 1;
+      const next =
+        remaining !== null && remaining <= 0
+          ? null
+          : nextOccurrence(existing.dueAt ?? now, rule, now);
       if (next !== null) {
         // 重复任务：原记录推进到下一到期时间，保留完成痕迹
         task = {
@@ -308,6 +333,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
           dueAt: next,
           completedAt: null,
           lastCompletedAt: now,
+          recurrence: remaining === null ? rule : { ...rule, remainingCount: remaining },
           updatedAt: now,
           revision: existing.revision + 1,
         };
@@ -317,6 +343,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
           status: "done",
           completedAt: now,
           lastCompletedAt: now,
+          recurrence: remaining === null ? rule : { ...rule, remainingCount: 0 },
           updatedAt: now,
           revision: existing.revision + 1,
         };
@@ -396,6 +423,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
           kind: payload.kind ?? existing.kind,
           status: payload.status ?? existing.status,
           color: payload.color !== undefined ? payload.color : existing.color,
+          areaId: payload.areaId !== undefined ? payload.areaId : existing.areaId,
           reviewIntervalDays: payload.reviewIntervalDays ?? existing.reviewIntervalDays,
           updatedAt: now,
           revision: existing.revision + 1,
@@ -407,6 +435,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
           kind: payload.kind ?? "parallel",
           status: payload.status ?? "active",
           color: payload.color ?? null,
+          areaId: payload.areaId ?? null,
           reviewIntervalDays: payload.reviewIntervalDays ?? 7,
           lastReviewedAt: null,
           createdAt: now,
@@ -416,13 +445,14 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
         };
     if (existing) {
       await tx.run(
-        "UPDATE projects SET name = ?, description = ?, kind = ?, status = ?, color = ?, review_interval_days = ?, last_reviewed_at = ?, updated_at = ?, revision = ?, deleted_at = ? WHERE id = ?",
+        "UPDATE projects SET name = ?, description = ?, kind = ?, status = ?, color = ?, area_id = ?, review_interval_days = ?, last_reviewed_at = ?, updated_at = ?, revision = ?, deleted_at = ? WHERE id = ?",
         [
           project.name,
           project.description,
           project.kind,
           project.status,
           project.color,
+          project.areaId,
           project.reviewIntervalDays,
           project.lastReviewedAt,
           project.updatedAt,
@@ -433,7 +463,7 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
       );
     } else {
       await tx.run(
-        "INSERT INTO projects (id, name, description, kind, status, color, review_interval_days, last_reviewed_at, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO projects (id, name, description, kind, status, color, area_id, review_interval_days, last_reviewed_at, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         projectToParams(project),
       );
     }
@@ -537,6 +567,79 @@ const handlers: { [K in CommandOp]: Handler<K> } = {
     return [{ type: "section", record: section }];
   },
 
+  "area.upsert": async (tx, payload, ctx) => {
+    const now = ctx.now();
+    let existing: Area | null = null;
+    if (payload.id !== undefined) {
+      const rows = await tx.query<SqliteRow>(
+        "SELECT * FROM areas WHERE id = ? AND deleted_at IS NULL",
+        [payload.id],
+      );
+      existing = rows.length > 0 ? areaFromRow(rows[0] as SqliteRow) : null;
+    } else {
+      const rows = await tx.query<SqliteRow>(
+        "SELECT * FROM areas WHERE name = ? AND deleted_at IS NULL LIMIT 1",
+        [payload.name],
+      );
+      existing = rows.length > 0 ? areaFromRow(rows[0] as SqliteRow) : null;
+    }
+    const area: Area = existing
+      ? {
+          ...existing,
+          name: payload.name,
+          color: payload.color !== undefined ? (payload.color ?? null) : existing.color,
+          updatedAt: now,
+          revision: existing.revision + 1,
+        }
+      : {
+          id: uuidv7(now),
+          name: payload.name,
+          color: payload.color ?? null,
+          orderKey: padOrderKey(now),
+          createdAt: now,
+          updatedAt: now,
+          revision: 1,
+          deletedAt: null,
+        };
+    if (existing) {
+      await tx.run("UPDATE areas SET name = ?, color = ?, updated_at = ?, revision = ? WHERE id = ?", [
+        area.name,
+        area.color,
+        area.updatedAt,
+        area.revision,
+        area.id,
+      ]);
+    } else {
+      await tx.run(
+        "INSERT INTO areas (id, name, color, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        areaToParams(area),
+      );
+    }
+    return [{ type: "area", record: area }];
+  },
+
+  "area.softDelete": async (tx, payload, ctx) => {
+    const rows = await tx.query<SqliteRow>(
+      "SELECT * FROM areas WHERE id = ? AND deleted_at IS NULL",
+      [payload.id],
+    );
+    if (rows.length === 0) throw new Error(`area not found: ${payload.id}`);
+    const now = ctx.now();
+    const area: Area = {
+      ...areaFromRow(rows[0] as SqliteRow),
+      deletedAt: now,
+      updatedAt: now,
+      revision: areaFromRow(rows[0] as SqliteRow).revision + 1,
+    };
+    await tx.run("UPDATE areas SET deleted_at = ?, updated_at = ?, revision = ? WHERE id = ?", [
+      area.deletedAt,
+      area.updatedAt,
+      area.revision,
+      area.id,
+    ]);
+    return [{ type: "area", record: area }];
+  },
+
   "attachment.add": async (tx, payload, ctx) => {
     const now = ctx.now();
     const attachment: AttachmentMeta = {
@@ -610,6 +713,8 @@ const SCHEMAS: { [K in CommandOp]: z.ZodType<CommandMap[K]> } = {
   "project.markReviewed": idOnlyPayloadSchema,
   "context.upsert": contextUpsertPayloadSchema,
   "section.create": sectionCreatePayloadSchema,
+  "area.upsert": areaUpsertPayloadSchema,
+  "area.softDelete": idOnlyPayloadSchema,
   "attachment.add": attachmentAddPayloadSchema,
   "attachment.remove": idOnlyPayloadSchema,
   "settings.set": settingsSetPayloadSchema,

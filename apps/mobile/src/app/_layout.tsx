@@ -3,10 +3,11 @@ import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, Text, View } from "react-native";
 
-import { Screen, ThemeProvider, useTheme, useT } from "@gtd/ui";
+import { Screen, ThemeProvider, useTheme, useT, PromptHost } from "@gtd/ui";
 import { appStore, bootstrapStore } from "@gtd/core";
 import { initPlatform } from "@/platform/bootstrap";
 import { installFontScaleOverride } from "@/platform/font-scale";
+import { CommandPaletteHost } from "@/platform/CommandPaletteHost";
 import * as Font from "expo-font";
 
 /** 加载内置霞鹜文楷字体（app 层负责，因为字体文件在 mobile assets 里） */
@@ -54,7 +55,11 @@ export default function RootLayout() {
       {error !== null ? (
         <BootError message={error} />
       ) : (
-        <StackScreens />
+        <>
+          <StackScreens />
+          <CommandPaletteHost />
+          <PromptHost />
+        </>
       )}
     </ThemeProvider>
   );

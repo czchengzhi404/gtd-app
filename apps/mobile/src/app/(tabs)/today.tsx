@@ -3,8 +3,10 @@ import { router } from "expo-router";
 import { View } from "react-native";
 
 import {
+  BulkActionBar,
   CalendarView,
   FilterBar,
+  OptionSheet,
   TaskList,
   TimelineView,
   UpcomingView,
@@ -13,12 +15,27 @@ import {
   useBreakpoint,
   useT,
 } from "@gtd/ui";
-import { applyListFilter, getTodayTasks, getUpcomingGroups, selectContexts } from "@gtd/core";
+import {
+  applyListFilter,
+  getAllTags,
+  getTodayTasks,
+  getUpcomingGroups,
+  selectContexts,
+} from "@gtd/core";
+import type { TaskStatusInput } from "@gtd/core";
 import { useOrderedTaskActions } from "@/hooks/useRowActions";
+import { useListInteractions } from "@/hooks/useListInteractions";
 import { openTaskContextMenu } from "@/lib/context-menu";
 import { completeTaskWithUndo, uncompleteTask } from "@/lib/task-ops";
 
 type TodayView = "list" | "upcoming" | "calendar" | "timeline";
+
+const MOVE_OPTIONS = [
+  { key: "next", labelKey: "detail.status.next" },
+  { key: "waiting", labelKey: "detail.status.waiting" },
+  { key: "someday", labelKey: "detail.status.someday" },
+  { key: "inbox", labelKey: "detail.status.inbox" },
+] as const;
 
 /** 今天：今日到期 + 逾期；列表 / 日历 / Timeline（≥1440） */
 export default function TodayScreen() {
@@ -26,6 +43,7 @@ export default function TodayScreen() {
   const upcomingGroups = useAppStore((s) => getUpcomingGroups(s, Date.now()));
   const allTasks = useAppStore((s) => Object.values(s.tasks));
   const contexts = useAppStore(selectContexts);
+  const allTags = useAppStore(getAllTags);
   const loaded = useAppStore((s) => s.loaded);
   const { isWideUp } = useBreakpoint();
   const t = useT();
@@ -33,13 +51,16 @@ export default function TodayScreen() {
   const [view, setView] = useState<TodayView>("list");
   const [query, setQuery] = useState("");
   const [contextId, setContextId] = useState<string | null>(null);
+  const [tag, setTag] = useState<string | null>(null);
   const [overdueOnly, setOverdueOnly] = useState(false);
+  const [moveSheetOpen, setMoveSheetOpen] = useState(false);
 
   const filtered = useMemo(
-    () => applyListFilter(tasks, { query, contextId, overdueOnly }, Date.now()),
-    [tasks, query, contextId, overdueOnly],
+    () => applyListFilter(tasks, { query, contextId, tag, overdueOnly }, Date.now()),
+    [tasks, query, contextId, tag, overdueOnly],
   );
   const actions = useOrderedTaskActions(filtered);
+  const interactions = useListInteractions(filtered);
 
   const contextNameById = useMemo(() => {
     const map: Record<string, string> = {};
@@ -60,6 +81,9 @@ export default function TodayScreen() {
         overdueOnly={overdueOnly}
         onOverdueChange={setOverdueOnly}
         resultCount={filtered.length}
+        tags={allTags}
+        tag={tag}
+        onTagChange={setTag}
       />
       <ViewToggle<TodayView>
         label={t("view.todayLabel")}
@@ -78,7 +102,7 @@ export default function TodayScreen() {
           tasks={filtered}
           now={Date.now()}
           contextNameById={contextNameById}
-          actions={actions}
+          actions={interactions.selectionMode ? undefined : actions}
           onContextMenuTask={(task, position) => openTaskContextMenu(task, position)}
           onToggleTask={(task) =>
             void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
@@ -86,6 +110,13 @@ export default function TodayScreen() {
           onPressTask={(task) => router.push(`/task/${task.id}`)}
           emptyTitle={t("today.emptyTitle")}
           emptyHint={t("today.emptyHint")}
+          selectionMode={interactions.selectionMode}
+          selectedIds={interactions.selectedIds}
+          onToggleSelect={interactions.toggleSelect}
+          onEnterSelection={interactions.enterSelection}
+          onSwipeLeftTask={(task) => void interactions.swipeLeft(task)}
+          onSwipeRightTask={(task) => void interactions.swipeRight(task)}
+          onReorderTask={(task, toIndex) => void interactions.reorder(filtered, task, toIndex)}
         />
       ) : view === "upcoming" ? (
         <UpcomingView
@@ -105,6 +136,28 @@ export default function TodayScreen() {
       ) : (
         <TimelineView tasks={allTasks} now={Date.now()} />
       )}
+
+      {interactions.selectionMode ? (
+        <BulkActionBar
+          count={interactions.selectedIds.size}
+          onComplete={() => void interactions.completeSelected()}
+          onDelete={() => void interactions.deleteSelected()}
+          onMove={() => setMoveSheetOpen(true)}
+          onClear={interactions.clearSelection}
+          onExit={interactions.exitSelection}
+        />
+      ) : null}
+
+      <OptionSheet
+        visible={moveSheetOpen}
+        title={t("bulk.moveTo")}
+        options={MOVE_OPTIONS.map((option) => ({ key: option.key, label: t(option.labelKey) }))}
+        onSelect={(key) => {
+          setMoveSheetOpen(false);
+          void interactions.moveSelected(key as TaskStatusInput);
+        }}
+        onClose={() => setMoveSheetOpen(false)}
+      />
     </View>
   );
 }

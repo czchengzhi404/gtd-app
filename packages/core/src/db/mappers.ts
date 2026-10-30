@@ -1,4 +1,5 @@
 import type {
+  Area,
   AttachmentMeta,
   ChecklistItem,
   Context,
@@ -57,6 +58,7 @@ export function taskFromRow(row: SqliteRow): Task {
     projectId: strNullable(row.project_id),
     sectionId: strNullable(row.section_id),
     contextIds: parseJson<string[]>(row.context_ids, []),
+    tags: parseJson<string[]>(row.tags, []),
     waitingFor: strNullable(row.waiting_for),
     starred: bool(row.starred),
     recurrence: parseJson<RecurrenceRule | null>(row.recurrence, null),
@@ -83,6 +85,7 @@ export function taskToParams(task: Task): unknown[] {
     task.projectId,
     task.sectionId,
     JSON.stringify(task.contextIds),
+    JSON.stringify(task.tags),
     task.waitingFor,
     task.starred ? 1 : 0,
     task.recurrence ? JSON.stringify(task.recurrence) : null,
@@ -103,6 +106,7 @@ export function projectFromRow(row: SqliteRow): Project {
     kind: str(row.kind) === "sequential" ? "sequential" : "parallel",
     status: str(row.status) === "onHold" ? "onHold" : str(row.status) === "done" ? "done" : "active",
     color: strNullable(row.color),
+    areaId: strNullable(row.area_id),
     reviewIntervalDays: num(row.review_interval_days) ?? 7,
     lastReviewedAt: num(row.last_reviewed_at),
     createdAt: num(row.created_at) ?? 0,
@@ -120,12 +124,39 @@ export function projectToParams(project: Project): unknown[] {
     project.kind,
     project.status,
     project.color,
+    project.areaId,
     project.reviewIntervalDays,
     project.lastReviewedAt,
     project.createdAt,
     project.updatedAt,
     project.revision,
     project.deletedAt,
+  ];
+}
+
+export function areaFromRow(row: SqliteRow): Area {
+  return {
+    id: str(row.id),
+    name: str(row.name),
+    color: strNullable(row.color),
+    orderKey: str(row.order_key),
+    createdAt: num(row.created_at) ?? 0,
+    updatedAt: num(row.updated_at) ?? 0,
+    revision: num(row.revision) ?? 0,
+    deletedAt: num(row.deleted_at),
+  };
+}
+
+export function areaToParams(area: Area): unknown[] {
+  return [
+    area.id,
+    area.name,
+    area.color,
+    area.orderKey,
+    area.createdAt,
+    area.updatedAt,
+    area.revision,
+    area.deletedAt,
   ];
 }
 

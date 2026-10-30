@@ -1,10 +1,11 @@
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { Project, Section, Task } from "@gtd/core";
+import type { Area, Project, Section, Task } from "@gtd/core";
 
 import { SectionHeader } from "./Screen";
 import { TaskRow } from "./TaskRow";
 import { EmptyState } from "./EmptyState";
+import { Chip } from "./Chip";
 import { AppText } from "../theme/AppText";
 import { Card, Divider } from "../theme/primitives";
 import { useTheme } from "../hooks/useTheme";
@@ -20,9 +21,12 @@ export interface ProjectDetailContentProps {
   now: number;
   onToggleTask: (task: Task) => void;
   onPressTask: (task: Task) => void;
+  /** 区域列表（传入方可修改归属） */
+  areas?: Area[];
+  onSetArea?: (areaId: string | null) => void;
 }
 
-/** 项目详情：进度 + 按 section 分组的任务 + 下一步行动高亮 */
+/** 项目详情：进度 + 所属区域 + 按 section 分组的任务 + 下一步行动高亮 */
 export function ProjectDetailContent({
   project,
   sections,
@@ -31,6 +35,8 @@ export function ProjectDetailContent({
   now,
   onToggleTask,
   onPressTask,
+  areas,
+  onSetArea,
 }: ProjectDetailContentProps) {
   const colors = useTheme();
   const t = useT();
@@ -87,6 +93,31 @@ export function ProjectDetailContent({
               {`${percent}%`}
             </AppText>
           </View>
+
+          {onSetArea !== undefined && areas !== undefined ? (
+            <View style={styles.areaRow}>
+              <AppText variant="caption" tone="tertiary" lines={1}>
+                {t("area.assign")}
+              </AppText>
+              <View style={styles.areaChips}>
+                <Chip
+                  label={t("area.none")}
+                  prefix={null}
+                  selected={project.areaId === null}
+                  onPress={() => onSetArea(null)}
+                />
+                {areas.map((area) => (
+                  <Chip
+                    key={area.id}
+                    label={area.name}
+                    prefix={null}
+                    selected={project.areaId === area.id}
+                    onPress={() => onSetArea(area.id)}
+                  />
+                ))}
+              </View>
+            </View>
+          ) : null}
         </Card>
 
         {tasks.length === 0 ? (
@@ -199,6 +230,15 @@ const styles = StyleSheet.create({
   groupEmpty: {
     paddingHorizontal: space.lg,
     paddingBottom: space.sm,
+  },
+  areaRow: {
+    gap: space.xs,
+    paddingTop: space.xs,
+  },
+  areaChips: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: space.xs,
   },
   nextWrap: {
     marginHorizontal: space.sm,

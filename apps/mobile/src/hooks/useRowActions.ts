@@ -1,12 +1,12 @@
-import { Alert } from "react-native";
 import type { Task, Project } from "@gtd/core";
 import { runCommand } from "@gtd/core";
-import { t } from "@gtd/ui";
+import { t, showPrompt, showConfirm } from "@gtd/ui";
 import { moveTask, deleteTaskWithUndo } from "@/lib/task-ops";
 
 /**
  * 列表行操作接线：重命名 / 排序 / 删除。
- * 重命名用 window.prompt（Android 无 Alert.prompt），删除走软删除 + 撤销条。
+ * 重命名用跨端 PromptHost（window.prompt 在 RN 原生不存在），
+ * 删除走软删除 + 撤销条。
  */
 
 export type TaskRowAction = {
@@ -88,8 +88,7 @@ export function useProjectActions(): {
 }
 
 async function renameProject(project: Project): Promise<void> {
-  // eslint-disable-next-line no-alert
-  const input = typeof window !== "undefined" ? window.prompt(t("projects.renameTitle"), project.name) : null;
+  const input = await showPrompt({ title: t("projects.renameTitle"), initialValue: project.name });
   if (input === null) return;
   const name = input.trim();
   if (name.length === 0 || name === project.name) return;
@@ -111,31 +110,20 @@ async function toggleProjectKind(project: Project): Promise<void> {
   }).catch(() => undefined);
 }
 
-function confirmDeleteProject(project: Project): void {
-  Alert.alert(
-    t("projects.deleteConfirm"),
-    t("projects.deleteConfirmBody", { name: project.name }),
-    [
-      { text: t("common.cancel"), style: "cancel" },
-      {
-        text: t("common.delete"),
-        style: "destructive",
-        onPress: () => {
-          // 先解绑项目内任务的 projectId，再删项目（任务保留）
-          void (async () => {
-            const { appStore, runCommand: run } = await import("@gtd/core");
-            const tasks = Object.values(appStore.getState().tasks).filter(
-              (task) => task.projectId === project.id && task.deletedAt === null,
-            );
-            for (const task of tasks) {
-              await run("task.update", { id: task.id, patch: { projectId: null } }).catch(
-                () => undefined,
-              );
-            }
-            await run("project.softDelete", { id: project.id }).catch(() => undefined);
-          })();
-        },
-      },
-    ],
+async function confirmDeleteProject(project: Project): Promise<void> {
+  const ok = await showConfirm({
+    title: t("projects.deleteConfirm"),
+    message: t("projects.deleteConfirmBody", { name: project.name }),
+    confirmLabel: t("common.delete"),
+  });
+  if (!ok) return;
+  // 先解绑项目内任务的 projectId，再删项目（任务保留）
+  const { appStore, runCommand: run } = await import("@gtd/core");
+  const tasks = Object.values(appStore.getState().tasks).filter(
+    (task) => task.projectId === project.id && task.deletedAt === null,
   );
+  for (const task of tasks) {
+    await run("task.update", { id: task.id, patch: { projectId: null } }).catch(() => undefined);
+  }
+  await run("project.softDelete", { id: project.id }).catch(() => undefined);
 }

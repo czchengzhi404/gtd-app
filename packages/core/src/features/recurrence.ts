@@ -39,6 +39,22 @@ export function nextOccurrence(
   const limit = 1000;
 
   switch (rule.freq) {
+    /** 完成后第 N 天：以完成时刻（now）为基准，不依赖原到期日 */
+    case "afterCompletion": {
+      const base = startOfDay(now) + DAY_MS;
+      const next = base + (interval - 1) * DAY_MS;
+      return checkUntil(atPreservedTime(next, anchor), rule);
+    }
+    /** 每工作日：跳过周六周日 */
+    case "weekdays": {
+      let day = startOfDay(floor) + DAY_MS;
+      for (let steps = 0; steps < limit; steps++) {
+        const weekday = new Date(day).getDay();
+        if (weekday !== 0 && weekday !== 6) return checkUntil(atPreservedTime(day, anchor), rule);
+        day += DAY_MS;
+      }
+      return checkUntil(null, rule);
+    }
     case "daily": {
       let next = anchor + interval * DAY_MS;
       let steps = 0;
@@ -107,6 +123,14 @@ export function nextOccurrence(
       }
     }
   }
+}
+
+/** 保留 anchor 的时分秒（日期取 dayStart 当天） */
+function atPreservedTime(dayStart: number, anchor: number): number {
+  const a = new Date(anchor);
+  const d = new Date(dayStart);
+  d.setHours(a.getHours(), a.getMinutes(), 0, 0);
+  return d.getTime();
 }
 
 /** 当月最后一个工作日（周一至周五） */

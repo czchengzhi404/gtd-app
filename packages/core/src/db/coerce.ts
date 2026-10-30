@@ -1,5 +1,6 @@
 import type { TaggedRecord } from "../models/commands";
 import type {
+  Area,
   AttachmentMeta,
   ChecklistItem,
   Context,
@@ -104,6 +105,7 @@ export function coerceTask(obj: Record<string, unknown>): Task | null {
     projectId: asStringNull(obj.projectId),
     sectionId: asStringNull(obj.sectionId),
     contextIds: asStringArray(obj.contextIds),
+    tags: asStringArray(obj.tags),
     waitingFor: asStringNull(obj.waitingFor),
     starred: asBool(obj.starred),
     recurrence,
@@ -124,6 +126,7 @@ export function coerceProject(obj: Record<string, unknown>): Project | null {
     kind: kind === "sequential" ? "sequential" : "parallel",
     status: status === "onHold" ? "onHold" : status === "done" ? "done" : "active",
     color: asStringNull(obj.color),
+    areaId: asStringNull(obj.areaId),
     reviewIntervalDays: Math.max(1, Math.trunc(asNumber(obj.reviewIntervalDays) ?? 7)),
     lastReviewedAt: asNumber(obj.lastReviewedAt),
   };
@@ -164,11 +167,23 @@ export function coerceAttachment(obj: Record<string, unknown>): AttachmentMeta |
   };
 }
 
+export function coerceArea(obj: Record<string, unknown>): Area | null {
+  const base = baseFields(obj);
+  if (base.id.length === 0) return null;
+  return {
+    ...base,
+    name: asString(obj.name).slice(0, 200),
+    color: asStringNull(obj.color),
+    orderKey: asString(obj.orderKey),
+  };
+}
+
 const COERCERS: Record<TaggedRecord["type"], (obj: Record<string, unknown>) => unknown> = {
   task: coerceTask,
   project: coerceProject,
   section: coerceSection,
   context: coerceContext,
+  area: coerceArea,
   attachment: coerceAttachment,
 };
 
@@ -180,7 +195,12 @@ export function coerceTaggedRecords(input: unknown): TaggedRecord[] {
     if (item === null || typeof item !== "object") continue;
     const { type, record } = item as { type?: unknown; record?: unknown };
     if (
-      (type !== "task" && type !== "project" && type !== "section" && type !== "context" && type !== "attachment") ||
+      (type !== "task" &&
+        type !== "project" &&
+        type !== "section" &&
+        type !== "context" &&
+        type !== "area" &&
+        type !== "attachment") ||
       record === null ||
       typeof record !== "object"
     ) {

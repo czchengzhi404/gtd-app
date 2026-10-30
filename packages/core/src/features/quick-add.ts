@@ -1,5 +1,6 @@
 import type { RecurrenceRule } from "../models/task";
 import { endOfDay, startOfDay } from "./recurrence";
+import { normalizeTags } from "./tags";
 
 /**
  * 快速添加自然语言解析（中英混排）。纯函数：输入原始文本 + 当前时间，
@@ -28,6 +29,8 @@ export interface QuickAddParseResult {
   dueAt: number | undefined;
   waitingFor: string | undefined;
   contextNames: string[];
+  /** +标签：多维检索用 */
+  tags: string[];
   projectName: string | undefined;
   recurrence: RecurrenceRule | undefined;
   /** > 语法出现时建议 status=waiting */
@@ -85,6 +88,7 @@ interface Extracted {
   contextNames: string[];
   projectName: string | undefined;
   waitingFor: string | undefined;
+  tags: string[];
 }
 
 function cut(text: string, match: RegExpMatchArray): string {
@@ -116,6 +120,16 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
       text = cut(text, m);
     }
   }
+
+  // 2b) 标签（可多个）：+紧急 +等审批
+  const rawTags: string[] = [];
+  for (;;) {
+    const m = text.match(/(?:^|\s)\+([^\s@#+>!]+)/u);
+    if (!m) break;
+    rawTags.push(m[1] ?? "");
+    text = cut(text, m);
+  }
+  const tags = normalizeTags(rawTags);
 
   // 3) 等待中 >人
   {
@@ -158,6 +172,38 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
           early = { freq: "daily", interval: Math.max(2, Number(everyNDays[1])), until: null };
           text = cut(text, everyNDays);
         }
+      }
+      // 每工作日：只排周一到周五
+      if (early === undefined) {
+        const workdays = text.match(/(?:^|\s)(?:每个?工作日|工作日)(?=\s|$)/u);
+        if (workdays) {
+          early = { freq: "weekdays", interval: 1, until: null };
+          text = cut(text, workdays);
+        }
+      }
+      // 完成后N天：以完成时刻为基准，而非原到期日
+      if (early === undefined) {
+        const afterDone = text.match(/(?:^|\s)完成后(\d{1,3})天(?=\s|$)/u);
+        if (afterDone) {
+          early = {
+            freq: "afterCompletion",
+            interval: Math.max(1, Number(afterDone[1])),
+            until: null,
+          };
+          text = cut(text, afterDone);
+        }
+      }
+      // 重复N次：限定总次数（完成即消耗一次）
+      let remainingCount: number | null = null;
+      {
+        const times = text.match(/(?:^|\s)重复(\d{1,3})次(?=\s|$)/u);
+        if (times) {
+          remainingCount = Math.max(1, Number(times[1]));
+          text = cut(text, times);
+        }
+      }
+      if (early !== undefined && remainingCount !== null) {
+        early = { ...early, remainingCount };
       }
     }
 
@@ -352,6 +398,7 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
     dueAt: dueDayStart,
     waitingFor,
     contextNames: contextNames.filter((n) => n.length > 0),
+    tags: tags.filter((n) => n.length > 0),
     projectName,
     recurrence,
     suggestsWaiting: waitingFor !== undefined,

@@ -7,13 +7,20 @@ export type TaskStatus = (typeof TASK_STATUSES)[number];
 export type TaskStatusInput = Exclude<TaskStatus, "done">;
 
 export interface RecurrenceRule {
-  freq: "daily" | "weekly" | "monthly" | "yearly";
-  /** 间隔：2 = 每两周/每两月 */
+  /**
+   * - daily / weekly / monthly / yearly：按日历推进
+   * - weekdays：仅工作日（周一至周五）
+   * - afterCompletion：完成后第 N 天（不依赖原到期日）
+   */
+  freq: "daily" | "weekly" | "monthly" | "yearly" | "weekdays" | "afterCompletion";
+  /** 间隔：2 = 每两周/每两月/每隔两天 */
   interval: number;
   /** 0=周日 … 6=周六，仅 freq=weekly 时有意义 */
   byWeekday?: number[];
   /** monthly 专用：取当月最后一个工作日（周一至周五），优先于日序 */
   lastWeekday?: boolean;
+  /** 剩余次数：null 表示无限；完成时递减，归零后任务结束 */
+  remainingCount?: number | null;
   /** 不再重复的截止时间（毫秒），null 表示无限重复 */
   until?: number | null;
 }
@@ -42,6 +49,8 @@ export interface Task extends BaseRecord {
   projectId: string | null;
   sectionId: string | null;
   contextIds: string[];
+  /** 标签：多维检索（#紧急 #等审批 #5分钟），与情境（在哪做）互补 */
+  tags: string[];
   waitingFor: string | null;
   /** 专注视图已选中的下一步行动 */
   starred: boolean;
@@ -56,12 +65,21 @@ export type ProjectKind = (typeof PROJECT_KINDS)[number];
 export const PROJECT_STATUSES = ["active", "onHold", "done"] as const;
 export type ProjectStatus = (typeof PROJECT_STATUSES)[number];
 
+/** 区域：项目的上层归类（工作 / 生活 / 学习） */
+export interface Area extends BaseRecord {
+  name: string;
+  color: string | null;
+  orderKey: string;
+}
+
 export interface Project extends BaseRecord {
   name: string;
   description: string;
   kind: ProjectKind;
   status: ProjectStatus;
   color: string | null;
+  /** 所属区域；null 表示未归类 */
+  areaId: string | null;
   /** 回顾周期（天）：距上次回顾超过该天数即视为待回顾 */
   reviewIntervalDays: number;
   /** 上次回顾时间；null 表示从未回顾 */

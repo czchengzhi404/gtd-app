@@ -9,7 +9,7 @@ import { DueDateChip } from "./DueDateChip";
 import { Divider } from "../theme/primitives";
 import { t } from "../i18n";
 import { useTheme } from "../hooks/useTheme";
-import { radius, space } from "../theme/tokens";
+import { hit, radius, space } from "../theme/tokens";
 
 export interface TaskRowAction {
   key: string;
@@ -33,7 +33,25 @@ export interface TaskListProps {
   emptyHint?: string;
   /** 卡片化容器（列表页默认开；嵌在其他卡片内时可关） */
   carded?: boolean;
+  /** 多选模式 */
+  selectionMode?: boolean;
+  selectedIds?: ReadonlySet<string>;
+  onToggleSelect?: (task: Task) => void;
+  /** 长按进入多选 */
+  onEnterSelection?: (task: Task) => void;
+  /** 左滑动作（如完成） */
+  onSwipeLeftTask?: (task: Task) => void;
+  /** 右滑动作（如删除/延后） */
+  onSwipeRightTask?: (task: Task) => void;
+  /** 拖拽手柄松手：把任务移到目标下标（父级负责落库 orderKey） */
+  onReorderTask?: (task: Task, toIndex: number) => void;
+  /** 列表顶部/底部插槽 */
+  header?: React.ReactElement | null;
+  footer?: React.ReactElement | null;
 }
+
+/** 与 TaskRow 行高（hit.row）一致，用于把拖拽位移换算成行数 */
+const ROW_STEP = hit.row;
 
 /**
  * 任务列表：单卡片 + 细分隔线（比逐行卡片更紧凑、滚动更省空间）。
@@ -50,6 +68,15 @@ export function TaskList({
   emptyTitle,
   emptyHint,
   carded = true,
+  selectionMode = false,
+  selectedIds,
+  onToggleSelect,
+  onEnterSelection,
+  onSwipeLeftTask,
+  onSwipeRightTask,
+  onReorderTask,
+  header,
+  footer,
 }: TaskListProps) {
   const colors = useTheme();
 
@@ -57,18 +84,34 @@ export function TaskList({
     return <EmptyState title={emptyTitle ?? t("empty.list")} hint={emptyHint ?? t("empty.listHint")} />;
   }
 
-  const renderItem = ({ item }: ListRenderItemInfo<Task>) => (
+  const renderItem = ({ item, index }: ListRenderItemInfo<Task>) => (
     <TaskRow
       title={item.title}
       done={item.status === "done"}
       onToggle={() => onToggleTask(item)}
       onPress={() => onPressTask(item)}
+      onLongPress={onEnterSelection !== undefined ? () => onEnterSelection(item) : undefined}
       onContextMenu={
         onContextMenuTask !== undefined
           ? async (position) => {
               const handled = await onContextMenuTask(item, position);
               if (!handled) onPressTask(item);
               return handled;
+            }
+          : undefined
+      }
+      selectionMode={selectionMode}
+      selected={selectedIds?.has(item.id) ?? false}
+      onSelect={() => onToggleSelect?.(item)}
+      onSwipeLeft={onSwipeLeftTask !== undefined ? () => onSwipeLeftTask(item) : undefined}
+      onSwipeRight={onSwipeRightTask !== undefined ? () => onSwipeRightTask(item) : undefined}
+      onDragEnd={
+        onReorderTask !== undefined && !selectionMode
+          ? (dy) => {
+              const offset = Math.round(dy / ROW_STEP);
+              if (offset === 0) return;
+              const target = Math.min(tasks.length - 1, Math.max(0, index + offset));
+              if (target !== index) onReorderTask(item, target);
             }
           : undefined
       }
@@ -86,6 +129,9 @@ export function TaskList({
             const name = contextNameById[id];
             return name !== undefined ? <Chip key={id} label={name} /> : null;
           })}
+          {item.tags.slice(0, 2).map((tag) => (
+            <Chip key={tag} label={tag} prefix="#" />
+          ))}
         </>
       }
     />
@@ -97,6 +143,8 @@ export function TaskList({
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
       ItemSeparatorComponent={() => <Divider inset={space.lg} />}
+      ListHeaderComponent={header ?? null}
+      ListFooterComponent={footer ?? null}
       keyboardShouldPersistTaps="handled"
       style={[
         styles.list,
