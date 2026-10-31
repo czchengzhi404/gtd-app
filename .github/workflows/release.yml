@@ -91,33 +91,126 @@ jobs:
           echo "signing injected"
         env:
           GTD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      - name: Inject ABI splits + APK naming (arm64/v7a/x86_64 + universal)
+        run: |
+          cat >> apps/mobile/android/app/build.gradle <<'EOF'
+          android {
+            splits {
+              abi {
+                enable true
+                reset()
+                include "armeabi-v7a", "arm64-v8a", "x86_64"
+                universalApk true
+              }
+            }
+            applicationVariants.all { variant ->
+              variant.outputs.all { output ->
+                def abi = output.getFilter(com.android.build.OutputFile.ABI)
+                outputFileName = abi != null ?
+                    "GTD-v${variant.versionName}-${abi}.apk" :
+                    "GTD-v${variant.versionName}-universal.apk"
+              }
+            }
+          }
+          EOF
+          echo "abi splits injected"
       - name: Build release APK
         run: ./gradlew assembleRelease --no-daemon
         working-directory: apps/mobile/android
         env:
           GTD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ORG_GRADLE_PROJECT_reactNativeArchitectures: "arm64-v8a,armeabi-v7a,x86_64"
-      - name: Verify APK (signature + manifest)
+      - name: Verify APKs (signature + manifest)
         run: |
           set -e
-          APK="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
-          test -f "$APK"
+          OUT="apps/mobile/android/app/build/outputs/apk/release"
+          COUNT=$(ls "$OUT"/GTD-*.apk | wc -l)
+          echo "produced $COUNT APKs"
+          test "$COUNT" -ge 4
           BT="$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)"
-          "$BT/apksigner" verify --print-certs "$APK" | head -4
-          "$BT/aapt" dump badging "$APK" | grep -E "^package|^application-label:|launchable-activity" | head -4
+          for APK in "$OUT"/GTD-*.apk; do
+            echo "== $(basename "$APK") =="
+            "$BT/apksigner" verify --print-certs "$APK" | head -4
+            "$BT/aapt" dump badging "$APK" | grep -E "^package|^application-label:|launchable-activity" | head -4
+          done
       # 直接挂到 Release（不经制品存储：Actions 制品配额有限）
-      - name: Upload APK to release
+      - name: Upload APKs to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          APK="apps/mobile/android/app/build/outputs/apk/release/app-release.apk"
-          cp "$APK" "GTD-${GITHUB_REF_NAME}-android.apk"
+          OUT="apps/mobile/android/app/build/outputs/apk/release"
           gh release view "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" \
               --title "GTD 清单 ${GITHUB_REF_NAME}" \
-              --notes "CI 构建。Android 为签名 release 包；macOS dmg 未签名（首次打开需右键 → 打开）。"
-          gh release upload "${GITHUB_REF_NAME}" "GTD-${GITHUB_REF_NAME}-android.apk" \
+              --notes "CI 构建。Android 为签名 release 包（arm64/v7a/x86_64 分包 + universal 通用包）；macOS dmg 未签名（首次打开需右键 → 打开）；iOS 为未签名 IPA（TrollStore/自签侧载，见 README）。"
+          gh release upload "${GITHUB_REF_NAME}" "$OUT"/GTD-*.apk \
+            --repo "$GITHUB_REPOSITORY" --clobber
+
+  ios-unsigned:
+    name: iOS (unsigned IPA + simulator)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Generate native project
+        run: bunx expo prebuild -p ios --no-install
+        working-directory: apps/mobile
+        env:
+          EXPO_NO_TELEMETRY: "1"
+          CI: "1"
+      - name: Install pods
+        run: pod install --project-directory=ios
+        working-directory: apps/mobile
+      # 发现 prebuild 生成的 workspace/scheme/app 名（随 app.json name 变化）
+      - name: Resolve build names
+        id: names
+        run: |
+          set -e
+          WS=$(ls apps/mobile/ios/*.xcworkspace | head -1 | xargs basename -s .xcworkspace)
+          echo "workspace=$WS" >> "$GITHUB_OUTPUT"
+      - name: Build device (unsigned, arm64)
+        run: |
+          set -e
+          WS="${{ steps.names.outputs.workspace }}"
+          xcodebuild -workspace "apps/mobile/ios/$WS.xcworkspace" -scheme "$WS" \
+            -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            -derivedDataPath apps/mobile/build/ios | tail -5
+      - name: Build simulator
+        run: |
+          set -e
+          WS="${{ steps.names.outputs.workspace }}"
+          xcodebuild -workspace "apps/mobile/ios/$WS.xcworkspace" -scheme "$WS" \
+            -configuration Release -sdk iphonesimulator \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            -derivedDataPath apps/mobile/build/ios-sim | tail -5
+      - name: Package IPA + simulator zip
+        run: |
+          set -e
+          APP=$(ls -d apps/mobile/build/ios/Build/Products/Release-iphoneos/*.app | head -1)
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry "GTD-${GITHUB_REF_NAME}-ios-unsigned.ipa" Payload
+          rm -rf Payload
+          SIM=$(ls -d apps/mobile/build/ios-sim/Build/Products/Release-iphonesimulator/*.app | head -1)
+          zip -qry "GTD-${GITHUB_REF_NAME}-ios-simulator.zip" "$SIM"
+          ls -la GTD-${GITHUB_REF_NAME}-ios-*
+      - name: Upload iOS artifacts to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          gh release view "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" \
+              --title "GTD 清单 ${GITHUB_REF_NAME}" \
+              --notes "CI 构建。"
+          gh release upload "${GITHUB_REF_NAME}" \
+            "GTD-${GITHUB_REF_NAME}-ios-unsigned.ipa" "GTD-${GITHUB_REF_NAME}-ios-simulator.zip" \
             --repo "$GITHUB_REPOSITORY" --clobber
 
   desktop-windows:

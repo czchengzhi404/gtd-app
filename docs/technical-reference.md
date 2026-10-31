@@ -351,12 +351,17 @@ More 页在距上次回顾 ≥7 天（或从未）时显示红点「该回顾了
 版本号（JSON 解析式修改，禁 sed）→ 四包 tsc + 测试 + export + smoke + 截图
 → Git Data API 推提交（blob→tree→commit→ref，Python + gh api）
 → 打 tag（annotated，POST git/tags + git/refs）
-→ CI：Android APK（签名注入 + apksigner 验签 + gh release upload）
-      Windows/Linux（electron-builder --publish always）
-      macOS（--publish never 构建 + 手工 upload，needs 串行防 422）
+→ CI：Android 4 包（ABI splits：arm64-v8a/armeabi-v7a/x86_64 + universal，
+      workflow 注入 splits 配置；签名密钥从 Secrets 还原 + apksigner 逐包验签）
+      Windows NSIS x64+arm64 / Linux AppImage x64+arm64（electron-builder --publish always）
+      macOS dmg x64+arm64（--publish never 构建 + 手工 upload，needs 串行防 422）
+      iOS（macOS runner：expo prebuild + xcodebuild CODE_SIGNING_ALLOWED=NO
+          → 未签名设备 IPA + 模拟器 zip 上传；无 Apple 开发者账号的侧载方案）
 → 核对资产时间戳（必须全部来自本次 run）→ PATCH draft=false + release notes
 → APK 下载本地校验（zipfile 全量 CRC）
 ```
+
+**产物矩阵**：Android 4 APK（按 ABI 选包）+ Windows/macOS/Linux x64 与 arm64 安装包 + iOS 未签名 IPA/模拟器包。兼容区间：Android 7.0+（minSdk 24）、iOS 15.1+、Windows 10+、macOS 11+。
 
 **发布铁律**：重打标签前必须删草稿 + 删标签（取消的 run 会把旧提交资产留在草稿里造成污染）；`taskkill curl` 后只保留一条下载命令；校验以 `zf.testzip()` 为准。
 

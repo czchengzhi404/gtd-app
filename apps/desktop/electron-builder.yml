@@ -35,7 +35,7 @@ win:
   icon: assets/icon.png
   target:
     - target: nsis
-      arch: [x64]
+      arch: [x64, arm64]
   # 代码签名（阶段四基础项）：设置环境变量 CSC_LINK / CSC_KEY_PASSWORD 启用；
   # 未配置时本地构建不签名（安装包仍可用，SmartScreen 会提示）。
   # certificateSubjectName: 你的证书主体
@@ -63,5 +63,6 @@ mac:
 linux:
   icon: assets/icon.png
   target:
-    - AppImage
+    - target: AppImage
+      arch: [x64, arm64]
   category: Utility

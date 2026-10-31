@@ -37,16 +37,40 @@
 - `apps/mobile` — Expo SDK 57 通用应用（ios / android / web 三目标；web 产物即桌面渲染层）
 - `apps/desktop` — Electron 壳（窗口/托盘/快捷键/通知/菜单/dialog/fs + SQLite 命令分发），零 GTD 逻辑
 
-## ## 下载安装（GitHub Releases）
+## 下载安装（GitHub Releases）
 
 推送 `v*` 标签后，GitHub Actions 自动构建并发布到 [Releases](../../releases)：
 
-- **Android**：`GTD-v*.*.*-android.apk` —— **签名 release 包**（v0.2.0 起）。⚠️ 曾安装过 v0.1.0 的 debug 包请先卸载（签名不同无法覆盖安装）；安装时允许"未知来源"。
-- **Windows**：NSIS 安装器（`GTD.Setup.*.exe`）与便携版
-- **macOS**：未签名 dmg（首次打开：右键 → 打开；自动更新需签名后启用）
-- **Linux**：AppImage
+### Android（4 个包，按机型选）
 
-发布新版本：`git tag v0.2.0 && git push origin v0.2.0`。
+| 文件 | 适用 |
+|---|---|
+| `GTD-v*-arm64-v8a.apk` | **绝大多数现代手机**（2016 年后大概率是这个） |
+| `GTD-v*-armeabi-v7a.apk` | 老旧 32 位手机 |
+| `GTD-v*-x86_64.apk` | x86 模拟器 / 部分平板 |
+| `GTD-v*-universal.apk` | 不确定就选这个（体积更大，含全部架构） |
+
+- 全部为**签名 release 包**；安装时允许"未知来源"。
+- 系统要求：Android 7.0（API 24）及以上。
+
+### 桌面端
+
+- **Windows**：`*-setup-x64.exe`（Intel/AMD）、`*-setup-arm64.exe`（Surface/骁龙笔记本）；NSIS 安装器
+- **macOS**：`*.*.dmg`（Intel）与 `*-arm64.dmg`（Apple Silicon）；未签名（首次打开：右键 → 打开）
+- **Linux**：`*-x86_64.AppImage` 与 `*-arm64.AppImage`
+- 系统要求：Windows 10+、macOS 11+、主流发行版（glibc 2.31+）
+
+### iOS（未签名侧载包，无 Apple 开发者账号的现实方案）
+
+| 文件 | 用途 |
+|---|---|
+| `GTD-v*-ios-unsigned.ipa` | 设备包（arm64）：TrollStore 直接装（iOS 14–16.6.1 / 17.0）；或用 AltStore / Sideloadly 以个人 Apple ID 重签（7 天有效期，可续） |
+| `GTD-v*-ios-simulator.zip` | iOS 模拟器包：解压拖入 Xcode Simulator |
+
+- 未签名 IPA **无法**在普通设备直接安装——这是苹果签名机制决定的；需要常规安装/上架需 Apple Developer（$99/年）签名。
+- 系统要求：iOS 15.1+（React Native 0.86 下限）。
+
+发布新版本：`git tag v0.12.0 && git push origin v0.12.0`。
 
 ### Android 签名说明
 
