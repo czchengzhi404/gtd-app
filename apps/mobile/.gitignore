@@ -42,5 +42,5 @@ example
 /ios
 /android
 
-# 签名密钥库例外：release 签名跨构建稳定所需（密码不入库）
-!keys/*.p12
+# 签名密钥库不入库：CI 从 Secrets（ANDROID_KEYSTORE_BASE64）还原；本地文件仅存于开发机
+*.p12
