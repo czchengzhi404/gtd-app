@@ -59,6 +59,15 @@ jobs:
           else:
               print("already injected")
           PYEOF
+      - name: Restore signing keystore from Secrets
+        run: |
+          set -e
+          mkdir -p apps/mobile/keys
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > apps/mobile/keys/gtd-release.p12
+          test -s apps/mobile/keys/gtd-release.p12
+          echo "keystore restored ($(wc -c < apps/mobile/keys/gtd-release.p12) bytes)"
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
       - name: Inject release signing config
         run: |
           cat >> apps/mobile/android/app/build.gradle <<'EOF'
