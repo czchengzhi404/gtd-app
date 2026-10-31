@@ -14,5 +14,6 @@
   "peerDependencies": {
     "react": "*",
     "react-native": "*"
-  }
+  },
+  "license": "Apache-2.0"
 }

@@ -1,0 +1,17 @@
+GTD 清单 (gtd-app)
+Copyright 2026 czchengzhi404
+
+This product includes software developed by third parties:
+
+  * Electron (https://www.electronjs.org) — MIT License
+  * React / React Native / react-native-web (https://reactnative.dev) — MIT License
+  * Expo SDK (https://expo.dev) — MIT License
+  * better-sqlite3 (https://github.com/WiseLibs/better-sqlite3) — MIT License
+  * zod (https://zod.dev) — MIT License
+  * zustand (https://github.com/pmndrs/zustand) — MIT License
+  * @expo/vector-icons / Ionicons (https://icons.expo.fyi) — MIT License
+
+This product bundles the LXGW WenKai typeface
+(https://github.com/lxgw/LxgwWenKai), licensed under the
+SIL Open Font License, Version 1.1. A copy of the license is
+included with the font: apps/mobile/assets/fonts/LICENSE-OFL-1.1.txt.

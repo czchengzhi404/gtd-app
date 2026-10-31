@@ -21,5 +21,6 @@
   },
   "dependencies": {
     "expo-sharing": "~57.0.24"
-  }
+  },
+  "license": "Apache-2.0"
 }
