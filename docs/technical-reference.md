@@ -328,7 +328,7 @@ More 页在距上次回顾 ≥7 天（或从未）时显示红点「该回顾了
 - **IPC**：命令白名单 + zod payload 校验 + 结构化克隆纪律 + 查询 SELECT-only 校验；
 - **密钥**：safeStorage OS 级加密（DPAPI/Keychain/libsecret），不上传明文；
 - **Markdown 链接**：仅 http/https；
-- **CI**：action 按 commit SHA 固定（防 tag 劫持）；签名密钥库随私有仓库（转公开前须迁出）；Actions 零制品存储（防配额耗尽型 DoS）；
+- **CI**：action 按 commit SHA 固定（防 tag 劫持）；**签名密钥不入库**（CI 从 Secrets 还原 `ANDROID_KEYSTORE_BASE64`；2026-10-31 已换为本机离线自签 RSA-4096 并抹除全部 git 历史中的旧钥）；Actions 零制品存储（防配额耗尽型 DoS）；
 - **发请求纪律**：仅 http/https，host 校验拒绝回环/私有/保留地址。
 
 ---
