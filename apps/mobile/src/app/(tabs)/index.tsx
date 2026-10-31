@@ -11,9 +11,11 @@ import {
   QuickAddBar,
   TaskList,
   useAppStore,
+  useBreakpoint,
   ViewToggle,
   useT,
 } from "@gtd/ui";
+import { IconButton } from "@gtd/ui";
 import {
   applyListFilter,
   getAllTags,
@@ -49,6 +51,7 @@ export default function InboxScreen() {
   const waitingTasks = useAppStore((s) => getTasksByStatus(s, "waiting"));
   const somedayTasks = useAppStore((s) => getTasksByStatus(s, "someday"));
   const loaded = useAppStore((s) => s.loaded);
+  const { isTabletUp } = useBreakpoint();
   const t = useT();
 
   const [view, setView] = useState<InboxView>("list");
@@ -141,6 +144,7 @@ export default function InboxScreen() {
     <View style={{ flex: 1 }}>
       <QuickAddBar preview={preview} onSubmit={submit} submitting={submitting} />
       <FilterBar
+        compact={isTabletUp}
         query={query}
         onQueryChange={(text) => {
           setQuery(text);
@@ -189,6 +193,16 @@ export default function InboxScreen() {
           { key: "list", label: t("view.list") },
           { key: "kanban", label: t("view.kanban") },
         ]}
+        trailing={
+          view === "list" ? (
+            <IconButton
+              icon="swap-vertical"
+              filled={interactions.reorderMode}
+              onPress={interactions.toggleReorderMode}
+              accessibilityLabel={t("task.dragHandle")}
+            />
+          ) : null
+        }
       />
 
       {view === "list" ? (
@@ -196,7 +210,7 @@ export default function InboxScreen() {
           tasks={filtered}
           now={Date.now()}
           contextNameById={contextNameById}
-          actions={interactions.selectionMode ? undefined : actions}
+          actions={interactions.selectionMode || interactions.reorderMode ? undefined : actions}
           onContextMenuTask={(task, position) => openTaskContextMenu(task, position)}
           onToggleTask={(task) =>
             void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
@@ -211,6 +225,7 @@ export default function InboxScreen() {
           onSwipeLeftTask={(task) => void interactions.swipeLeft(task)}
           onSwipeRightTask={(task) => void interactions.swipeRight(task)}
           onReorderTask={(task, toIndex) => void interactions.reorder(filtered, task, toIndex)}
+          reorderMode={interactions.reorderMode}
         />
       ) : (
         <KanbanBoard

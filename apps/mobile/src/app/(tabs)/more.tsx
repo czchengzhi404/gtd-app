@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -7,7 +7,7 @@ import {
   AppText,
   Button,
   Card,
-  SectionHeader,
+  Divider,
   useAppStore,
   useTheme,
   useT,
@@ -29,6 +29,7 @@ import {
   testSyncConnection,
 } from "@/platform/desktop-actions";
 import { isDesktop } from "@/platform/env";
+import { exportOnMobile } from "@/platform/mobile-actions";
 
 /** 同步预设：坚果云/WebDAV/S3/本地文件夹（坚果云本质走 WebDAV，endpoint 已预填） */
 interface SyncPreset {
@@ -123,6 +124,9 @@ export default function MoreScreen() {
     kv["review.lastAt"] !== undefined
       ? new Date(Number(kv["review.lastAt"])).toLocaleDateString()
       : t("more.reviewNever");
+  // 距上次回顾 ≥7 天（或从未回顾）时提示，红点只出现在 More 页，不做全局打扰
+  const reviewDue =
+    kv["review.lastAt"] === undefined || Date.now() - Number(kv["review.lastAt"]) >= 7 * 86400000;
 
   const update = (patch: Partial<SyncConfig>) => setConfig((prev) => ({ ...prev, ...patch }));
 
@@ -201,8 +205,14 @@ export default function MoreScreen() {
   const onExport = async () => {
     setBusy(true);
     try {
-      const target = await exportAllToFile();
-      setStatus(target === null ? t("more.status.canceled") : t("more.status.exported") + target);
+      if (isDesktop()) {
+        const target = await exportAllToFile();
+        setStatus(target === null ? t("more.status.canceled") : t("more.status.exported") + target);
+      } else {
+        // 移动端：系统分享面板导出（此前导出/备份是桌面专属，手机用户没有数据出口）
+        await exportOnMobile();
+        setStatus(t("more.status.exported") + t("more.exportMobileDone"));
+      }
     } catch (err) {
       setStatus(t("more.status.exportFailed") + (err instanceof Error ? err.message : String(err)));
     } finally {
@@ -225,18 +235,18 @@ export default function MoreScreen() {
   return (
     <ScrollView contentContainerStyle={styles.content} style={{ backgroundColor: colors.canvas }}>
       <View style={styles.column}>
-        {/* 等待中 / 将来也许 预览 */}
-        <SectionHeader
-          title={t("more.waiting")}
-          trailing={
+        {/* 任务状态：等待中 / 将来也许 */}
+        <GroupCard icon="layers-outline" title={t("more.group.status")}>
+          <View style={styles.subHeaderRow}>
+            <AppText variant="caption" tone="secondary" lines={1}>
+              {t("more.waiting")}
+            </AppText>
             <AppText variant="caption" tone="tertiary" lines={1}>
               {String(waiting.length)}
             </AppText>
-          }
-        />
-        <Card compact style={styles.block}>
+          </View>
           {waiting.length === 0 ? (
-            <AppText variant="label" tone="tertiary" lines={1}>
+            <AppText variant="label" tone="tertiary" lines={1} style={styles.groupEmpty}>
               {t("more.waitingEmpty")}
             </AppText>
           ) : (
@@ -249,19 +259,17 @@ export default function MoreScreen() {
               />
             ))
           )}
-        </Card>
-
-        <SectionHeader
-          title={t("more.someday")}
-          trailing={
+          <Divider style={styles.groupDivider} />
+          <View style={styles.subHeaderRow}>
+            <AppText variant="caption" tone="secondary" lines={1}>
+              {t("more.someday")}
+            </AppText>
             <AppText variant="caption" tone="tertiary" lines={1}>
               {String(someday.length)}
             </AppText>
-          }
-        />
-        <Card compact style={styles.block}>
+          </View>
           {someday.length === 0 ? (
-            <AppText variant="label" tone="tertiary" lines={1}>
+            <AppText variant="label" tone="tertiary" lines={1} style={styles.groupEmpty}>
               {t("more.somedayEmpty")}
             </AppText>
           ) : (
@@ -273,40 +281,50 @@ export default function MoreScreen() {
               />
             ))
           )}
-        </Card>
+        </GroupCard>
 
-        {/* 语言 */}
-        <SectionHeader title={t("more.language")} />
-        <View style={styles.inlineRow}>
-          <SegPill label={t("more.lang.zh")} selected={lang === "zh"} onPress={() => onSwitchLang("zh")} />
-          <SegPill label={t("more.lang.en")} selected={lang === "en"} onPress={() => onSwitchLang("en")} />
-        </View>
-
-        {/* 主题 */}
-        <SectionHeader title={t("more.themeSection")} />
-        <View style={styles.inlineRow}>
-          <SegPill label={t("more.theme.system")} selected={(kv["theme.mode"] ?? "system") === "system"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "system" }).catch(() => undefined)} />
-          <SegPill label={t("more.theme.light")} selected={kv["theme.mode"] === "light"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "light" }).catch(() => undefined)} />
-          <SegPill label={t("more.theme.dark")} selected={kv["theme.mode"] === "dark"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "dark" }).catch(() => undefined)} />
-        </View>
-
-        {/* 字体 */}
-        <SectionHeader title={t("more.fontSection")} />
-        <View style={styles.inlineRow}>
-          <SegPill label={t("more.font.wenkai")} selected={(kv["font.family"] ?? "LXGWWenKai") === "LXGWWenKai"} onPress={() => void runCommand("settings.set", { key: "font.family", value: "LXGWWenKai" }).catch(() => undefined)} />
-          <SegPill label={t("more.font.system")} selected={kv["font.family"] === "system"} onPress={() => void runCommand("settings.set", { key: "font.family", value: "system" }).catch(() => undefined)} />
-        </View>
+        {/* 外观：语言 / 主题 / 字体 */}
+        <GroupCard icon="color-palette-outline" title={t("more.appearance")}>
+          <AppText variant="caption" tone="tertiary" lines={1} style={styles.subLabel}>
+            {t("more.language")}
+          </AppText>
+          <View style={styles.pillRow}>
+            <SegPill label={t("more.lang.zh")} selected={lang === "zh"} onPress={() => onSwitchLang("zh")} />
+            <SegPill label={t("more.lang.en")} selected={lang === "en"} onPress={() => onSwitchLang("en")} />
+          </View>
+          <AppText variant="caption" tone="tertiary" lines={1} style={styles.subLabel}>
+            {t("more.themeSection")}
+          </AppText>
+          <View style={styles.pillRow}>
+            <SegPill label={t("more.theme.system")} selected={(kv["theme.mode"] ?? "system") === "system"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "system" }).catch(() => undefined)} />
+            <SegPill label={t("more.theme.light")} selected={kv["theme.mode"] === "light"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "light" }).catch(() => undefined)} />
+            <SegPill label={t("more.theme.dark")} selected={kv["theme.mode"] === "dark"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "dark" }).catch(() => undefined)} />
+          </View>
+          <AppText variant="caption" tone="tertiary" lines={1} style={styles.subLabel}>
+            {t("more.fontSection")}
+          </AppText>
+          <View style={styles.pillRow}>
+            <SegPill label={t("more.font.wenkai")} selected={(kv["font.family"] ?? "LXGWWenKai") === "LXGWWenKai"} onPress={() => void runCommand("settings.set", { key: "font.family", value: "LXGWWenKai" }).catch(() => undefined)} />
+            <SegPill label={t("more.font.system")} selected={kv["font.family"] === "system"} onPress={() => void runCommand("settings.set", { key: "font.family", value: "system" }).catch(() => undefined)} />
+          </View>
+        </GroupCard>
 
         {/* 每周回顾 */}
-        <SectionHeader
+        <GroupCard
+          icon="refresh-circle-outline"
           title={t("more.reviewSection")}
           trailing={
-            <AppText variant="caption" tone="tertiary" lines={1}>
-              {lastReview}
-            </AppText>
+            reviewDue ? (
+              <AppText variant="caption" color={colors.danger} lines={1}>
+                ● {t("review.dueBadge")}
+              </AppText>
+            ) : (
+              <AppText variant="caption" tone="tertiary" lines={1}>
+                {lastReview}
+              </AppText>
+            )
           }
-        />
-        <View style={styles.block}>
+        >
           <Button
             label={t("more.reviewStart")}
             icon="refresh-circle-outline"
@@ -314,11 +332,10 @@ export default function MoreScreen() {
             block
             onPress={() => router.push("/review")}
           />
-        </View>
+        </GroupCard>
 
-        {/* 同步 */}
-        <SectionHeader title={t("more.syncSection")} />
-        <Card style={styles.block}>
+        {/* 同步（可选） */}
+        <GroupCard icon="cloudy-outline" title={t("more.syncSection")}>
           {/* 预设选择 */}
           <View style={styles.inlineRow}>
             {SYNC_PRESETS.map((preset) => (
@@ -405,11 +422,8 @@ export default function MoreScreen() {
             {t("more.lastSync")}
             {lastSync}
           </AppText>
-        </Card>
-
-        {/* 同步日志 */}
-        <SectionHeader title={t("more.syncLogSection")} />
-        <Card style={styles.block}>
+          <Divider style={styles.groupDivider} />
+          {/* 同步日志 */}
           {syncLog === null ? (
             <AppText variant="label" tone="tertiary" lines={1}>
               {t("more.syncLogEmpty")}
@@ -437,54 +451,54 @@ export default function MoreScreen() {
               ) : null}
             </>
           )}
-        </Card>
+        </GroupCard>
 
         {/* 本地备份（桌面端） */}
         {isDesktop() ? (
-          <>
-            <SectionHeader
-              title={t("more.backupSection")}
-              trailing={
-                <AppText variant="caption" tone="tertiary" lines={1}>
-                  {backups > 0 ? t("more.backupList", { n: backups }) : t("more.backupNever")}
-                </AppText>
-              }
+          <GroupCard
+            icon="save-outline"
+            title={t("more.backupSection")}
+            trailing={
+              <AppText variant="caption" tone="tertiary" lines={1}>
+                {backups > 0 ? t("more.backupList", { n: backups }) : t("more.backupNever")}
+              </AppText>
+            }
+          >
+            <Button
+              label={t("more.backupNow")}
+              icon="save-outline"
+              disabled={busy}
+              block
+              onPress={() => void onBackup()}
             />
-            <View style={styles.block}>
-              <Button
-                label={t("more.backupNow")}
-                icon="save-outline"
-                disabled={busy}
-                block
-                onPress={() => void onBackup()}
-              />
-              <View style={styles.gap} />
-              <Button
-                label={t("more.backupRestore")}
-                icon="time-outline"
-                variant="danger"
-                disabled={busy || backups === 0}
-                block
-                onPress={onRestore}
-              />
-            </View>
-          </>
+            <View style={styles.gap} />
+            <Button
+              label={t("more.backupRestore")}
+              icon="time-outline"
+              variant="danger"
+              disabled={busy || backups === 0}
+              block
+              onPress={onRestore}
+            />
+          </GroupCard>
         ) : null}
 
-        {/* 完成记录 */}
-        <SectionHeader title={t("completed.title")} />
-        <View style={styles.block}>
+        {/* 数据与记录 */}
+        <GroupCard icon="server-outline" title={t("more.group.data")}>
           <Button
             label={t("more.completedEntry")}
             icon="checkmark-done-outline"
             block
             onPress={() => router.push("/completed")}
           />
-        </View>
-
-        {/* 数据 */}
-        <SectionHeader title={t("more.dataSection")} />
-        <View style={styles.block}>
+          <View style={styles.gap} />
+          <Button
+            label={t("more.trashEntry")}
+            icon="trash-outline"
+            block
+            onPress={() => router.push("/trash")}
+          />
+          <Divider style={styles.groupDivider} />
           <Button
             label={t("more.export")}
             icon="download-outline"
@@ -500,13 +514,12 @@ export default function MoreScreen() {
             block
             onPress={() => void onImport()}
           />
-        </View>
+        </GroupCard>
 
         {/* 关于 */}
-        <SectionHeader title={t("more.about")} />
-        <View style={styles.block}>
+        <GroupCard icon="information-circle-outline" title={t("more.about")}>
           <Button label={t("more.about")} icon="information-circle-outline" block onPress={() => router.push("/about")} />
-        </View>
+        </GroupCard>
 
         {status.length > 0 ? (
           <AppText variant="label" tone="secondary" lines={3} style={styles.status}>
@@ -515,6 +528,33 @@ export default function MoreScreen() {
         ) : null}
       </View>
     </ScrollView>
+  );
+}
+
+/** 分组卡片：图标 + 标题 + 行尾信息 + 内容，More 页的信息架构单元 */
+function GroupCard({
+  icon,
+  title,
+  trailing,
+  children,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  trailing?: ReactNode;
+  children: ReactNode;
+}) {
+  const colors = useTheme();
+  return (
+    <Card style={styles.group}>
+      <View style={styles.groupHeader}>
+        <Ionicons name={icon} size={16} color={colors.primary} />
+        <AppText variant="label" weight="600" lines={1} style={styles.groupTitle}>
+          {title}
+        </AppText>
+        {trailing ?? null}
+      </View>
+      {children}
+    </Card>
   );
 }
 
@@ -621,11 +661,47 @@ function Field({
 const styles = StyleSheet.create({
   content: {
     paddingBottom: 40,
+    gap: 12,
   },
   column: {
     width: "100%",
     maxWidth: 760,
     alignSelf: "center",
+  },
+  group: {
+    marginHorizontal: 16,
+    gap: 8,
+  },
+  groupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
+  },
+  groupTitle: {
+    flex: 1,
+    minWidth: 0,
+  },
+  subHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 2,
+  },
+  subLabel: {
+    marginTop: 4,
+  },
+  pillRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: 8,
+  },
+  groupEmpty: {
+    paddingVertical: 2,
+  },
+  groupDivider: {
+    marginVertical: 8,
   },
   block: {
     marginHorizontal: 16,

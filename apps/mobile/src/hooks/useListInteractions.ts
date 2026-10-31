@@ -17,6 +17,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export interface ListInteractions {
   selectionMode: boolean;
   selectedIds: ReadonlySet<string>;
+  /** 排序模式：显示拖拽手柄（避免常驻把手占行宽） */
+  reorderMode: boolean;
+  toggleReorderMode: () => void;
   enterSelection: (task: Task) => void;
   toggleSelect: (task: Task) => void;
   clearSelection: () => void;
@@ -32,8 +35,16 @@ export interface ListInteractions {
 export function useListInteractions(tasks: Task[]): ListInteractions {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [reorderMode, setReorderMode] = useState(false);
+
+  const toggleReorderMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+    setReorderMode((value) => !value);
+  }, []);
 
   const enterSelection = useCallback((task: Task) => {
+    setReorderMode(false);
     setSelectionMode(true);
     setSelectedIds(new Set([task.id]));
   }, []);
@@ -147,6 +158,8 @@ export function useListInteractions(tasks: Task[]): ListInteractions {
   return {
     selectionMode,
     selectedIds,
+    reorderMode,
+    toggleReorderMode,
     enterSelection,
     toggleSelect,
     clearSelection,

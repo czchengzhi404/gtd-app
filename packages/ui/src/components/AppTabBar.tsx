@@ -17,6 +17,8 @@ type IoniconName = ComponentProps<typeof Ionicons>["name"];
 export interface AppTabBarProps {
   state: { routes: { name: string; key: string }[]; index: number };
   navigation: { navigate: (name: string, params?: object) => void };
+  /** 路由名 → 待办数徽标（如收集箱未理清数、今天到期数）；>99 显示 99+ */
+  badges?: Record<string, number>;
 }
 
 /**
@@ -26,7 +28,7 @@ export interface AppTabBarProps {
  * - 图标与文字同列垂直居中，选中态仅换底色（无布局位移）
  * - ≥768 由侧栏接管，自动隐藏
  */
-export function AppTabBar({ state, navigation }: AppTabBarProps) {
+export function AppTabBar({ state, navigation, badges = {} }: AppTabBarProps) {
   const colors = useTheme();
   const insets = useSafeAreaInsets();
   const focus = useFocusStyle(radius.sm);
@@ -52,13 +54,14 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
         if (item === undefined) return null;
         const active = route.name === activeRoute;
         const label = t(item.labelKey);
+        const count = badges[route.name] ?? 0;
 
         return (
           <Pressable
             key={route.key}
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
-            accessibilityLabel={label}
+            accessibilityLabel={count > 0 ? `${label}，${t("filter.resultCount", { n: count })}` : label}
             onPress={() => navigation.navigate(route.name)}
             style={({ pressed }) => [styles.tab, focus, { opacity: pressed ? 0.7 : 1 }]}
           >
@@ -68,11 +71,20 @@ export function AppTabBar({ state, navigation }: AppTabBarProps) {
                 active ? { backgroundColor: colors.primaryMuted } : null,
               ]}
             >
-              <Ionicons
-                name={item.icon as IoniconName}
-                size={21}
-                color={active ? colors.primary : colors.textTertiary}
-              />
+              <View style={styles.iconWrap}>
+                <Ionicons
+                  name={item.icon as IoniconName}
+                  size={21}
+                  color={active ? colors.primary : colors.textTertiary}
+                />
+                {count > 0 ? (
+                  <View style={[styles.badge, { backgroundColor: colors.danger }]}>
+                    <AppText variant="caption" weight="700" color={colors.onPrimary} lines={1}>
+                      {count > 99 ? "99+" : `${count}`}
+                    </AppText>
+                  </View>
+                ) : null}
+              </View>
               <AppText
                 variant="caption"
                 weight={active ? "700" : "500"}
@@ -113,6 +125,22 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 2,
     paddingHorizontal: space.xs,
+  },
+  iconWrap: {
+    // 徽标锚点：不占布局空间，绝对定位在图标右上角
+    position: "relative",
+  },
+  badge: {
+    position: "absolute",
+    top: -5,
+    right: -9,
+    minWidth: 16,
+    height: 15,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    ...elevation.float,
   },
   tabLabel: {
     fontSize: 11,

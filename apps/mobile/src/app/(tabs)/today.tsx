@@ -5,8 +5,11 @@ import { View } from "react-native";
 import {
   BulkActionBar,
   CalendarView,
+  EmptyState,
   FilterBar,
+  IconButton,
   OptionSheet,
+  showUndo,
   TaskList,
   TimelineView,
   UpcomingView,
@@ -18,9 +21,12 @@ import {
 import {
   applyListFilter,
   getAllTags,
+  getInboxTasks,
   getTodayTasks,
   getUpcomingGroups,
+  runCommand,
   selectContexts,
+  startOfDay,
 } from "@gtd/core";
 import type { TaskStatusInput } from "@gtd/core";
 import { useOrderedTaskActions } from "@/hooks/useRowActions";
@@ -42,10 +48,11 @@ export default function TodayScreen() {
   const tasks = useAppStore((s) => getTodayTasks(s, Date.now()));
   const upcomingGroups = useAppStore((s) => getUpcomingGroups(s, Date.now()));
   const allTasks = useAppStore((s) => Object.values(s.tasks));
+  const inboxTasks = useAppStore(getInboxTasks);
   const contexts = useAppStore(selectContexts);
   const allTags = useAppStore(getAllTags);
   const loaded = useAppStore((s) => s.loaded);
-  const { isWideUp } = useBreakpoint();
+  const { isWideUp, isTabletUp } = useBreakpoint();
   const t = useT();
 
   const [view, setView] = useState<TodayView>("list");
@@ -54,6 +61,7 @@ export default function TodayScreen() {
   const [tag, setTag] = useState<string | null>(null);
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [moveSheetOpen, setMoveSheetOpen] = useState(false);
+  const [pickSheetOpen, setPickSheetOpen] = useState(false);
 
   const filtered = useMemo(
     () => applyListFilter(tasks, { query, contextId, tag, overdueOnly }, Date.now()),
@@ -73,6 +81,7 @@ export default function TodayScreen() {
   return (
     <View style={{ flex: 1 }}>
       <FilterBar
+        compact={isTabletUp}
         query={query}
         onQueryChange={setQuery}
         contexts={contexts.map((c) => ({ id: c.id, name: c.name }))}
@@ -95,6 +104,16 @@ export default function TodayScreen() {
           { key: "calendar", label: t("view.calendar") },
           { key: "timeline", label: t("view.timeline"), disabled: !isWideUp },
         ]}
+        trailing={
+          view === "list" ? (
+            <IconButton
+              icon="swap-vertical"
+              filled={interactions.reorderMode}
+              onPress={interactions.toggleReorderMode}
+              accessibilityLabel={t("task.dragHandle")}
+            />
+          ) : null
+        }
       />
 
       {view === "list" ? (
@@ -102,7 +121,7 @@ export default function TodayScreen() {
           tasks={filtered}
           now={Date.now()}
           contextNameById={contextNameById}
-          actions={interactions.selectionMode ? undefined : actions}
+          actions={interactions.selectionMode || interactions.reorderMode ? undefined : actions}
           onContextMenuTask={(task, position) => openTaskContextMenu(task, position)}
           onToggleTask={(task) =>
             void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
@@ -110,6 +129,16 @@ export default function TodayScreen() {
           onPressTask={(task) => router.push(`/task/${task.id}`)}
           emptyTitle={t("today.emptyTitle")}
           emptyHint={t("today.emptyHint")}
+          emptyIllustration="today"
+          emptyAction={
+            inboxTasks.length > 0
+              ? {
+                  label: t("today.pick"),
+                  icon: "file-tray-outline",
+                  onPress: () => setPickSheetOpen(true),
+                }
+              : undefined
+          }
           selectionMode={interactions.selectionMode}
           selectedIds={interactions.selectedIds}
           onToggleSelect={interactions.toggleSelect}
@@ -117,6 +146,7 @@ export default function TodayScreen() {
           onSwipeLeftTask={(task) => void interactions.swipeLeft(task)}
           onSwipeRightTask={(task) => void interactions.swipeRight(task)}
           onReorderTask={(task, toIndex) => void interactions.reorder(filtered, task, toIndex)}
+          reorderMode={interactions.reorderMode}
         />
       ) : view === "upcoming" ? (
         <UpcomingView
@@ -157,6 +187,28 @@ export default function TodayScreen() {
           void interactions.moveSelected(key as TaskStatusInput);
         }}
         onClose={() => setMoveSheetOpen(false)}
+      />
+
+      <OptionSheet
+        visible={pickSheetOpen}
+        title={t("today.pickTitle")}
+        options={inboxTasks.slice(0, 10).map((task) => ({
+          key: task.id,
+          label: task.title,
+        }))}
+        onSelect={(taskId) => {
+          setPickSheetOpen(false);
+          const task = inboxTasks.find((candidate) => candidate.id === taskId);
+          if (task === undefined) return;
+          const dueAt = startOfDay(Date.now()) + 18 * 60 * 60 * 1000;
+          void runCommand("task.update", { id: task.id, patch: { dueAt } }).catch(() => undefined);
+          showUndo(t("today.picked", { title: task.title }), () => {
+            void runCommand("task.update", { id: task.id, patch: { dueAt: null } }).catch(
+              () => undefined,
+            );
+          });
+        }}
+        onClose={() => setPickSheetOpen(false)}
       />
     </View>
   );

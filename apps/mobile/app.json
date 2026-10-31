@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "app.gtd.local",
-      "versionCode": 15,
+      "versionCode": 16,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -40,5 +40,5 @@
     ],
     "experiments": {}
   },
-  "version": "0.10.0"
+  "version": "0.11.0"
 }

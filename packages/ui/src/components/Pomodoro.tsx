@@ -13,13 +13,16 @@ export interface PomodoroProps {
   minutes?: number;
   /** 一轮计时结束 */
   onComplete?: () => void;
+  /** 当前绑定的专注任务（如有：显示标题 + 完成按钮） */
+  currentTask?: { id: string; title: string } | null;
+  onCompleteTask?: (task: { id: string; title: string }) => void;
 }
 
 /**
  * 番茄钟：25 分钟专注计时。
  * 用「目标时间戳 - 当前时间」计算剩余，避免定时器漂移；暂停时保留剩余毫秒。
  */
-export function Pomodoro({ minutes = 25, onComplete }: PomodoroProps) {
+export function Pomodoro({ minutes = 25, onComplete, currentTask, onCompleteTask }: PomodoroProps) {
   const colors = useTheme();
   const t = useT();
   const totalMs = minutes * 60 * 1000;
@@ -106,6 +109,20 @@ export function Pomodoro({ minutes = 25, onComplete }: PomodoroProps) {
           ]}
         />
       </View>
+      {currentTask !== undefined && currentTask !== null && onCompleteTask !== undefined ? (
+        <View style={styles.taskRow}>
+          <AppText variant="label" tone="secondary" lines={1} style={styles.taskTitle}>
+            {`${t("focus.currentTask")} ${currentTask.title}`}
+          </AppText>
+          <Button
+            label={t("focus.completeCurrent")}
+            icon="checkmark"
+            variant="secondary"
+            size="sm"
+            onPress={() => onCompleteTask(currentTask)}
+          />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -146,5 +163,14 @@ const styles = StyleSheet.create({
   },
   fill: {
     height: 3,
+  },
+  taskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+  },
+  taskTitle: {
+    flex: 1,
+    minWidth: 0,
   },
 });

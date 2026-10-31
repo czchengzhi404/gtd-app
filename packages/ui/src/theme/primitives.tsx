@@ -187,15 +187,25 @@ export function Card({ children, onPress, accessibilityLabel, compact = false, s
 
 /* ---------------- Divider ---------------- */
 
-export function Divider({ inset = 0 }: { inset?: number }) {
+export function Divider({
+  inset = 0,
+  style,
+}: {
+  inset?: number;
+  /** 外部间距（如分组内的上下留白） */
+  style?: { marginVertical?: number; marginHorizontal?: number };
+}) {
   const colors = useTheme();
   return (
     <View
-      style={{
-        height: StyleSheet.hairlineWidth,
-        backgroundColor: colors.border,
-        marginLeft: inset,
-      }}
+      style={[
+        {
+          height: StyleSheet.hairlineWidth,
+          backgroundColor: colors.border,
+          marginLeft: inset,
+        },
+        style,
+      ]}
     />
   );
 }

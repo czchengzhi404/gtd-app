@@ -110,7 +110,7 @@ const styles = StyleSheet.create({
   scroll: {
     flexGrow: 0,
     width: "100%",
-    maxWidth: 760,
+    maxWidth: 880,
     alignSelf: "center",
   },
   row: {

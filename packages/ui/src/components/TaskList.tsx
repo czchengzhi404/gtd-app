@@ -1,7 +1,9 @@
-import { FlatList, StyleSheet, View, type ListRenderItemInfo } from "react-native";
+import { useEffect } from "react";
+import { FlatList, LayoutAnimation, Platform, StyleSheet, UIManager, View, type ListRenderItemInfo } from "react-native";
 import type { Task } from "@gtd/core";
+import { startOfDay } from "@gtd/core";
 
-import { EmptyState } from "./EmptyState";
+import { EmptyState, type EmptyStateAction, type EmptyStateProps } from "./EmptyState";
 import { TaskRow } from "./TaskRow";
 import { Chip } from "./Chip";
 import { PriorityBadge } from "./PriorityBadge";
@@ -31,6 +33,10 @@ export interface TaskListProps {
   onContextMenuTask?: (task: Task, position: { x: number; y: number }) => Promise<boolean>;
   emptyTitle?: string;
   emptyHint?: string;
+  /** 空态主行动（透传 EmptyState.action） */
+  emptyAction?: EmptyStateAction;
+  /** 空态插画变体（透传 EmptyState.illustration） */
+  emptyIllustration?: EmptyStateProps["illustration"];
   /** 卡片化容器（列表页默认开；嵌在其他卡片内时可关） */
   carded?: boolean;
   /** 多选模式 */
@@ -45,6 +51,8 @@ export interface TaskListProps {
   onSwipeRightTask?: (task: Task) => void;
   /** 拖拽手柄松手：把任务移到目标下标（父级负责落库 orderKey） */
   onReorderTask?: (task: Task, toIndex: number) => void;
+  /** 排序模式：显示拖拽手柄（配合 onReorderTask） */
+  reorderMode?: boolean;
   /** 列表顶部/底部插槽 */
   header?: React.ReactElement | null;
   footer?: React.ReactElement | null;
@@ -52,6 +60,7 @@ export interface TaskListProps {
 
 /** 与 TaskRow 行高（hit.row）一致，用于把拖拽位移换算成行数 */
 const ROW_STEP = hit.row;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /**
  * 任务列表：单卡片 + 细分隔线（比逐行卡片更紧凑、滚动更省空间）。
@@ -67,6 +76,8 @@ export function TaskList({
   onContextMenuTask,
   emptyTitle,
   emptyHint,
+  emptyAction,
+  emptyIllustration,
   carded = true,
   selectionMode = false,
   selectedIds,
@@ -75,14 +86,52 @@ export function TaskList({
   onSwipeLeftTask,
   onSwipeRightTask,
   onReorderTask,
+  reorderMode = false,
   header,
   footer,
 }: TaskListProps) {
   const colors = useTheme();
 
+  // 原生端：列表增删（完成/删除/恢复）时 220ms 收拢动画；
+  // web 走 react-native-web 自身过渡，不启用（避免与 DOM diff 打架）
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (
+      Platform.OS === "android" &&
+      typeof UIManager.setLayoutAnimationEnabledExperimental === "function"
+    ) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+    LayoutAnimation.configureNext({
+      duration: 220,
+      update: { type: LayoutAnimation.Types.easeInEaseOut },
+      delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.scaleXY },
+    });
+  }, [tasks.length]);
+
   if (tasks.length === 0) {
-    return <EmptyState title={emptyTitle ?? t("empty.list")} hint={emptyHint ?? t("empty.listHint")} />;
+    return (
+      <EmptyState
+        title={emptyTitle ?? t("empty.list")}
+        hint={emptyHint ?? t("empty.listHint")}
+        action={emptyAction}
+        illustration={emptyIllustration}
+      />
+    );
   }
+
+  const dayStart = startOfDay(now);
+
+  /** 状态竖条：逾期 > 今天到期 > 等待中（已完成不显示） */
+  const accentOf = (task: Task): string | undefined => {
+    if (task.status === "done") return undefined;
+    if (task.dueAt !== null && task.dueAt < now) return colors.danger;
+    if (task.dueAt !== null && task.dueAt >= dayStart && task.dueAt < dayStart + DAY_MS) {
+      return colors.warning;
+    }
+    if (task.status === "waiting") return colors.textTertiary;
+    return undefined;
+  };
 
   const renderItem = ({ item, index }: ListRenderItemInfo<Task>) => (
     <TaskRow
@@ -115,6 +164,8 @@ export function TaskList({
             }
           : undefined
       }
+      reorderMode={reorderMode}
+      accent={accentOf(item)}
       actions={actions?.map((action) => ({
         key: action.key,
         label: action.label,
@@ -166,7 +217,7 @@ const styles = StyleSheet.create({
   list: {
     flex: 1,
     width: "100%",
-    maxWidth: 760,
+    maxWidth: 880,
     alignSelf: "center",
     paddingHorizontal: space.lg,
     paddingTop: space.xs,

@@ -360,6 +360,54 @@ const zh: Dict = {
   "perspective.apply": "应用筛选：{name}",
   "perspective.delete": "删除筛选：{name}",
   "perspective.saved": "已保存筛选「{name}」",
+
+  // 今日空态：从收集箱拉任务
+  "today.pick": "从收集箱排今天的任务",
+  "today.pickTitle": "选一条，今天 18:00 到期",
+  "today.picked": "已排到今天「{title}」",
+  "today.inboxEmpty": "收集箱也是空的，先去记点什么吧",
+
+  // 快速添加语法速查
+  "qahelp.title": "快速添加语法",
+  "qahelp.close": "关闭速查",
+  "qahelp.open": "查看快速添加语法",
+  "qahelp.context": "@电脑",
+  "qahelp.contextDesc": "加入情境",
+  "qahelp.project": "#装修",
+  "qahelp.projectDesc": "归入项目（没有就创建）",
+  "qahelp.tag": "+紧急",
+  "qahelp.tagDesc": "打标签",
+  "qahelp.priority": "!!!",
+  "qahelp.priorityDesc": "优先级（! 到 !!!）",
+  "qahelp.date": "明天 / 周五 / 3天后 / 10月1日",
+  "qahelp.dateDesc": "到期日期",
+  "qahelp.time": "下午3点 / 15:30",
+  "qahelp.timeDesc": "具体时刻（会准时提醒）",
+  "qahelp.repeat": "每天 / 每周一三 / 每工作日 / 每月最后工作日 / 每隔3天 / 完成后3天 / 重复5次",
+  "qahelp.repeatDesc": "重复规则（完成后自动生成下一条）",
+  "qahelp.waiting": ">张三",
+  "qahelp.waitingDesc": "标记等待中（等 张三）",
+
+  // 回收站
+  "trash.title": "回收站",
+  "trash.empty": "回收站是空的",
+  "trash.emptyHint": "删除的任务会保留在这里，可以随时恢复",
+  "trash.restore": "恢复",
+  "trash.restored": "已恢复「{title}」",
+  "trash.deletedAt": "删除于 {date}",
+  "more.trashEntry": "回收站",
+
+  // 番茄钟绑定
+  "focus.currentTask": "正在专注：",
+  "focus.completeCurrent": "完成这个任务",
+
+  // 回顾提醒
+  "review.dueBadge": "该回顾了",
+  "filter.openSheet": "筛选",
+  "more.exportMobileDone": "已交给系统分享",
+  "more.group.status": "任务状态",
+  "more.appearance": "外观",
+  "more.group.data": "数据与记录",
 };
 
 const en: Dict = {
@@ -679,6 +727,49 @@ const en: Dict = {
   "perspective.apply": "Apply filter: {name}",
   "perspective.delete": "Delete filter: {name}",
   "perspective.saved": "Saved filter \"{name}\"",
+
+  "today.pick": "Pick from inbox for today",
+  "today.pickTitle": "Pick one — due today 18:00",
+  "today.picked": "Scheduled for today: \"{title}\"",
+  "today.inboxEmpty": "Inbox is empty too — capture something first",
+
+  "qahelp.title": "Quick-add syntax",
+  "qahelp.close": "Close",
+  "qahelp.open": "View quick-add syntax",
+  "qahelp.context": "@computer",
+  "qahelp.contextDesc": "Add a context",
+  "qahelp.project": "#project",
+  "qahelp.projectDesc": "Assign to a project (created if missing)",
+  "qahelp.tag": "+urgent",
+  "qahelp.tagDesc": "Add a tag",
+  "qahelp.priority": "!!!",
+  "qahelp.priorityDesc": "Priority (! to !!!)",
+  "qahelp.date": "tomorrow / fri / in 3 days",
+  "qahelp.dateDesc": "Due date",
+  "qahelp.time": "3pm / 15:30",
+  "qahelp.timeDesc": "Time of day (timed reminder)",
+  "qahelp.repeat": "daily / every mon&wed / weekdays / every 3 days / after 3 days / repeat 5 times",
+  "qahelp.repeatDesc": "Recurrence (next occurrence on completion)",
+  "qahelp.waiting": ">alice",
+  "qahelp.waitingDesc": "Mark waiting (on alice)",
+
+  "trash.title": "Trash",
+  "trash.empty": "Trash is empty",
+  "trash.emptyHint": "Deleted tasks stay here and can be restored anytime",
+  "trash.restore": "Restore",
+  "trash.restored": "Restored \"{title}\"",
+  "trash.deletedAt": "Deleted {date}",
+  "more.trashEntry": "Trash",
+
+  "focus.currentTask": "Focusing on:",
+  "focus.completeCurrent": "Complete this task",
+
+  "review.dueBadge": "Review due",
+  "filter.openSheet": "Filters",
+  "more.exportMobileDone": "handed to the share sheet",
+  "more.group.status": "Task status",
+  "more.appearance": "Appearance",
+  "more.group.data": "Data & records",
 };
 
 const DICTS: Record<Lang, Dict> = { zh, en };

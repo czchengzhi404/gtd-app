@@ -76,6 +76,14 @@ export async function getTaskById(executor: SqliteExecutor, id: string): Promise
   return rows.length > 0 ? taskFromRow(rows[0] as SqliteRow) : null;
 }
 
+/** 回收站：只取墓碑（软删除未清理的），按删除时间倒序；上限 200 条防列表失控 */
+export async function getDeletedTasks(executor: SqliteExecutor): Promise<Task[]> {
+  const rows = await executor.query<SqliteRow>(
+    "SELECT * FROM tasks WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC LIMIT 200",
+  );
+  return rows.map(taskFromRow);
+}
+
 export async function getProjects(
   executor: SqliteExecutor,
   includeOnHold = true,

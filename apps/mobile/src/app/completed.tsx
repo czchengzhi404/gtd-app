@@ -29,7 +29,7 @@ export default function CompletedScreen() {
     return (
       <Screen>
         <EmptyState
-          icon="checkmark-done-outline"
+          illustration="done"
           title={t("completed.empty")}
           hint={t("completed.emptyHint")}
         />

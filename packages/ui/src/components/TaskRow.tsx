@@ -27,8 +27,12 @@ export interface TaskRowProps {
   onSwipeLeft?: () => void;
   /** 右滑（手指向右）动作，如"删除" */
   onSwipeRight?: () => void;
-  /** 提供时显示拖拽手柄；松手回调位移（父级据此换算目标位置） */
+  /** 提供时支持拖拽排序；松手回调位移（父级据此换算目标位置） */
   onDragEnd?: (dy: number) => void;
+  /** 排序模式：仅此模式显示拖拽手柄（常驻把手会挤占行宽、徒增视觉噪音） */
+  reorderMode?: boolean;
+  /** 状态色竖条（逾期=danger / 今天到期=warning / 等待中=neutral），提供时渲染在行左缘 */
+  accent?: string;
 }
 
 const SWIPE_TRIGGER = 72;
@@ -56,12 +60,15 @@ export function TaskRow({
   onSwipeLeft,
   onSwipeRight,
   onDragEnd,
+  reorderMode = false,
+  accent,
 }: TaskRowProps) {
   const colors = useTheme();
   const focus = useFocusStyle(radius.sm);
   const translateX = useRef(new Animated.Value(0)).current;
 
-  const swipeEnabled = (onSwipeLeft !== undefined || onSwipeRight !== undefined) && !selectionMode;
+  const swipeEnabled =
+    (onSwipeLeft !== undefined || onSwipeRight !== undefined) && !selectionMode && !reorderMode;
 
   const swipeResponder = useMemo(
     () =>
@@ -127,6 +134,8 @@ export function TaskRow({
         {
           backgroundColor: selected ? colors.primaryMuted : colors.surface,
           transform: swipeEnabled ? [{ translateX }] : undefined,
+          borderLeftWidth: accent !== undefined ? 3 : 0,
+          borderLeftColor: accent,
         },
       ]}
       {...(webContextProps as object)}
@@ -177,7 +186,7 @@ export function TaskRow({
         </Pressable>
       )}
 
-      {onDragEnd !== undefined ? (
+      {onDragEnd !== undefined && reorderMode ? (
         <View {...dragResponder.panHandlers} style={styles.grip} accessible accessibilityLabel={t("task.dragHandle")}>
           <Ionicons name="reorder-three" size={18} color={colors.textTertiary} />
         </View>

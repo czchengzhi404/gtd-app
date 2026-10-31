@@ -17,6 +17,8 @@ export interface ViewToggleProps<T extends string> {
   onChange: (key: T) => void;
   /** 无障碍组名 */
   label: string;
+  /** 行尾插槽（如排序模式开关），与分段控件同行右对齐 */
+  trailing?: React.ReactNode;
 }
 
 /**
@@ -28,45 +30,51 @@ export function ViewToggle<T extends string>({
   value,
   onChange,
   label,
+  trailing,
 }: ViewToggleProps<T>) {
   const colors = useTheme();
   const focus = useFocusStyle(radius.xs);
   return (
     <View style={styles.outer}>
-      <SegmentedWrap>
-        <View accessibilityRole="tablist" accessibilityLabel={label} style={styles.row}>
-          {options.map((option) => {
-            const active = option.key === value;
-            return (
-              <Pressable
-                key={option.key}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: active, disabled: option.disabled === true }}
-                accessibilityLabel={option.label}
-                disabled={option.disabled}
-                onPress={() => onChange(option.key)}
-                style={({ pressed }) => [
-                  styles.segment,
-                  focus,
-                  {
-                    backgroundColor: active ? colors.surface : "transparent",
-                    opacity: option.disabled === true ? 0.4 : pressed ? 0.7 : 1,
-                  },
-                ]}
-              >
-                <AppText
-                  variant="label"
-                  weight={active ? "600" : "500"}
-                  color={active ? colors.primary : colors.textSecondary}
-                  lines={1}
+      <View style={styles.line}>
+        <SegmentedWrap>
+          <View accessibilityRole="tablist" accessibilityLabel={label} style={styles.row}>
+            {options.map((option) => {
+              const active = option.key === value;
+              return (
+                <Pressable
+                  key={option.key}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active, disabled: option.disabled === true }}
+                  accessibilityLabel={option.label}
+                  disabled={option.disabled}
+                  onPress={() => onChange(option.key)}
+                  style={({ pressed }) => [
+                    styles.segment,
+                    focus,
+                    {
+                      backgroundColor: active ? colors.surface : "transparent",
+                      opacity: option.disabled === true ? 0.4 : pressed ? 0.7 : 1,
+                    },
+                  ]}
                 >
-                  {option.label}
-                </AppText>
-              </Pressable>
-            );
-          })}
-        </View>
-      </SegmentedWrap>
+                  <AppText
+                    variant="label"
+                    weight={active ? "600" : "500"}
+                    color={active ? colors.primary : colors.textSecondary}
+                    lines={1}
+                  >
+                    {option.label}
+                  </AppText>
+                </Pressable>
+              );
+            })}
+          </View>
+        </SegmentedWrap>
+        {trailing !== undefined && trailing !== null ? (
+          <View style={styles.trailing}>{trailing}</View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -74,10 +82,19 @@ export function ViewToggle<T extends string>({
 const styles = StyleSheet.create({
   outer: {
     width: "100%",
-    maxWidth: 760,
+    maxWidth: 880,
     alignSelf: "center",
     paddingHorizontal: space.lg,
     paddingBottom: space.sm,
+  },
+  line: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  trailing: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "flex-end",
   },
   row: {
     flexDirection: "row",

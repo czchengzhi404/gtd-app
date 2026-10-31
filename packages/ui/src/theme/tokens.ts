@@ -32,8 +32,9 @@ export const radius = {
 export const type = {
   display: { fontSize: 24, lineHeight: 30, fontWeight: "700" },
   title: { fontSize: 18, lineHeight: 24, fontWeight: "600" },
-  body: { fontSize: 15, lineHeight: 21, fontWeight: "400" },
-  bodyStrong: { fontSize: 15, lineHeight: 21, fontWeight: "600" },
+  // 正文 16px：任务标题是最高频阅读面，满足 ui-ux-pro-max 正文 ≥16 的可读性线
+  body: { fontSize: 16, lineHeight: 22, fontWeight: "400" },
+  bodyStrong: { fontSize: 16, lineHeight: 22, fontWeight: "600" },
   label: { fontSize: 13, lineHeight: 18, fontWeight: "500" },
   caption: { fontSize: 11, lineHeight: 15, fontWeight: "500" },
   mono: { fontSize: 14, lineHeight: 21, fontWeight: "400" },
