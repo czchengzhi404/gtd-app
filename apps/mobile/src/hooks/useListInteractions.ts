@@ -1,18 +1,21 @@
 import { useCallback, useState } from "react";
 import type { Task, TaskStatusInput } from "@gtd/core";
-import { runCommand, startOfDay } from "@gtd/core";
+import {
+  planBulkComplete,
+  planBulkDelete,
+  planBulkMove,
+  planDeferToTomorrow,
+  runCommand,
+} from "@gtd/core";
 import { showUndo, t } from "@gtd/ui";
-
-import { completeTaskWithUndo, deleteTaskWithUndo } from "@/lib/task-ops";
-
-const DAY_MS = 24 * 60 * 60 * 1000;
+import { deleteTaskWithUndo, completeTaskWithUndo } from "@/lib/task-ops";
 
 /**
  * 列表交互：多选、滑动、拖拽排序。
  *
- * 所有写操作都走 core 命令（每条命令自身是 immediate 事务），批量操作
- * 逐条串行执行而不是拼成一个长事务——单条失败不影响已成功的部分，
- * 撤销条一次性回滚整批。
+ * 命令序列的"规划"在 core（features/bulk-ops，纯函数可测），这里只负责
+ * 执行计划 + 弹撤销条。批量逐条串行执行而不是拼成长事务——单条失败
+ * 不影响已成功的部分，撤销条一次性回滚整批。
  */
 export interface ListInteractions {
   selectionMode: boolean;
@@ -30,6 +33,13 @@ export interface ListInteractions {
   reorder: (ordered: Task[], task: Task, toIndex: number) => Promise<void>;
   swipeLeft: (task: Task) => Promise<void>;
   swipeRight: (task: Task) => Promise<void>;
+}
+
+/** 批量执行一个命令序列（逐条串行，失败吞掉由 store.lastError 记录） */
+async function runAll(envelopes: readonly { op: Parameters<typeof runCommand>[0]; payload: unknown }[]) {
+  for (const envelope of envelopes) {
+    await runCommand(envelope.op, envelope.payload as never).catch(() => undefined);
+  }
 }
 
 export function useListInteractions(tasks: Task[]): ListInteractions {
@@ -73,32 +83,22 @@ export function useListInteractions(tasks: Task[]): ListInteractions {
   const completeSelected = useCallback(async () => {
     const targets = selectedTasks();
     if (targets.length === 0) return;
+    const plan = planBulkComplete(targets.map((task) => task.id));
     exitSelection();
-    for (const task of targets) {
-      await runCommand("task.complete", { id: task.id }).catch(() => undefined);
-    }
+    await runAll(plan.run);
     showUndo(t("bulk.completed", { n: targets.length }), () => {
-      void (async () => {
-        for (const task of targets) {
-          await runCommand("task.uncomplete", { id: task.id }).catch(() => undefined);
-        }
-      })();
+      void runAll(plan.undo);
     });
   }, [exitSelection, selectedTasks]);
 
   const deleteSelected = useCallback(async () => {
     const targets = selectedTasks();
     if (targets.length === 0) return;
+    const plan = planBulkDelete(targets.map((task) => task.id));
     exitSelection();
-    for (const task of targets) {
-      await runCommand("task.softDelete", { id: task.id }).catch(() => undefined);
-    }
+    await runAll(plan.run);
     showUndo(t("bulk.deleted", { n: targets.length }), () => {
-      void (async () => {
-        for (const task of targets) {
-          await runCommand("task.restore", { id: task.id }).catch(() => undefined);
-        }
-      })();
+      void runAll(plan.undo);
     });
   }, [exitSelection, selectedTasks]);
 
@@ -106,22 +106,14 @@ export function useListInteractions(tasks: Task[]): ListInteractions {
     async (status: TaskStatusInput) => {
       const targets = selectedTasks();
       if (targets.length === 0) return;
-      const previous = targets.map((task) => ({
-        id: task.id,
-        status: task.status as TaskStatusInput,
-      }));
+      const plan = planBulkMove(
+        targets.map((task) => ({ id: task.id, from: task.status as TaskStatusInput })),
+        status,
+      );
       exitSelection();
-      for (const task of targets) {
-        await runCommand("task.moveStatus", { id: task.id, status }).catch(() => undefined);
-      }
+      await runAll(plan.run);
       showUndo(t("bulk.moved", { n: targets.length }), () => {
-        void (async () => {
-          for (const entry of previous) {
-            await runCommand("task.moveStatus", { id: entry.id, status: entry.status }).catch(
-              () => undefined,
-            );
-          }
-        })();
+        void runAll(plan.undo);
       });
     },
     [exitSelection, selectedTasks],
@@ -143,15 +135,10 @@ export function useListInteractions(tasks: Task[]): ListInteractions {
 
   /** 右滑延后到明天 9:00（不删除；删除是破坏性操作，只在动作面板里给） */
   const swipeRight = useCallback(async (task: Task) => {
-    const previous = task.deferUntil;
-    const tomorrow = startOfDay(Date.now() + DAY_MS) + 9 * 60 * 60 * 1000;
-    await runCommand("task.update", { id: task.id, patch: { deferUntil: tomorrow } }).catch(
-      () => undefined,
-    );
-    showUndo(t("task.deferredLabel", { date: new Date(tomorrow).toLocaleDateString() }), () => {
-      void runCommand("task.update", { id: task.id, patch: { deferUntil: previous } }).catch(
-        () => undefined,
-      );
+    const plan = planDeferToTomorrow(task.id, Date.now(), task.deferUntil);
+    await runCommand(plan.run.op, plan.run.payload).catch(() => undefined);
+    showUndo(t("task.deferredLabel", { date: new Date(plan.deferredAt).toLocaleDateString() }), () => {
+      void runCommand(plan.undo.op, plan.undo.payload).catch(() => undefined);
     });
   }, []);
 
@@ -172,5 +159,3 @@ export function useListInteractions(tasks: Task[]): ListInteractions {
     swipeRight,
   };
 }
-
-export { deleteTaskWithUndo };

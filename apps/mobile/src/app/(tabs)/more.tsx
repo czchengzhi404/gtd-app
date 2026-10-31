@@ -30,6 +30,7 @@ import {
 } from "@/platform/desktop-actions";
 import { isDesktop } from "@/platform/env";
 import { exportOnMobile } from "@/platform/mobile-actions";
+import { ensureBuiltinFont } from "@/platform/font-loader";
 
 /** 同步预设：坚果云/WebDAV/S3/本地文件夹（坚果云本质走 WebDAV，endpoint 已预填） */
 interface SyncPreset {
@@ -304,8 +305,8 @@ export default function MoreScreen() {
             {t("more.fontSection")}
           </AppText>
           <View style={styles.pillRow}>
-            <SegPill label={t("more.font.wenkai")} selected={(kv["font.family"] ?? "LXGWWenKai") === "LXGWWenKai"} onPress={() => void runCommand("settings.set", { key: "font.family", value: "LXGWWenKai" }).catch(() => undefined)} />
-            <SegPill label={t("more.font.system")} selected={kv["font.family"] === "system"} onPress={() => void runCommand("settings.set", { key: "font.family", value: "system" }).catch(() => undefined)} />
+            <SegPill label={t("more.font.wenkai")} selected={(kv["font.family"] ?? "system") === "LXGWWenKai"} onPress={() => void ensureBuiltinFont().then(() => runCommand("settings.set", { key: "font.family", value: "LXGWWenKai" }).catch(() => undefined)).catch(() => undefined)} />
+            <SegPill label={t("more.font.system")} selected={(kv["font.family"] ?? "system") === "system"} onPress={() => void runCommand("settings.set", { key: "font.family", value: "system" }).catch(() => undefined)} />
           </View>
         </GroupCard>
 

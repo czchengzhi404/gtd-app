@@ -8,7 +8,7 @@ import fs from "node:fs";
 import type { SqliteExecutor } from "@gtd/core";
 import { migrate } from "@gtd/core";
 import { executeCommand } from "@gtd/core";
-import { loadBootstrapData, getTasks } from "@gtd/core";
+import { loadBootstrapData, getTasks, getDeletedTasks, maybeCompactTombstones } from "@gtd/core";
 import { getTodayTasks, getFocusTasks, getProjectNextAction, appStore, applyRecords } from "@gtd/core";
 
 /**
@@ -99,8 +99,7 @@ describe("命令层（真实 SQLite）", () => {
     const task = done.records[0]?.record as {
       status: string;
       dueAt: number | null;
-      completedAt: number | null;
-      lastCompletedAt: number | null;
+      completedAt: number | null;      lastCompletedAt: number | null;
     };
     expect(task.status).not.toBe("done");
     expect(task.completedAt).toBeNull();
@@ -114,6 +113,79 @@ describe("命令层（真实 SQLite）", () => {
     await executeCommand(executor, "task.softDelete", { id }, ctx);
     const alive = await getTasks(executor, { includeDone: true });
     expect(alive).toHaveLength(0);
+  });
+
+  it("回收站：getDeletedTasks 只含墓碑、按删除时间倒序、restore 后消失", async () => {
+    const a = await executeCommand(executor, "task.create", { title: "先删的" }, ctx);
+    const b = await executeCommand(executor, "task.create", { title: "后删的" }, ctx);
+    const idA = (a.records[0]?.record as { id: string }).id;
+    const idB = (b.records[0]?.record as { id: string }).id;
+    // 不同删除时刻（倒序断言需要可区分的时间戳）
+    await executeCommand(executor, "task.softDelete", { id: idA }, ctx);
+    await executeCommand(executor, "task.softDelete", { id: idB }, { now: () => NOW + 1000 });
+
+    const deleted = await getDeletedTasks(executor);
+    expect(deleted.map((t) => t.title)).toEqual(["后删的", "先删的"]); // 倒序
+    expect(deleted.every((t) => t.deletedAt !== null)).toBe(true);
+
+    await executeCommand(executor, "task.restore", { id: idB }, ctx);
+    const after = await getDeletedTasks(executor);
+    expect(after.map((t) => t.title)).toEqual(["先删的"]);
+    const alive = await getTasks(executor, { includeDone: true });
+    expect(alive.map((t) => t.title)).toEqual(["后删的"]);
+  });
+
+  it("无到期日的重复任务：完成时以完成时刻为锚点推进（文档 §4.3 语义）", async () => {
+    const created = await executeCommand(
+      executor,
+      "task.create",
+      { title: "随手记", recurrence: { freq: "daily", interval: 1, until: null } },
+      ctx,
+    );
+    const id = (created.records[0]?.record as { id: string }).id;
+    expect((created.records[0]?.record as { dueAt: number | null }).dueAt).toBeNull();
+    const done = await executeCommand(executor, "task.complete", { id }, ctx);
+    const task = done.records[0]?.record as { status: string; dueAt: number | null };
+    expect(task.status).not.toBe("done");
+    expect(task.dueAt).not.toBeNull();
+    // daily interval=1：锚点 = 完成时刻（ctx.now）→ dueAt = now + 1 天
+    expect(task.dueAt).toBe(NOW + 86400000);
+  });
+
+  it("墓碑压缩：90 天前的墓碑物理删除，近期墓碑与活记录保留；24h 门控", async () => {
+    const old = NOW - 91 * 86400000;
+    const recent = NOW - 10 * 86400000;
+    // 直接种两个墓碑（绕过命令的 now）
+    await executor.run(
+      "INSERT INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, tags, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, '', 'inbox', 0, NULL, NULL, NULL, NULL, NULL, NULL, '[]', '[]', NULL, 0, NULL, '[]', '0001', ?, ?, 1, ?)",
+      ["t-old", "老墓碑", old, old, old],
+    );
+    await executor.run(
+      "INSERT INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, tags, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, '', 'inbox', 0, NULL, NULL, NULL, NULL, NULL, NULL, '[]', '[]', NULL, 0, NULL, '[]', '0002', ?, ?, 1, ?)",
+      ["t-recent", "新墓碑", recent, recent, recent],
+    );
+    await executor.run(
+      "INSERT INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, tags, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, '', 'inbox', 0, NULL, NULL, NULL, NULL, NULL, NULL, '[]', '[]', NULL, 0, NULL, '[]', '0003', ?, ?, 1, NULL)",
+      ["t-alive", "活任务", NOW, NOW],
+    );
+
+    // 第一次：到期压缩（kv 无标记 → 执行）
+    const removed = await maybeCompactTombstones(executor, NOW);
+    expect(removed).toBe(1); // 只删老墓碑
+
+    const survivors = await getDeletedTasks(executor);
+    expect(survivors.map((t) => t.title)).toEqual(["新墓碑"]);
+    const alive = await getTasks(executor, { includeDone: true });
+    expect(alive.map((t) => t.title)).toEqual(["活任务"]);
+
+    // 第二次（同日）：门控生效，不再扫表
+    const removedAgain = await maybeCompactTombstones(executor, NOW + 3600_000);
+    expect(removedAgain).toBe(0);
+    expect(await getDeletedTasks(executor)).toHaveLength(1);
+
+    // 跨过 24h：再次执行（近期墓碑仍未到期，不删）
+    const removedLater = await maybeCompactTombstones(executor, NOW + 25 * 86400000);
+    expect(removedLater).toBe(0);
   });
 
   it("context.upsert 幂等：同名复用，@ 前缀被剥离", async () => {

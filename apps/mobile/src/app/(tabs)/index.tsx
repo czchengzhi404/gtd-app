@@ -97,9 +97,16 @@ export default function InboxScreen() {
             ? "recurrence.weekly"
             : rule.freq === "monthly"
               ? "recurrence.monthly"
-              : "recurrence.yearly",
+              : rule.freq === "yearly"
+                ? "recurrence.yearly"
+                : rule.freq === "weekdays"
+                  ? "recurrence.weekdays"
+                  : "recurrence.afterCompletion",
       );
       parts.push(rule.interval > 1 ? `${base} ×${rule.interval}` : base);
+      if (rule.remainingCount !== undefined && rule.remainingCount !== null) {
+        parts.push(t("recurrence.timesLeft", { count: rule.remainingCount }));
+      }
     }
     if (parsed.projectName !== undefined) parts.push(`#${parsed.projectName}`);
     for (const name of parsed.contextNames) parts.push(`@${name}`);

@@ -7,6 +7,7 @@ import { useTheme } from "../hooks/useTheme";
 import { AppText } from "../theme/AppText";
 import { elevation, hit, radius, space } from "../theme/tokens";
 import { useT } from "../i18n";
+import { fuzzyScore as score } from "../lib/fuzzy";
 
 export interface CommandPaletteProps {
   visible: boolean;
@@ -25,23 +26,6 @@ interface Result {
   label: string;
   sub?: string;
   action: () => void;
-}
-
-/** 打分：全等 > 前缀 > 包含 > 子序列 */
-function score(text: string, query: string): number {
-  const hay = text.toLowerCase();
-  const q = query.toLowerCase();
-  if (q.length === 0) return 1;
-  if (hay === q) return 100;
-  if (hay.startsWith(q)) return 80;
-  if (hay.includes(q)) return 60;
-  // 子序列（fuzzy）
-  let i = 0;
-  for (const ch of hay) {
-    if (ch === q[i]) i++;
-    if (i === q.length) return 30;
-  }
-  return 0;
 }
 
 /**

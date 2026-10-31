@@ -41,5 +41,6 @@ export * from "./components/TagEditor";
 export * from "./components/OptionSheet";
 export * from "./components/PromptHost";
 export * from "./components/PerspectiveBar";
+export * from "./lib/fuzzy";
 export * from "./hooks/useFocusStyle";
 export * from "./platform/useKeyboardShortcuts";

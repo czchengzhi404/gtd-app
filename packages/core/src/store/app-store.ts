@@ -5,6 +5,7 @@ import { executeCommand, type CommandContext } from "../db/commands";
 import { loadBootstrapData } from "../db/queries";
 import { getCommandPort, getSqliteExecutor } from "../platform/ports";
 import { parseQuickAdd } from "../features/quick-add";
+import { maybeCompactTombstones } from "../features/tombstones";
 import type { RecurrenceRule } from "../models/task";
 
 /**
@@ -101,7 +102,8 @@ export function applyRecords(records: TaggedRecord[]): void {
 }
 
 export async function bootstrapStore(): Promise<void> {
-  const data = await loadBootstrapData(getSqliteExecutor());
+  const executor = getSqliteExecutor();
+  const data = await loadBootstrapData(executor);
   appStore.setState({
     loaded: true,
     tasks: indexById(data.tasks),
@@ -112,6 +114,8 @@ export async function bootstrapStore(): Promise<void> {
     kv: data.kv,
     lastError: null,
   });
+  // 墓碑压缩：每日至多一次（低频、可跳过，失败不影响启动）
+  void maybeCompactTombstones(executor, Date.now()).catch(() => undefined);
 }
 
 export async function runCommand<K extends CommandOp>(

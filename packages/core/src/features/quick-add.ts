@@ -140,17 +140,27 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
     }
   }
 
-  // 4) 优先级 !!!/!!!（优先取最长）
+  // 4) 优先级 !/!!/!!!（超过 3 个按 3 计，全部消耗避免残留进标题）
   {
-    const m = text.match(/(?:^|\s)(!{1,3})(?=\s|$)/u);
+    const m = text.match(/(?:^|\s)(!+)(?=\s|$)/u);
     if (m) {
-      priority = (m[1]?.length ?? 1) as 1 | 2 | 3;
+      priority = Math.min(3, (m[1]?.length ?? 1)) as 1 | 2 | 3;
       text = cut(text, m);
     }
   }
 
   // 5) 重复规则（每周X 可多次出现收集多天；其余形式各一次，循环 cut 保证标题干净）
   {
+    // 5a0) 重复N次：限定总次数（完成即消耗一次）——提前捕获，对任意 freq 生效
+    let remainingCount: number | null = null;
+    {
+      const times = text.match(/(?:^|\s)重复(\d{1,3})次(?=\s|$)/u);
+      if (times) {
+        remainingCount = Math.max(1, Number(times[1]));
+        text = cut(text, times);
+      }
+    }
+
     // 5a) 优先识别多周期间隔与特殊月规则：双周 / 每隔N天 / 每月最后工作日
     let early: RecurrenceRule | undefined;
     {
@@ -167,9 +177,13 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
         }
       }
       if (early === undefined) {
-        const everyNDays = text.match(/(?:^|\s)(?:每隔|每)(\d{1,2})天(?=\s|$)/u);
+        // 每1天 → daily；每3天 → 周期 3 天；每隔N天 → 传统语义"隔 N 天"（最小 2）
+        const everyNDays = text.match(/(?:^|\s)(每隔|每)(\d{1,2})天(?=\s|$)/u);
         if (everyNDays) {
-          early = { freq: "daily", interval: Math.max(2, Number(everyNDays[1])), until: null };
+          const n = Number(everyNDays[2]);
+          const interval =
+            everyNDays[1] === "每隔" ? Math.max(2, n) : Math.max(1, n);
+          early = { freq: "daily", interval, until: null };
           text = cut(text, everyNDays);
         }
       }
@@ -193,15 +207,6 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
           text = cut(text, afterDone);
         }
       }
-      // 重复N次：限定总次数（完成即消耗一次）
-      let remainingCount: number | null = null;
-      {
-        const times = text.match(/(?:^|\s)重复(\d{1,3})次(?=\s|$)/u);
-        if (times) {
-          remainingCount = Math.max(1, Number(times[1]));
-          text = cut(text, times);
-        }
-      }
       if (early !== undefined && remainingCount !== null) {
         early = { ...early, remainingCount };
       }
@@ -209,11 +214,12 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
 
     const weeklyDays: number[] = [];
     for (;;) {
-      const m = text.match(/(?:^|\s)每周([一二三四五六日天])?/u);
+      // 紧凑写法（每周一三）与单日写法（每周一）都吃进同一个 match
+      const m = text.match(/(?:^|\s)每周([一二三四五六日天]{1,7})?/u);
       if (!m) break;
-      if (m[1] !== undefined) weeklyDays.push(WEEKDAY_MAP[m[1]] ?? 1);
       text = cut(text, m);
       if (m[1] === undefined) break; // 裸"每周"只出现一次
+      for (const ch of m[1]) weeklyDays.push(WEEKDAY_MAP[ch] ?? 1);
     }
     if (early !== undefined) {
       recurrence = early;
@@ -236,16 +242,21 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
         const m = text.match(/(?:^|\s)每月(\d{1,2})[日号]?(?=\s|$)/u);
         if (!m) break;
         recurrence = { freq: "monthly", interval: 1, until: null };
-        dueDayStart = monthDayThisOrNext(now, Number(m[1]), new Date(now).getMonth());
+        dueDayStart = monthlyFirstDue(now, Number(m[1]));
         text = cut(text, m);
       }
       for (;;) {
         const m = text.match(/(?:^|\s)每年(\d{1,2})月(\d{1,2})[日号]?(?=\s|$)/u);
         if (!m) break;
-        recurrence = { freq: "yearly", interval: 1, until: null };
+        recurrence = { freq: "yearly", interval: 1, until: null, ...(remainingCount !== null ? { remainingCount } : {}) };
         dueDayStart = monthDayThisOrNext(now, Number(m[2]), Number(m[1]) - 1);
         text = cut(text, m);
       }
+    }
+
+    // 重复N次兜底：前面链路（每天/每周X/每月N日）没吃到 early 时，在此统一附加
+    if (recurrence !== undefined && remainingCount !== null && recurrence.remainingCount === undefined) {
+      recurrence = { ...recurrence, remainingCount };
     }
   }
 
@@ -405,7 +416,15 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
   };
 }
 
-/** 给定 (月 index, 日)，若今年已过则取明年 */
+/** 每月N日的首次到期：本月 N 日；已过则下月 N 日（不是明年） */
+function monthlyFirstDue(now: number, day: number): number {
+  const d = new Date(now);
+  const candidate = new Date(d.getFullYear(), d.getMonth(), day).getTime();
+  if (candidate >= startOfDay(now)) return candidate;
+  return new Date(d.getFullYear(), d.getMonth() + 1, day).getTime();
+}
+
+/** 给定 (月 index, 日)，若今年已过则取明年（一次性绝对日期用） */
 function monthDayThisOrNext(now: number, day: number, monthIndex0: number): number {
   const y = new Date(now).getFullYear();
   const candidate = new Date(y, monthIndex0, day).getTime();

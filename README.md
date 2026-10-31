@@ -2,7 +2,7 @@
 
 本地优先（local-first）的 GTD 任务清单应用：一套 UI，四端运行 —— Windows / macOS / Linux（Electron 壳）、Android / iOS（Expo）。数据默认留在设备上，无账号即可使用；同步为可选增强（WebDAV / 自托管 / 桌面本地文件夹）。
 
-架构与阶段验收详见 [docs/architecture.md](docs/architecture.md)。
+架构与阶段验收详见 [docs/architecture.md](docs/architecture.md)；**全功能技术文档（数据模型/命令架构/功能规格/同步/安全/发布）见 [docs/technical-reference.md](docs/technical-reference.md)**。
 
 ## 功能（v0.10.0）
 

@@ -14,6 +14,8 @@ export * from "./features/tags";
 export * from "./features/due-scan";
 export * from "./features/review";
 export * from "./features/kanban-dnd";
+export * from "./features/bulk-ops";
+export * from "./features/tombstones";
 export * from "./db/coerce";
 export * from "./sync/types";
 export * from "./sync/merge";

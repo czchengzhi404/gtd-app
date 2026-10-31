@@ -38,7 +38,8 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   const fontPref = useAppStore((s) => s.kv["font.family"] as FontFamily | undefined);
 
   const mode: ThemeMode = themeMode ?? "system";
-  const fontFamily: FontFamily = fontPref ?? "LXGWWenKai";
+  // 默认系统字体（内置霞鹜文楷为可选项，选中时才懒加载）
+  const fontFamily: FontFamily = fontPref ?? "system";
 
   const isDark = mode === "dark" || (mode === "system" && system === "dark");
   const colors = withLegacyAlias(isDark ? darkColors : lightColors);

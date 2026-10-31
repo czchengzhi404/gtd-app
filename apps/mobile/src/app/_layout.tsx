@@ -7,21 +7,15 @@ import { Screen, ThemeProvider, useTheme, useT, PromptHost } from "@gtd/ui";
 import { appStore, bootstrapStore } from "@gtd/core";
 import { initPlatform } from "@/platform/bootstrap";
 import { installFontScaleOverride } from "@/platform/font-scale";
+import { ensureBuiltinFont, isBuiltinFontSelected } from "@/platform/font-loader";
 import { CommandPaletteHost } from "@/platform/CommandPaletteHost";
-import * as Font from "expo-font";
-
-/** 加载内置霞鹜文楷字体（app 层负责，因为字体文件在 mobile assets 里） */
-async function loadBuiltinFont(): Promise<void> {
-  await Font.loadAsync({
-    LXGWWenKai: require("../../assets/fonts/LXGWWenKai-Regular.ttf"),
-  }).catch(() => undefined);
-}
 
 installFontScaleOverride();
 
 /**
  * 根布局：注入平台端口 → 迁移（原生）→ 种子 → bootstrap → 事件/通知接线。
  * 主题（日夜/字体）由 ThemeProvider 从 kv 读取，设置页修改后即时生效。
+ * 内置字体懒加载：bootstrap 之后再按 kv 判断是否需要载入（默认系统字体不载）。
  */
 export default function RootLayout() {
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +27,10 @@ export default function RootLayout() {
       try {
         const result = await initPlatform();
         cleanup = result.cleanup;
-        await loadBuiltinFont();
         await bootstrapStore();
+        if (isBuiltinFontSelected()) {
+          await ensureBuiltinFont();
+        }
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : String(err);
