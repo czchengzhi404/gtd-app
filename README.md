@@ -50,7 +50,7 @@
 
 ### Android 签名说明
 
-签名密钥库 `apps/mobile/keys/gtd-release.p12` 随私有仓库保存（保证跨构建签名稳定、可平滑升级）；密码存 GitHub Secrets（`ANDROID_KEYSTORE_PASSWORD`），本地重置密码见 `scripts/gen-android-keystore.mjs`（重新生成会使已装用户无法覆盖升级，慎用）。仓库转公开前请评估是否迁移密钥管理。
+签名密钥**不入库**：CI 从 GitHub Secrets（`ANDROID_KEYSTORE_BASE64` + `ANDROID_KEYSTORE_PASSWORD`）构建时还原。当前密钥为 2026-10-31 本机离线自签的 RSA-4096（30 年有效期），取代早期随仓库保存的 RSA-2048——旧密钥仅存于本机归档（`release-local/keystore-archive/`），已从全部 git 历史抹除。**换钥影响**：v0.11.1 及之前的 APK 用旧签名，安装过旧版的话，升级到 v0.11.2+ 需卸载重装一次。
 
 ## 常用命令（根目录）
 
