@@ -120,18 +120,23 @@ jobs:
         env:
           GTD_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ORG_GRADLE_PROJECT_reactNativeArchitectures: "arm64-v8a,armeabi-v7a,x86_64"
-      - name: Verify APKs (signature + manifest)
+      - name: Verify APKs (signature + manifest + version)
         run: |
           set -e
           OUT="apps/mobile/android/app/build/outputs/apk/release"
           COUNT=$(ls "$OUT"/GTD-*.apk | wc -l)
           echo "produced $COUNT APKs"
           test "$COUNT" -ge 4
+          EXPECTED=$(python3 -c "import json;print(json.load(open('apps/mobile/app.json'))['expo']['version'])")
+          echo "expected versionName=$EXPECTED"
           BT="$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -1)"
           for APK in "$OUT"/GTD-*.apk; do
             echo "== $(basename "$APK") =="
             "$BT/apksigner" verify --print-certs "$APK" | head -4
             "$BT/aapt" dump badging "$APK" | grep -E "^package|^application-label:|launchable-activity" | head -4
+            "$BT/aapt" dump badging "$APK" | grep -q "versionName='$EXPECTED'" || {
+              echo "FATAL: versionName mismatch in $APK (expected $EXPECTED)"; exit 1;
+            }
           done
       # 直接挂到 Release（不经制品存储：Actions 制品配额有限）
       - name: Upload APKs to release
@@ -139,12 +144,16 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          # tag 触发时 GITHUB_REF_NAME=tag；workflow_dispatch 时为 main → 从 app.json 推导
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in v*) ;; *) TAG="v$(python3 -c "import json;print(json.load(open('apps/mobile/app.json'))['expo']['version'])")" ;; esac
+          echo "release tag=$TAG"
           OUT="apps/mobile/android/app/build/outputs/apk/release"
-          gh release view "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" \
-              --title "GTD 清单 ${GITHUB_REF_NAME}" \
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "GTD 清单 $TAG" \
               --notes "CI 构建。Android 为签名 release 包（arm64/v7a/x86_64 分包 + universal 通用包）；macOS dmg 未签名（首次打开需右键 → 打开）；iOS 为未签名 IPA（TrollStore/自签侧载，见 README）。"
-          gh release upload "${GITHUB_REF_NAME}" "$OUT"/GTD-*.apk \
+          gh release upload "$TAG" "$OUT"/GTD-*.apk \
             --repo "$GITHUB_REPOSITORY" --clobber
 
   ios-unsigned:
@@ -166,51 +175,67 @@ jobs:
       - name: Install pods
         run: pod install --project-directory=ios
         working-directory: apps/mobile
-      # 发现 prebuild 生成的 workspace/scheme/app 名（随 app.json name 变化）
+      # 发现 prebuild 生成的 workspace/scheme/app 名（随 app.json name 变化）。
+      # 注意：`ls 目录通配符` 会列出目录内容而非目录本身，必须用 find
       - name: Resolve build names
         id: names
         run: |
           set -e
-          WS=$(ls apps/mobile/ios/*.xcworkspace | head -1 | xargs basename -s .xcworkspace)
+          set -o pipefail
+          WS_PATH=$(find apps/mobile/ios -maxdepth 1 -name "*.xcworkspace" | head -1)
+          if [ -z "$WS_PATH" ]; then
+            echo "FATAL: no .xcworkspace generated"; ls -la apps/mobile/ios; exit 1
+          fi
+          WS=$(basename "$WS_PATH" .xcworkspace)
           echo "workspace=$WS" >> "$GITHUB_OUTPUT"
+          echo "path=$WS_PATH" >> "$GITHUB_OUTPUT"
+          echo "resolved: $WS_PATH"
       - name: Build device (unsigned, arm64)
         run: |
           set -e
-          WS="${{ steps.names.outputs.workspace }}"
-          xcodebuild -workspace "apps/mobile/ios/$WS.xcworkspace" -scheme "$WS" \
+          WS_PATH="${{ steps.names.outputs.path }}"
+          xcodebuild -workspace "$WS_PATH" -scheme "${{ steps.names.outputs.workspace }}" \
             -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             -derivedDataPath apps/mobile/build/ios | tail -5
       - name: Build simulator
         run: |
           set -e
-          WS="${{ steps.names.outputs.workspace }}"
-          xcodebuild -workspace "apps/mobile/ios/$WS.xcworkspace" -scheme "$WS" \
+          WS_PATH="${{ steps.names.outputs.path }}"
+          xcodebuild -workspace "$WS_PATH" -scheme "${{ steps.names.outputs.workspace }}" \
             -configuration Release -sdk iphonesimulator \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
             -derivedDataPath apps/mobile/build/ios-sim | tail -5
       - name: Package IPA + simulator zip
         run: |
           set -e
-          APP=$(ls -d apps/mobile/build/ios/Build/Products/Release-iphoneos/*.app | head -1)
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in v*) ;; *) TAG="v$(python3 -c "import json;print(json.load(open('apps/mobile/app.json'))['expo']['version'])")" ;; esac
+          echo "release tag=$TAG"
+          APP=$(find apps/mobile/build/ios/Build/Products/Release-iphoneos -maxdepth 1 -name "*.app" | head -1)
+          test -n "$APP" || { echo "FATAL: no .app produced"; exit 1; }
           mkdir -p Payload
           cp -R "$APP" Payload/
-          zip -qry "GTD-${GITHUB_REF_NAME}-ios-unsigned.ipa" Payload
+          zip -qry "GTD-$TAG-ios-unsigned.ipa" Payload
           rm -rf Payload
-          SIM=$(ls -d apps/mobile/build/ios-sim/Build/Products/Release-iphonesimulator/*.app | head -1)
-          zip -qry "GTD-${GITHUB_REF_NAME}-ios-simulator.zip" "$SIM"
-          ls -la GTD-${GITHUB_REF_NAME}-ios-*
+          SIM=$(find apps/mobile/build/ios-sim/Build/Products/Release-iphonesimulator -maxdepth 1 -name "*.app" | head -1)
+          test -n "$SIM" || { echo "FATAL: no simulator .app produced"; exit 1; }
+          zip -qry "GTD-$TAG-ios-simulator.zip" "$SIM"
+          ls -la GTD-$TAG-ios-*
       - name: Upload iOS artifacts to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
-          gh release view "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
-            gh release create "${GITHUB_REF_NAME}" --repo "$GITHUB_REPOSITORY" \
-              --title "GTD 清单 ${GITHUB_REF_NAME}" \
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in v*) ;; *) TAG="v$(python3 -c "import json;print(json.load(open('apps/mobile/app.json'))['expo']['version'])")" ;; esac
+          echo "release tag=$TAG"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" \
+              --title "GTD 清单 $TAG" \
               --notes "CI 构建。"
-          gh release upload "${GITHUB_REF_NAME}" \
-            "GTD-${GITHUB_REF_NAME}-ios-unsigned.ipa" "GTD-${GITHUB_REF_NAME}-ios-simulator.zip" \
+          gh release upload "$TAG" \
+            "GTD-$TAG-ios-unsigned.ipa" "GTD-$TAG-ios-simulator.zip" \
             --repo "$GITHUB_REPOSITORY" --clobber
 
   desktop-windows:
@@ -295,6 +320,9 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+          TAG="${GITHUB_REF_NAME}"
+          case "$TAG" in v*) ;; *) TAG="v$(python3 -c "import json;print(json.load(open('apps/mobile/app.json'))['expo']['version'])")" ;; esac
+          echo "release tag=$TAG"
           ls -la apps/desktop/release/*.dmg
-          gh release upload "${GITHUB_REF_NAME}" apps/desktop/release/*.dmg \
+          gh release upload "$TAG" apps/desktop/release/*.dmg \
             --repo "$GITHUB_REPOSITORY" --clobber
