@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { Modal, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -33,6 +34,11 @@ export interface FilterBarProps {
    * 搜索行右侧只留一个带激活数徽标的漏斗按钮——不再三层工具条叠罗汉。
    */
   compact?: boolean;
+  /**
+   * 弹层附加内容（可选）：把「保存的筛选」等低频控件一起收进漏斗弹层，
+   * 让列表页首屏只保留「快速添加 + 搜索」两行。
+   */
+  sheetExtra?: ReactNode;
 }
 
 /** 漏斗弹层里的筛选内容（与行内 chips 同一份数据源） */
@@ -101,6 +107,7 @@ export function FilterBar({
   tag = null,
   onTagChange,
   compact = false,
+  sheetExtra,
 }: FilterBarProps) {
   const colors = useTheme();
   const t = useT();
@@ -260,6 +267,7 @@ export function FilterBar({
                 tag={tag}
                 onTagChange={onTagChange}
               />
+              {sheetExtra !== undefined ? <View style={styles.sheetExtra}>{sheetExtra}</View> : null}
             </ScrollView>
             <Pressable
               accessibilityRole="button"
@@ -366,6 +374,12 @@ const styles = StyleSheet.create({
   sheetGroup: {
     flexDirection: "row",
     flexWrap: "wrap",
+    gap: space.xs,
+  },
+  sheetExtra: {
+    paddingTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: "transparent",
     gap: space.xs,
   },
   sheetDone: {

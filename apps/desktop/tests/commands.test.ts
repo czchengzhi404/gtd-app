@@ -115,6 +115,33 @@ describe("命令层（真实 SQLite）", () => {
     expect(alive).toHaveLength(0);
   });
 
+  it("project.softDelete → 墓碑沿用既有 revision 并 +1（删除才能同步传播）", async () => {
+    const created = await executeCommand(executor, "project.upsert", { name: "项目A" }, ctx);
+    const projectId = (created.records[0]?.record as { id: string }).id;
+    await executeCommand(executor, "project.upsert", { id: projectId, name: "项目A改" }, ctx);
+    const deleted = await executeCommand(executor, "project.softDelete", { id: projectId }, ctx);
+    const record = deleted.records[0]?.record as { revision: number; deletedAt: number | null };
+    expect(record.deletedAt).toBe(NOW);
+    // 创建(1) → 改名(2) → 删除(3)：不能把 revision 重置为 1，否则远端更高 revision 会"复活"项目
+    expect(record.revision).toBe(3);
+  });
+
+  it("attachment.remove → 墓碑 revision 递增", async () => {
+    const created = await executeCommand(executor, "task.create", { title: "带附件" }, ctx);
+    const taskId = (created.records[0]?.record as { id: string }).id;
+    const added = await executeCommand(
+      executor,
+      "attachment.add",
+      { taskId, fileName: "a.txt", storagePath: "/tmp/a.txt" },
+      ctx,
+    );
+    const attachmentId = (added.records[0]?.record as { id: string }).id;
+    const removed = await executeCommand(executor, "attachment.remove", { id: attachmentId }, ctx);
+    const record = removed.records[0]?.record as { revision: number; deletedAt: number | null };
+    expect(record.deletedAt).toBe(NOW);
+    expect(record.revision).toBe(2);
+  });
+
   it("回收站：getDeletedTasks 只含墓碑、按删除时间倒序、restore 后消失", async () => {
     const a = await executeCommand(executor, "task.create", { title: "先删的" }, ctx);
     const b = await executeCommand(executor, "task.create", { title: "后删的" }, ctx);

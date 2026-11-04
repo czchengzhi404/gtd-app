@@ -1,7 +1,9 @@
 import { useCallback, useState } from "react";
-import type { Task, TaskStatusInput } from "@gtd/core";
+import type { DeferPreset, Task, TaskStatusInput } from "@gtd/core";
 import {
+  deferTargetTime,
   planBulkComplete,
+  planBulkDefer,
   planBulkDelete,
   planBulkMove,
   planDeferToTomorrow,
@@ -30,6 +32,8 @@ export interface ListInteractions {
   completeSelected: () => Promise<void>;
   deleteSelected: () => Promise<void>;
   moveSelected: (status: TaskStatusInput) => Promise<void>;
+  /** 批量推迟到期时间（today / tomorrow / nextWeek） */
+  deferSelected: (preset: DeferPreset) => Promise<void>;
   reorder: (ordered: Task[], task: Task, toIndex: number) => Promise<void>;
   swipeLeft: (task: Task) => Promise<void>;
   swipeRight: (task: Task) => Promise<void>;
@@ -102,6 +106,25 @@ export function useListInteractions(tasks: Task[]): ListInteractions {
     });
   }, [exitSelection, selectedTasks]);
 
+  /** 批量推迟：改到期时间，撤销回到各自原来的 dueAt */
+  const deferSelected = useCallback(
+    async (preset: DeferPreset) => {
+      const targets = selectedTasks();
+      if (targets.length === 0) return;
+      const dueAt = deferTargetTime(preset, Date.now());
+      const plan = planBulkDefer(
+        targets.map((task) => ({ id: task.id, dueAt: task.dueAt })),
+        dueAt,
+      );
+      exitSelection();
+      await runAll(plan.run);
+      showUndo(t("bulk.deferred", { n: targets.length }), () => {
+        void runAll(plan.undo);
+      });
+    },
+    [exitSelection, selectedTasks],
+  );
+
   const moveSelected = useCallback(
     async (status: TaskStatusInput) => {
       const targets = selectedTasks();
@@ -154,6 +177,7 @@ export function useListInteractions(tasks: Task[]): ListInteractions {
     completeSelected,
     deleteSelected,
     moveSelected,
+    deferSelected,
     reorder,
     swipeLeft,
     swipeRight,

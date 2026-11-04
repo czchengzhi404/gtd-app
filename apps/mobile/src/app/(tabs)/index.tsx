@@ -1,39 +1,37 @@
 import { useMemo, useState } from "react";
 import { router } from "expo-router";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
   BulkActionBar,
+  Button,
   FilterBar,
-  KanbanBoard,
+  IconButton,
   OptionSheet,
+  PageHeader,
   PerspectiveBar,
   QuickAddBar,
   TaskList,
+  space,
   useAppStore,
-  useBreakpoint,
-  ViewToggle,
+  useTheme,
   useT,
 } from "@gtd/ui";
-import { IconButton } from "@gtd/ui";
 import {
   applyListFilter,
   getAllTags,
   getInboxTasks,
-  getTasksByStatus,
   parseQuickAdd,
   quickAdd,
-  runCommand,
   selectContexts,
 } from "@gtd/core";
-import type { TaskStatusInput } from "@gtd/core";
+import type { DeferPreset, TaskStatusInput } from "@gtd/core";
 import { useOrderedTaskActions } from "@/hooks/useRowActions";
 import { useListInteractions } from "@/hooks/useListInteractions";
 import { usePerspectives } from "@/hooks/usePerspectives";
 import { openTaskContextMenu } from "@/lib/context-menu";
 import { completeTaskWithUndo, uncompleteTask } from "@/lib/task-ops";
-
-type InboxView = "list" | "kanban";
 
 const MOVE_OPTIONS = [
   { key: "next", labelKey: "detail.status.next" },
@@ -42,19 +40,26 @@ const MOVE_OPTIONS = [
   { key: "inbox", labelKey: "detail.status.inbox" },
 ] as const;
 
-/** 收集箱：快速添加 + 搜索/情境/标签筛选 + 保存筛选 + 多选/滑动/拖拽 + 列表或看板 */
+const DEFER_OPTIONS = [
+  { key: "today", labelKey: "bulk.deferToday" },
+  { key: "tomorrow", labelKey: "bulk.deferTomorrow" },
+  { key: "nextWeek", labelKey: "bulk.deferNextWeek" },
+] as const;
+
+/**
+ * 收集箱：首屏只保留「快速添加 + 一行搜索/筛选」两行。
+ * 情境/标签/保存的筛选都收进漏斗弹层；视图固定为列表（收集箱里的任务还没有状态，
+ * 用看板按状态分列没有意义——理清才是收集箱唯一的出口）。
+ */
 export default function InboxScreen() {
   const inbox = useAppStore(getInboxTasks);
   const contexts = useAppStore(selectContexts);
   const allTags = useAppStore(getAllTags);
-  const nextTasks = useAppStore((s) => getTasksByStatus(s, "next"));
-  const waitingTasks = useAppStore((s) => getTasksByStatus(s, "waiting"));
-  const somedayTasks = useAppStore((s) => getTasksByStatus(s, "someday"));
   const loaded = useAppStore((s) => s.loaded);
-  const { isTabletUp } = useBreakpoint();
+  const insets = useSafeAreaInsets();
+  const colors = useTheme();
   const t = useT();
 
-  const [view, setView] = useState<InboxView>("list");
   const [submitting, setSubmitting] = useState(false);
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
@@ -63,6 +68,7 @@ export default function InboxScreen() {
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [activePerspective, setActivePerspective] = useState<string | null>(null);
   const [moveSheetOpen, setMoveSheetOpen] = useState(false);
+  const [deferSheetOpen, setDeferSheetOpen] = useState(false);
 
   const { perspectives, saveCurrent, remove } = usePerspectives();
 
@@ -125,6 +131,21 @@ export default function InboxScreen() {
     }
   };
 
+  /** 空态示例片段：点一下追加到输入框（已有内容则用空格拼接） */
+  const appendSnippet = (snippet: string) => {
+    setInput((prev) => (prev.trim().length === 0 ? snippet : `${prev.trimEnd()} ${snippet}`));
+  };
+
+  const suggestions = useMemo(
+    () => [
+      { label: t("inbox.suggest.context"), onPress: () => appendSnippet(t("inbox.suggest.context")) },
+      { label: t("inbox.suggest.project"), onPress: () => appendSnippet(t("inbox.suggest.project")) },
+      { label: t("inbox.suggest.priorityDate"), onPress: () => appendSnippet(t("inbox.suggest.priorityDate")) },
+      { label: t("inbox.suggest.waiting"), onPress: () => appendSnippet(t("inbox.suggest.waiting")) },
+    ],
+    [t],
+  );
+
   const applyPerspective = (id: string) => {
     const entry = perspectives.find((candidate) => candidate.id === id);
     if (entry === undefined) return;
@@ -148,10 +169,39 @@ export default function InboxScreen() {
   const filterActive = query.trim() !== "" || contextId !== null || tag !== null || overdueOnly;
 
   return (
-    <View style={{ flex: 1 }}>
-      <QuickAddBar preview={preview} onSubmit={submit} submitting={submitting} />
+    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+      <View style={{ paddingTop: insets.top }}>
+        <PageHeader
+          title={t("nav.inbox")}
+          subtitle={t("app.inbox.subtitle", { n: inbox.length })}
+          actions={
+            <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
+              <IconButton
+                icon="swap-vertical"
+                filled={interactions.reorderMode}
+                onPress={interactions.toggleReorderMode}
+                accessibilityLabel={t("task.dragHandle")}
+              />
+              <Button
+                label={t("app.inbox.process")}
+                icon="layers-outline"
+                variant="primary"
+                accessibilityLabel={t("app.inbox.processA11y")}
+                onPress={() => router.push("/process")}
+              />
+            </View>
+          }
+        />
+      </View>
+      <QuickAddBar
+        value={input}
+        onChangeText={setInput}
+        preview={preview}
+        onSubmit={submit}
+        submitting={submitting}
+      />
       <FilterBar
-        compact={isTabletUp}
+        compact
         query={query}
         onQueryChange={(text) => {
           setQuery(text);
@@ -175,81 +225,49 @@ export default function InboxScreen() {
           setTag(value);
           setActivePerspective(null);
         }}
-      />
-      <PerspectiveBar
-        perspectives={perspectives}
-        activeId={activePerspective}
-        canSave={filterActive && activePerspective === null}
-        onApply={applyPerspective}
-        onClearActive={clearPerspective}
-        onSave={() => {
-          void saveCurrent({ query, contextId, tag, overdueOnly }).then((entry) => {
-            if (entry !== null) setActivePerspective(entry.id);
-          });
-        }}
-        onDelete={(id) => {
-          if (activePerspective === id) setActivePerspective(null);
-          void remove(id);
-        }}
-      />
-      <ViewToggle<InboxView>
-        label={t("view.inboxLabel")}
-        value={view}
-        onChange={setView}
-        options={[
-          { key: "list", label: t("view.list") },
-          { key: "kanban", label: t("view.kanban") },
-        ]}
-        trailing={
-          view === "list" ? (
-            <IconButton
-              icon="swap-vertical"
-              filled={interactions.reorderMode}
-              onPress={interactions.toggleReorderMode}
-              accessibilityLabel={t("task.dragHandle")}
-            />
-          ) : null
+        sheetExtra={
+          <PerspectiveBar
+            perspectives={perspectives}
+            activeId={activePerspective}
+            canSave={filterActive && activePerspective === null}
+            onApply={applyPerspective}
+            onClearActive={clearPerspective}
+            onSave={() => {
+              void saveCurrent({ query, contextId, tag, overdueOnly }).then((entry) => {
+                if (entry !== null) setActivePerspective(entry.id);
+              });
+            }}
+            onDelete={(id) => {
+              if (activePerspective === id) setActivePerspective(null);
+              void remove(id);
+            }}
+          />
         }
       />
 
-      {view === "list" ? (
-        <TaskList
-          tasks={filtered}
-          now={Date.now()}
-          contextNameById={contextNameById}
-          actions={interactions.selectionMode || interactions.reorderMode ? undefined : actions}
-          onContextMenuTask={(task, position) => openTaskContextMenu(task, position)}
-          onToggleTask={(task) =>
-            void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
-          }
-          onPressTask={(task) => router.push(`/task/${task.id}`)}
-          emptyTitle={t("inbox.emptyTitle")}
-          emptyHint={t("inbox.emptyHint")}
-          selectionMode={interactions.selectionMode}
-          selectedIds={interactions.selectedIds}
-          onToggleSelect={interactions.toggleSelect}
-          onEnterSelection={interactions.enterSelection}
-          onSwipeLeftTask={(task) => void interactions.swipeLeft(task)}
-          onSwipeRightTask={(task) => void interactions.swipeRight(task)}
-          onReorderTask={(task, toIndex) => void interactions.reorder(filtered, task, toIndex)}
-          reorderMode={interactions.reorderMode}
-        />
-      ) : (
-        <KanbanBoard
-          now={Date.now()}
-          actions={actions}
-          columns={[
-            { key: "inbox", title: t("detail.status.inbox"), status: "inbox", tasks: filtered },
-            { key: "next", title: t("detail.status.next"), status: "next", tasks: nextTasks },
-            { key: "waiting", title: t("detail.status.waiting"), status: "waiting", tasks: waitingTasks },
-            { key: "someday", title: t("detail.status.someday"), status: "someday", tasks: somedayTasks },
-          ]}
-          onMoveTask={(task, status) =>
-            void runCommand("task.moveStatus", { id: task.id, status }).catch(() => undefined)
-          }
-          onPressTask={(task) => router.push(`/task/${task.id}`)}
-        />
-      )}
+      <TaskList
+        tasks={filtered}
+        now={Date.now()}
+        contextNameById={contextNameById}
+        actions={interactions.selectionMode || interactions.reorderMode ? undefined : actions}
+        onContextMenuTask={(task, position) => openTaskContextMenu(task, position)}
+        onToggleTask={(task) =>
+          void (task.status === "done" ? uncompleteTask(task) : completeTaskWithUndo(task))
+        }
+        onPressTask={(task) => router.push(`/task/${task.id}`)}
+        emptyIllustration="inbox"
+        emptyTitle={t("inbox.emptyTitle")}
+        emptyHint={t("inbox.emptyHint")}
+        emptySuggestions={suggestions}
+        selectionMode={interactions.selectionMode}
+        selectedIds={interactions.selectedIds}
+        onToggleSelect={interactions.toggleSelect}
+        onEnterSelection={interactions.enterSelection}
+        onSwipeLeftTask={(task) => void interactions.swipeLeft(task)}
+        onSwipeRightTask={(task) => void interactions.swipeRight(task)}
+        onReorderTask={(task, toIndex) => void interactions.reorder(filtered, task, toIndex)}
+        reorderMode={interactions.reorderMode}
+      />
 
       {interactions.selectionMode ? (
         <BulkActionBar
@@ -257,6 +275,7 @@ export default function InboxScreen() {
           onComplete={() => void interactions.completeSelected()}
           onDelete={() => void interactions.deleteSelected()}
           onMove={() => setMoveSheetOpen(true)}
+          onDefer={() => setDeferSheetOpen(true)}
           onClear={interactions.clearSelection}
           onExit={interactions.exitSelection}
         />
@@ -271,6 +290,17 @@ export default function InboxScreen() {
           void interactions.moveSelected(key as TaskStatusInput);
         }}
         onClose={() => setMoveSheetOpen(false)}
+      />
+
+      <OptionSheet
+        visible={deferSheetOpen}
+        title={t("bulk.deferTo")}
+        options={DEFER_OPTIONS.map((option) => ({ key: option.key, label: t(option.labelKey) }))}
+        onSelect={(key) => {
+          setDeferSheetOpen(false);
+          void interactions.deferSelected(key as DeferPreset);
+        }}
+        onClose={() => setDeferSheetOpen(false)}
       />
     </View>
   );

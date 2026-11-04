@@ -61,6 +61,7 @@ function state(tasks: Task[], projects: Project[] = []): AppState {
     sections: {},
     areas: {},
     contexts: {},
+    templates: {},
     kv: {},
     lastError: null,
   };

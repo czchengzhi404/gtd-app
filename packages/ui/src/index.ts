@@ -16,9 +16,7 @@ export * from "./components/Chip";
 export * from "./components/PriorityBadge";
 export * from "./components/DueDateChip";
 export * from "./components/SearchBar";
-export * from "./components/Fab";
 export * from "./components/Sidebar";
-export * from "./components/TwoPaneLayout";
 export * from "./components/ProjectCard";
 export * from "./components/AppTabBar";
 export * from "./components/RowActions";
@@ -41,6 +39,18 @@ export * from "./components/TagEditor";
 export * from "./components/OptionSheet";
 export * from "./components/PromptHost";
 export * from "./components/PerspectiveBar";
+export * from "./components/Onboarding";
 export * from "./lib/fuzzy";
+export * from "./lib/shortcuts";
+export * from "./lib/undo-stack";
 export * from "./hooks/useFocusStyle";
 export * from "./platform/useKeyboardShortcuts";
+
+/* ---------------- v2 ---------------- */
+export * from "./theme/feedback";
+export * from "./hooks/useReducedMotion";
+export * from "./components/SegmentedControl";
+export * from "./components/Sheet";
+export * from "./components/AppShell";
+export * from "./components/StatTile";
+export * from "./components/Highlight";

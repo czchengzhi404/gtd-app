@@ -78,6 +78,7 @@ function makeState(tasks: Task[], projects: Project[] = [], areas: Area[] = []):
     sections: {},
     areas: Object.fromEntries(areas.map((a) => [a.id, a])),
     contexts: {},
+    templates: {},
     kv: {},
     lastError: null,
   };

@@ -134,6 +134,41 @@ const MIGRATIONS: readonly Migration[] = [
       `ALTER TABLE projects ADD COLUMN area_id TEXT`,
     ],
   },
+  {
+    version: 4,
+    statements: [
+      // 排序/更新/墓碑与项目区域的查询索引
+      `CREATE INDEX IF NOT EXISTS idx_tasks_order ON tasks(status, order_key)`,
+      `CREATE INDEX IF NOT EXISTS idx_tasks_updated ON tasks(updated_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_tasks_deleted ON tasks(deleted_at)`,
+      `CREATE INDEX IF NOT EXISTS idx_projects_area ON projects(area_id)`,
+      // 历史空排序键按 rowid 回填为固定 15 位字典序键
+      `UPDATE tasks SET order_key = printf('%015d', rowid) WHERE order_key = ''`,
+    ],
+  },
+  {
+    version: 5,
+    statements: [
+      // 任务模板：可复用的任务骨架（数组/规则以 JSON 文本存储，条目级同步）
+      `CREATE TABLE IF NOT EXISTS task_templates (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        title TEXT NOT NULL,
+        notes TEXT NOT NULL DEFAULT '',
+        priority INTEGER NOT NULL DEFAULT 0,
+        project_id TEXT,
+        context_ids TEXT NOT NULL DEFAULT '[]',
+        tags TEXT NOT NULL DEFAULT '[]',
+        checklist TEXT NOT NULL DEFAULT '[]',
+        recurrence TEXT,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL,
+        revision INTEGER NOT NULL DEFAULT 1,
+        deleted_at INTEGER
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_task_templates_active ON task_templates(deleted_at)`,
+    ],
+  },
 ];
 
 export async function migrate(executor: SqliteExecutor): Promise<number> {

@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 
@@ -28,6 +28,11 @@ export interface EmptyStateProps {
   action?: EmptyStateAction;
   /** 次行动（如"去收集箱看看"） */
   secondaryAction?: EmptyStateAction;
+  /**
+   * 示例片段（如 `@电脑`、`!!! 明天`）：点一下由调用方填入输入框。
+   * 空态是新用户唯一会认真读的地方，语法提示放这里比藏在文档里有效。
+   */
+  suggestions?: { label: string; onPress: () => void }[];
 }
 
 const ILLUSTRATIONS: Record<
@@ -49,6 +54,7 @@ export function EmptyState({
   illustration,
   action,
   secondaryAction,
+  suggestions,
 }: EmptyStateProps) {
   const colors = useTheme();
   const art = illustration !== undefined ? ILLUSTRATIONS[illustration] : { icon, accent: null };
@@ -70,6 +76,30 @@ export function EmptyState({
         <AppText variant="label" tone="tertiary" lines={3} align="center" style={styles.hint}>
           {hint}
         </AppText>
+      ) : null}
+      {suggestions !== undefined && suggestions.length > 0 ? (
+        <View style={styles.suggestions}>
+          {suggestions.map((item) => (
+            <Pressable
+              key={item.label}
+              accessibilityRole="button"
+              accessibilityLabel={item.label}
+              onPress={item.onPress}
+              style={({ pressed }) => [
+                styles.suggestionChip,
+                {
+                  backgroundColor: colors.surfaceMuted,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <AppText variant="caption" tone="secondary" lines={1}>
+                {item.label}
+              </AppText>
+            </Pressable>
+          ))}
+        </View>
       ) : null}
       {action !== undefined ? (
         <View style={styles.actions}>
@@ -134,5 +164,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: space.xs,
     paddingTop: space.xs,
+  },
+  suggestions: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: space.xs,
+    paddingTop: space.xs,
+    maxWidth: 300,
+  },
+  suggestionChip: {
+    minHeight: 30,
+    paddingHorizontal: space.md,
+    borderRadius: 15,
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

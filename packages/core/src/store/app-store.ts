@@ -1,6 +1,6 @@
 import { createStore } from "zustand/vanilla";
 import type { CommandMap, CommandOp, CommandResult, TaggedRecord } from "../models/commands";
-import type { Area, Context, Project, Section, Task } from "../models/task";
+import type { Area, Context, Project, Section, Task, TaskTemplate } from "../models/task";
 import { executeCommand, type CommandContext } from "../db/commands";
 import { loadBootstrapData } from "../db/queries";
 import { getCommandPort, getSqliteExecutor } from "../platform/ports";
@@ -23,6 +23,8 @@ export interface AppState {
   sections: Record<string, Section>;
   contexts: Record<string, Context>;
   areas: Record<string, Area>;
+  /** 任务模板（可复用任务骨架） */
+  templates: Record<string, TaskTemplate>;
   /** 设置（不参与同步） */
   kv: Record<string, string>;
   lastError: string | null;
@@ -35,6 +37,7 @@ export const appStore = createStore<AppState>(() => ({
   sections: {},
   contexts: {},
   areas: {},
+  templates: {},
   kv: {},
   lastError: null,
 }));
@@ -55,6 +58,7 @@ export function applyRecords(records: TaggedRecord[]): void {
     const sections = { ...state.sections };
     const contexts = { ...state.contexts };
     const areas = { ...state.areas };
+    const templates = { ...state.templates };
     for (const { type, record } of records) {
       switch (type) {
         case "task":
@@ -92,12 +96,19 @@ export function applyRecords(records: TaggedRecord[]): void {
             areas[record.id] = record as Area;
           }
           break;
+        case "template":
+          if (record.deletedAt !== null) {
+            delete templates[record.id];
+          } else {
+            templates[record.id] = record as TaskTemplate;
+          }
+          break;
         case "attachment":
           // 附件元数据由详情页按需查询，暂不进全局状态
           break;
       }
     }
-    return { tasks, projects, sections, contexts, areas };
+    return { tasks, projects, sections, contexts, areas, templates };
   });
 }
 
@@ -111,6 +122,7 @@ export async function bootstrapStore(): Promise<void> {
     sections: indexById(data.sections),
     contexts: indexById(data.contexts),
     areas: indexById(data.areas),
+    templates: indexById(data.templates),
     kv: data.kv,
     lastError: null,
   });

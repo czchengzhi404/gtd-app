@@ -1,3 +1,5 @@
+> ⚠️ **v1 历史文档**：内容对应 v0.11 之前的实现，已被 [technical-reference.md](./technical-reference.md)（v2）取代。保留仅为追溯设计演进，不要据此开发。
+
 # UI 设计系统（v0.3.0）
 
 一套 UI 同时跑移动端（RN 原生渲染）与桌面端（react-native-web），平台差异只允许出现在 `*.web.tsx` / `*.native.tsx`。

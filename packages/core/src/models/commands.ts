@@ -1,5 +1,13 @@
 import { z } from "zod";
-import type { Area, AttachmentMeta, Context, Project, Section, Task } from "./task";
+import type {
+  Area,
+  AttachmentMeta,
+  Context,
+  Project,
+  Section,
+  Task,
+  TaskTemplate,
+} from "./task";
 
 /**
  * 命令表 payload schema。
@@ -26,6 +34,16 @@ const recurrenceSchema = z.object({
   until: timestampSchema.nullable().optional(),
 });
 
+/** 清单子项（task.create / task.update / template.upsert 共用） */
+const checklistSchema = z.array(
+  z.object({
+    id: idSchema,
+    title: z.string().min(1).max(2000),
+    done: z.boolean(),
+    orderKey: z.string(),
+  }),
+);
+
 export const taskCreatePayloadSchema = z.object({
   title: z.string().min(1).max(2000),
   notes: z.string().max(100_000).optional(),
@@ -41,16 +59,7 @@ export const taskCreatePayloadSchema = z.object({
   waitingFor: z.string().max(500).nullable().optional(),
   starred: z.boolean().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
-  checklist: z
-    .array(
-      z.object({
-        id: idSchema,
-        title: z.string().min(1).max(2000),
-        done: z.boolean(),
-        orderKey: z.string(),
-      }),
-    )
-    .optional(),
+  checklist: checklistSchema.optional(),
 });
 export type TaskCreatePayload = z.infer<typeof taskCreatePayloadSchema>;
 
@@ -69,16 +78,7 @@ export const taskUpdatePayloadSchema = z.object({
     tags: z.array(z.string().min(1).max(60)).optional(),
     waitingFor: z.string().max(500).nullable().optional(),
     starred: z.boolean().optional(),
-    checklist: z
-      .array(
-        z.object({
-          id: idSchema,
-          title: z.string().min(1).max(2000),
-          done: z.boolean(),
-          orderKey: z.string(),
-        }),
-      )
-      .optional(),
+    checklist: checklistSchema.optional(),
     recurrence: recurrenceSchema.nullable().optional(),
   }),
 });
@@ -123,6 +123,26 @@ export const areaUpsertPayloadSchema = z.object({
 export type AreaUpsertPayload = z.infer<typeof areaUpsertPayloadSchema>;
 export type ProjectUpsertPayload = z.infer<typeof projectUpsertPayloadSchema>;
 
+/**
+ * 任务模板 upsert（按名 find-or-create）：
+ * - 有 id → 按 id 更新（revision+1）；
+ * - 无 id → 同名未删除模板即视为同一条并更新，否则创建（revision=1）。
+ * 省略的字段在更新时保留原值（与 project.upsert 一致），创建时取默认值。
+ */
+export const templateUpsertPayloadSchema = z.object({
+  id: idSchema.optional(),
+  name: z.string().min(1).max(200),
+  title: z.string().min(1).max(2000),
+  notes: z.string().max(100_000).optional(),
+  priority: prioritySchema.optional(),
+  projectId: idSchema.nullable().optional(),
+  contextIds: z.array(idSchema).optional(),
+  tags: z.array(z.string().min(1).max(60)).optional(),
+  checklist: checklistSchema.optional(),
+  recurrence: recurrenceSchema.nullable().optional(),
+});
+export type TemplateUpsertPayload = z.infer<typeof templateUpsertPayloadSchema>;
+
 export const settingsSetPayloadSchema = z.object({
   key: z.string().min(1).max(200),
   value: z.union([z.string(), z.number(), z.boolean(), z.null()]),
@@ -160,7 +180,15 @@ export type AttachmentAddPayload = z.infer<typeof attachmentAddPayloadSchema>;
 export const recordsApplyPayloadSchema = z.object({
       records: z.array(
         z.object({
-          type: z.enum(["task", "project", "section", "context", "area", "attachment"]),
+          type: z.enum([
+            "task",
+            "project",
+            "section",
+            "context",
+            "area",
+            "attachment",
+            "template",
+          ]),
           record: z.record(z.string(), z.unknown()),
         }),
       ),
@@ -189,6 +217,12 @@ export interface CommandMap {
   "section.create": SectionCreatePayload;
   "area.upsert": AreaUpsertPayload;
   "area.softDelete": IdOnlyPayload;
+  /** 任务模板：按名 find-or-create 的 upsert */
+  "template.upsert": TemplateUpsertPayload;
+  /** 任务模板软删除：写入墓碑并 revision+1 */
+  "template.softDelete": IdOnlyPayload;
+  /** 从模板新建任务（同一事务内创建 task，返回新建的 task 记录） */
+  "template.instantiate": IdOnlyPayload;
   "attachment.add": AttachmentAddPayload;
   "attachment.remove": IdOnlyPayload;
   "settings.set": SettingsSetPayload;
@@ -206,11 +240,18 @@ export interface Command<K extends CommandOp = CommandOp> {
 }
 
 /** 变更记录的类型标签，渲染进程据此合并进对应状态切片 */
-export type RecordType = "task" | "project" | "section" | "context" | "area" | "attachment";
+export type RecordType =
+  | "task"
+  | "project"
+  | "section"
+  | "context"
+  | "area"
+  | "attachment"
+  | "template";
 
 export interface TaggedRecord {
   type: RecordType;
-  record: Task | Project | Section | Context | Area | AttachmentMeta;
+  record: Task | Project | Section | Context | Area | AttachmentMeta | TaskTemplate;
 }
 
 /** IPC/命令结果：返回受影响记录的完整快照（可克隆数据），渲染进程据此 reconcile */

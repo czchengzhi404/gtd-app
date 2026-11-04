@@ -138,7 +138,7 @@ export function ProjectDetailContent({
                     key={task.id}
                     style={
                       task.id === nextActionId
-                        ? [styles.nextWrap, { backgroundColor: colors.primaryMuted }]
+                        ? [styles.nextWrap, { backgroundColor: colors.primaryMuted, borderLeftColor: colors.primary }]
                         : undefined
                     }
                   >
@@ -244,7 +244,6 @@ const styles = StyleSheet.create({
     marginHorizontal: space.sm,
     borderRadius: radius.sm,
     borderLeftWidth: 3,
-    borderLeftColor: "#2563EB",
   },
   nextTag: {
     flexDirection: "row",

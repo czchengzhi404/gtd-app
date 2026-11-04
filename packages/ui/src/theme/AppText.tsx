@@ -3,7 +3,16 @@ import { useTheme } from "../hooks/useTheme";
 import { useThemeSettings } from "../hooks/useTheme";
 import { type as typeScale, type TypeVariant } from "./tokens";
 
-export type TextTone = "primary" | "secondary" | "tertiary" | "accent" | "danger" | "success" | "warning" | "onPrimary";
+export type TextTone =
+  | "primary"
+  | "secondary"
+  | "tertiary"
+  | "accent"
+  | "danger"
+  | "success"
+  | "warning"
+  | "info"
+  | "onPrimary";
 
 export interface AppTextProps extends Omit<TextProps, "style" | "allowFontScaling"> {
   /** 字号阶梯（决定 size/lineHeight/weight） */
@@ -20,15 +29,16 @@ export interface AppTextProps extends Omit<TextProps, "style" | "allowFontScalin
 }
 
 /**
- * 唯一的文本原语。
+ * 唯一的文本原语（v2）。
  *
- * 三重锁定（这是手机端“文字撑爆布局”的根治手段）：
+ * 四重锁定（这是手机端“文字撑爆布局”的根治手段）：
  * 1. allowFontScaling={false} —— 不随系统字体大小缩放
  * 2. maxFontSizeMultiplier={1} —— 双保险（部分 ROM 只认这个）
  * 3. 字号/行高来自固定阶梯 —— 容器高度可预测
  * 4. 默认 numberOfLines=1 + 省略号 —— 长文本不会挤占相邻元素
  *
  * 全应用禁止直接使用 react-native 的 <Text>。
+ * v2 新增变体（hero/subtitle）与 info tone，既有 props 语义不变。
  */
 export function AppText({
   variant = "body",
@@ -53,6 +63,7 @@ export function AppText({
     danger: colors.danger,
     success: colors.success,
     warning: colors.warning,
+    info: colors.info,
     onPrimary: colors.onPrimary,
   };
 

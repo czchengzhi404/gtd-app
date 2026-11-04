@@ -85,3 +85,46 @@ function startOfToday(now: number): number {
   d.setHours(0, 0, 0, 0);
   return d.getTime();
 }
+
+/** 批量推迟的预设目标 */
+export type DeferPreset = "today" | "tomorrow" | "nextWeek";
+
+/**
+ * 预设目标时刻（一律落在 18:00，与快速添加只写日期的默认一致）。
+ * nextWeek 取「下周一」，避免把任务推到周末。
+ */
+export function deferTargetTime(preset: DeferPreset, now: number): number {
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const base = startOfToday(now);
+  if (preset === "today") return base + 18 * 60 * 60 * 1000;
+  if (preset === "tomorrow") return base + DAY_MS + 18 * 60 * 60 * 1000;
+  const weekday = new Date(base).getDay(); // 0=周日
+  const daysToNextMonday = weekday === 1 ? 7 : (8 - weekday) % 7;
+  return base + daysToNextMonday * DAY_MS + 18 * 60 * 60 * 1000;
+}
+
+export interface BulkDeferEntry {
+  id: string;
+  /** 改期前的到期时间（撤销用；原本没有到期日就是 null） */
+  dueAt: number | null;
+}
+
+/**
+ * 批量推迟到期时间：撤销回到各自的原始 dueAt（不是统一清空）。
+ * 不清 deferUntil：用户说的是"改到某天做"，不是"藏起来"。
+ */
+export function planBulkDefer(
+  entries: readonly BulkDeferEntry[],
+  dueAt: number,
+): {
+  run: CommandEnvelope<"task.update">[];
+  undo: CommandEnvelope<"task.update">[];
+} {
+  return {
+    run: entries.map((entry) => ({ op: "task.update", payload: { id: entry.id, patch: { dueAt } } })),
+    undo: entries.map((entry) => ({
+      op: "task.update",
+      payload: { id: entry.id, patch: { dueAt: entry.dueAt } },
+    })),
+  };
+}

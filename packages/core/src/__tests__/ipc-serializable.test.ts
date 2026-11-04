@@ -13,6 +13,7 @@ import {
   attachmentAddPayloadSchema,
   settingsSetPayloadSchema,
   recordsApplyPayloadSchema,
+  templateUpsertPayloadSchema,
   type CommandMap,
 } from "../models/commands";
 
@@ -59,6 +60,20 @@ const FIXTURES: { [K in keyof CommandMap]: CommandMap[K] } = {
   "section.create": { projectId: "p1", name: "设计" },
   "area.upsert": { name: "工作" },
   "area.softDelete": { id: "ar1" },
+  "template.upsert": {
+    id: "tpl1",
+    name: "每周回顾",
+    title: "做周回顾",
+    notes: "## 步骤\n1. 清理收集箱",
+    priority: 3,
+    projectId: null,
+    contextIds: ["ctx-pc"],
+    tags: ["例行"],
+    checklist: [{ id: "c1", title: "看收件箱", done: false, orderKey: "0001" }],
+    recurrence: { freq: "weekly", interval: 1, byWeekday: [5], lastWeekday: false, until: null },
+  },
+  "template.softDelete": { id: "tpl1" },
+  "template.instantiate": { id: "tpl1" },
   "attachment.add": {
     taskId: "t1",
     fileName: "报价单.pdf",
@@ -116,6 +131,9 @@ const SCHEMAS = {
   "section.create": sectionCreatePayloadSchema,
   "area.upsert": areaUpsertPayloadSchema,
   "area.softDelete": idOnlyPayloadSchema,
+  "template.upsert": templateUpsertPayloadSchema,
+  "template.softDelete": idOnlyPayloadSchema,
+  "template.instantiate": idOnlyPayloadSchema,
   "attachment.add": attachmentAddPayloadSchema,
   "attachment.remove": idOnlyPayloadSchema,
   "sync.applyRemote": recordsApplyPayloadSchema,

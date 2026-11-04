@@ -8,6 +8,7 @@ import type {
   RecurrenceRule,
   Section,
   Task,
+  TaskTemplate,
 } from "../models/task";
 import { TASK_STATUSES } from "../models/task";
 
@@ -37,6 +38,67 @@ function asBool(v: unknown): boolean {
 
 function asStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+/** 清单子项：id 缺失的条目丢弃（子项 id 是同步合并/实例化的身份键） */
+function asChecklist(v: unknown): ChecklistItem[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .map((item): ChecklistItem | null => {
+      if (item === null || typeof item !== "object") return null;
+      const c = item as Record<string, unknown>;
+      const id = asString(c.id);
+      if (id.length === 0) return null;
+      return {
+        id,
+        title: asString(c.title),
+        done: asBool(c.done),
+        orderKey: asString(c.orderKey),
+      };
+    })
+    .filter((item): item is ChecklistItem => item !== null);
+}
+
+const RECURRENCE_FREQS: readonly RecurrenceRule["freq"][] = [
+  "daily",
+  "weekly",
+  "monthly",
+  "yearly",
+  "weekdays",
+  "afterCompletion",
+];
+
+/**
+ * 重复规则（任务与模板共用字段集）。与 coerceTask 内联版本的区别：
+ * 这里保留全部六种频率与 lastWeekday / remainingCount，供模板原样往返。
+ */
+function asRecurrence(v: unknown): RecurrenceRule | null {
+  if (v === null || typeof v !== "object") return null;
+  const r = v as Record<string, unknown>;
+  const freq = asString(r.freq) as RecurrenceRule["freq"];
+  if (!RECURRENCE_FREQS.includes(freq)) return null;
+  const byWeekday = Array.isArray(r.byWeekday)
+    ? r.byWeekday.filter(
+        (x): x is number => typeof x === "number" && Number.isInteger(x) && x >= 0 && x <= 6,
+      )
+    : [];
+  const rule: RecurrenceRule = {
+    freq,
+    interval: Math.max(1, Math.trunc(asNumber(r.interval) ?? 1)),
+  };
+  if (byWeekday.length > 0) rule.byWeekday = byWeekday;
+  if (typeof r.lastWeekday === "boolean") rule.lastWeekday = r.lastWeekday;
+  if (typeof r.remainingCount === "number") {
+    rule.remainingCount = Math.max(0, Math.trunc(r.remainingCount));
+  } else if (r.remainingCount === null) {
+    rule.remainingCount = null;
+  }
+  if (typeof r.until === "number" && Number.isFinite(r.until)) {
+    rule.until = r.until;
+  } else if (r.until === null) {
+    rule.until = null;
+  }
+  return rule;
 }
 
 function baseFields(obj: Record<string, unknown>) {
@@ -71,22 +133,7 @@ export function coerceTask(obj: Record<string, unknown>): Task | null {
       };
     }
   }
-  const checklist: ChecklistItem[] = Array.isArray(obj.checklist)
-    ? obj.checklist
-        .map((item): ChecklistItem | null => {
-          if (item === null || typeof item !== "object") return null;
-          const c = item as Record<string, unknown>;
-          const id = asString(c.id);
-          if (id.length === 0) return null;
-          return {
-            id,
-            title: asString(c.title),
-            done: asBool(c.done),
-            orderKey: asString(c.orderKey),
-          };
-        })
-        .filter((x): x is ChecklistItem => x !== null)
-    : [];
+  const checklist = asChecklist(obj.checklist);
 
   return {
     ...base,
@@ -111,6 +158,26 @@ export function coerceTask(obj: Record<string, unknown>): Task | null {
     recurrence,
     checklist,
     orderKey: asString(obj.orderKey),
+  };
+}
+
+export function coerceTemplate(obj: Record<string, unknown>): TaskTemplate | null {
+  const base = baseFields(obj);
+  if (base.id.length === 0) return null;
+  const priority = asNumber(obj.priority) ?? 0;
+  return {
+    ...base,
+    name: asString(obj.name).slice(0, 200),
+    title: asString(obj.title).slice(0, 2000),
+    notes: asString(obj.notes).slice(0, 100_000),
+    priority: (PRIORITIES as readonly number[]).includes(priority)
+      ? (priority as TaskTemplate["priority"])
+      : 0,
+    projectId: asStringNull(obj.projectId),
+    contextIds: asStringArray(obj.contextIds),
+    tags: asStringArray(obj.tags),
+    checklist: asChecklist(obj.checklist),
+    recurrence: asRecurrence(obj.recurrence),
   };
 }
 
@@ -185,6 +252,7 @@ const COERCERS: Record<TaggedRecord["type"], (obj: Record<string, unknown>) => u
   context: coerceContext,
   area: coerceArea,
   attachment: coerceAttachment,
+  template: coerceTemplate,
 };
 
 /** 逐条安全转换；非法条目丢弃（返回 null 项被过滤） */
@@ -200,7 +268,8 @@ export function coerceTaggedRecords(input: unknown): TaggedRecord[] {
         type !== "section" &&
         type !== "context" &&
         type !== "area" &&
-        type !== "attachment") ||
+        type !== "attachment" &&
+        type !== "template") ||
       record === null ||
       typeof record !== "object"
     ) {

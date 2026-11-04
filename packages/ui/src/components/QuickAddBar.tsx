@@ -14,6 +14,9 @@ export interface QuickAddBarProps {
   placeholder?: string;
   onSubmit: (text: string) => void;
   submitting?: boolean;
+  /** 受控输入（可选）：父级持有文本，便于空态示例 chip 一键预填 */
+  value?: string;
+  onChangeText?: (text: string) => void;
 }
 
 const SYNTAX_ROWS: { syntaxKey: string; descKey: string }[] = [
@@ -84,13 +87,26 @@ function QuickAddHelpSheet({ visible, onClose }: { visible: boolean; onClose: ()
  * 输入框固定 44 高、字号固定、不随系统缩放；预览单独一行、单行省略，
  * 不会把页面结构往上顶。
  */
-export function QuickAddBar({ preview, placeholder, onSubmit, submitting = false }: QuickAddBarProps) {
+export function QuickAddBar({
+  preview,
+  placeholder,
+  onSubmit,
+  submitting = false,
+  value,
+  onChangeText,
+}: QuickAddBarProps) {
   const colors = useTheme();
   const tr = useT();
   const focus = useFocusStyle(radius.sm);
-  const [text, setText] = useState("");
+  const [inner, setInner] = useState("");
   const [focused, setFocused] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+
+  const text = value ?? inner;
+  const setText = (next: string) => {
+    if (onChangeText !== undefined) onChangeText(next);
+    else setInner(next);
+  };
 
   const empty = text.trim().length === 0;
   const submit = () => {

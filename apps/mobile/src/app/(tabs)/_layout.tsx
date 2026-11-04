@@ -31,8 +31,16 @@ export default function TabsLayout() {
     ),
   };
 
+  // 收集箱/今天在页面内用 PageHeader 自绘标题（带副标题与操作），隐藏 tabs 自带标题避免双标题
   const screens = NAV_ITEMS.map((item) => (
-    <Tabs.Screen key={item.route} name={item.route} options={{ title: tr(item.labelKey) }} />
+    <Tabs.Screen
+      key={item.route}
+      name={item.route}
+      options={{
+        title: tr(item.labelKey),
+        headerShown: item.route !== "index" && item.route !== "today",
+      }}
+    />
   ));
 
   if (!isTabletUp) {

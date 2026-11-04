@@ -8,6 +8,7 @@ import type {
   Section,
   Task,
   TaskStatus,
+  TaskTemplate,
 } from "../models/task";
 import type { SqliteRow } from "../platform/executor";
 
@@ -95,6 +96,44 @@ export function taskToParams(task: Task): unknown[] {
     task.updatedAt,
     task.revision,
     task.deletedAt,
+  ];
+}
+
+export function templateFromRow(row: SqliteRow): TaskTemplate {
+  return {
+    id: str(row.id),
+    name: str(row.name),
+    title: str(row.title),
+    notes: str(row.notes),
+    priority: (num(row.priority) ?? 0) as TaskTemplate["priority"],
+    projectId: strNullable(row.project_id),
+    contextIds: parseJson<string[]>(row.context_ids, []),
+    tags: parseJson<string[]>(row.tags, []),
+    checklist: parseJson<ChecklistItem[]>(row.checklist, []),
+    recurrence: parseJson<RecurrenceRule | null>(row.recurrence, null),
+    createdAt: num(row.created_at) ?? 0,
+    updatedAt: num(row.updated_at) ?? 0,
+    revision: num(row.revision) ?? 0,
+    deletedAt: num(row.deleted_at),
+  };
+}
+
+export function templateToParams(template: TaskTemplate): unknown[] {
+  return [
+    template.id,
+    template.name,
+    template.title,
+    template.notes,
+    template.priority,
+    template.projectId,
+    JSON.stringify(template.contextIds),
+    JSON.stringify(template.tags),
+    JSON.stringify(template.checklist),
+    template.recurrence ? JSON.stringify(template.recurrence) : null,
+    template.createdAt,
+    template.updatedAt,
+    template.revision,
+    template.deletedAt,
   ];
 }
 

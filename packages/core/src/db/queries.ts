@@ -5,6 +5,7 @@ import type {
   Project,
   Section,
   Task,
+  TaskTemplate,
 } from "../models/task";
 import {
   areaFromRow,
@@ -13,6 +14,7 @@ import {
   projectFromRow,
   sectionFromRow,
   taskFromRow,
+  templateFromRow,
 } from "./mappers";
 import type { SqliteExecutor, SqliteRow } from "../platform/executor";
 
@@ -159,6 +161,43 @@ export async function findContextByName(
   return rows.length > 0 ? contextFromRow(rows[0] as SqliteRow) : null;
 }
 
+/**
+ * 任务模板列表。默认排除墓碑；`includeDeleted = true` 用于同步收集
+ * （墓碑必须参与合并，删除才能传播）。
+ */
+export async function getTemplates(
+  executor: SqliteExecutor,
+  includeDeleted = false,
+): Promise<TaskTemplate[]> {
+  const rows = await executor.query<SqliteRow>(
+    "SELECT * FROM task_templates ORDER BY created_at ASC",
+  );
+  const templates = rows.map(templateFromRow);
+  return includeDeleted ? templates : templates.filter((template) => template.deletedAt === null);
+}
+
+export async function getTemplateById(
+  executor: SqliteExecutor,
+  id: string,
+): Promise<TaskTemplate | null> {
+  const rows = await executor.query<SqliteRow>(
+    "SELECT * FROM task_templates WHERE id = ? AND deleted_at IS NULL",
+    [id],
+  );
+  return rows.length > 0 ? templateFromRow(rows[0] as SqliteRow) : null;
+}
+
+export async function findTemplateByName(
+  executor: SqliteExecutor,
+  name: string,
+): Promise<TaskTemplate | null> {
+  const rows = await executor.query<SqliteRow>(
+    "SELECT * FROM task_templates WHERE name = ? AND deleted_at IS NULL LIMIT 1",
+    [name],
+  );
+  return rows.length > 0 ? templateFromRow(rows[0] as SqliteRow) : null;
+}
+
 export async function getAttachmentsForTask(
   executor: SqliteExecutor,
   taskId: string,
@@ -199,17 +238,19 @@ export interface BootstrapData {
   sections: Section[];
   contexts: Context[];
   areas: Area[];
+  templates: TaskTemplate[];
   kv: Record<string, string>;
 }
 
 export async function loadBootstrapData(executor: SqliteExecutor): Promise<BootstrapData> {
-  const [tasks, projects, sections, contexts, areas, kv] = await Promise.all([
+  const [tasks, projects, sections, contexts, areas, templates, kv] = await Promise.all([
     getTasks(executor, { includeDone: true }),
     getProjects(executor),
     getSections(executor),
     getContexts(executor),
     getAreas(executor),
+    getTemplates(executor),
     getKv(executor),
   ]);
-  return { tasks, projects, sections, contexts, areas, kv };
+  return { tasks, projects, sections, contexts, areas, templates, kv };
 }

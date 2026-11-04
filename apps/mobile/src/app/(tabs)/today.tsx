@@ -1,21 +1,27 @@
 import { useMemo, useState } from "react";
 import { router } from "expo-router";
-import { View } from "react-native";
+import { StyleSheet, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
+  Badge,
   BulkActionBar,
   CalendarView,
   EmptyState,
   FilterBar,
+  getLang,
   IconButton,
   OptionSheet,
+  PageHeader,
   showUndo,
   TaskList,
   TimelineView,
   UpcomingView,
   ViewToggle,
+  space,
   useAppStore,
   useBreakpoint,
+  useTheme,
   useT,
 } from "@gtd/ui";
 import {
@@ -28,7 +34,7 @@ import {
   selectContexts,
   startOfDay,
 } from "@gtd/core";
-import type { TaskStatusInput } from "@gtd/core";
+import type { DeferPreset, TaskStatusInput } from "@gtd/core";
 import { useOrderedTaskActions } from "@/hooks/useRowActions";
 import { useListInteractions } from "@/hooks/useListInteractions";
 import { openTaskContextMenu } from "@/lib/context-menu";
@@ -43,6 +49,12 @@ const MOVE_OPTIONS = [
   { key: "inbox", labelKey: "detail.status.inbox" },
 ] as const;
 
+const DEFER_OPTIONS = [
+  { key: "today", labelKey: "bulk.deferToday" },
+  { key: "tomorrow", labelKey: "bulk.deferTomorrow" },
+  { key: "nextWeek", labelKey: "bulk.deferNextWeek" },
+] as const;
+
 /** 今天：今日到期 + 逾期；列表 / 日历 / Timeline（≥1440） */
 export default function TodayScreen() {
   const tasks = useAppStore((s) => getTodayTasks(s, Date.now()));
@@ -53,6 +65,8 @@ export default function TodayScreen() {
   const allTags = useAppStore(getAllTags);
   const loaded = useAppStore((s) => s.loaded);
   const { isWideUp, isTabletUp } = useBreakpoint();
+  const insets = useSafeAreaInsets();
+  const colors = useTheme();
   const t = useT();
 
   const [view, setView] = useState<TodayView>("list");
@@ -62,6 +76,8 @@ export default function TodayScreen() {
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [moveSheetOpen, setMoveSheetOpen] = useState(false);
   const [pickSheetOpen, setPickSheetOpen] = useState(false);
+  const [deferSheetOpen, setDeferSheetOpen] = useState(false);
+  const [viewsSheetOpen, setViewsSheetOpen] = useState(false);
 
   const filtered = useMemo(
     () => applyListFilter(tasks, { query, contextId, tag, overdueOnly }, Date.now()),
@@ -78,8 +94,35 @@ export default function TodayScreen() {
 
   if (!loaded) return null;
 
+  const now = Date.now();
+  const dayStart = startOfDay(now);
+  const overdueCount = filtered.filter(
+    (task) => task.dueAt !== null && task.dueAt < dayStart,
+  ).length;
+  const todayCount = filtered.length - overdueCount;
+
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.canvas }}>
+      <View style={{ paddingTop: insets.top }}>
+        <PageHeader
+          title={formatDateLabel(now)}
+          subtitle={t("app.today.counts", { overdue: overdueCount, today: todayCount })}
+          actions={
+            <IconButton
+              icon="stats-chart-outline"
+              onPress={() => router.push("/insights")}
+              accessibilityLabel={t("app.today.openInsights")}
+            />
+          }
+        />
+      </View>
+      <View style={styles.countRow}>
+        <Badge
+          label={`${t("app.today.overdue")} ${String(overdueCount)}`}
+          tone={overdueCount > 0 ? "danger" : "neutral"}
+        />
+        <Badge label={`${t("app.today.today")} ${String(todayCount)}`} />
+      </View>
       <FilterBar
         compact={isTabletUp}
         query={query}
@@ -98,21 +141,37 @@ export default function TodayScreen() {
         label={t("view.todayLabel")}
         value={view}
         onChange={setView}
-        options={[
-          { key: "list", label: t("view.list") },
-          { key: "upcoming", label: t("view.upcoming") },
-          { key: "calendar", label: t("view.calendar") },
-          { key: "timeline", label: t("view.timeline"), disabled: !isWideUp },
-        ]}
+        options={
+          isWideUp
+            ? [
+                { key: "list", label: t("view.list") },
+                { key: "upcoming", label: t("view.upcoming") },
+                { key: "calendar", label: t("view.calendar") },
+                { key: "timeline", label: t("view.timeline") },
+              ]
+            : [
+                { key: "list", label: t("view.list") },
+                { key: "upcoming", label: t("view.upcoming") },
+              ]
+        }
         trailing={
-          view === "list" ? (
-            <IconButton
-              icon="swap-vertical"
-              filled={interactions.reorderMode}
-              onPress={interactions.toggleReorderMode}
-              accessibilityLabel={t("task.dragHandle")}
-            />
-          ) : null
+          <View style={styles.trailing}>
+            {view === "list" ? (
+              <IconButton
+                icon="swap-vertical"
+                filled={interactions.reorderMode}
+                onPress={interactions.toggleReorderMode}
+                accessibilityLabel={t("task.dragHandle")}
+              />
+            ) : null}
+            {isWideUp ? null : (
+              <IconButton
+                icon="calendar-outline"
+                onPress={() => setViewsSheetOpen(true)}
+                accessibilityLabel={t("view.more")}
+              />
+            )}
+          </View>
         }
       />
 
@@ -173,10 +232,33 @@ export default function TodayScreen() {
           onComplete={() => void interactions.completeSelected()}
           onDelete={() => void interactions.deleteSelected()}
           onMove={() => setMoveSheetOpen(true)}
+          onDefer={() => setDeferSheetOpen(true)}
           onClear={interactions.clearSelection}
           onExit={interactions.exitSelection}
         />
       ) : null}
+
+      <OptionSheet
+        visible={deferSheetOpen}
+        title={t("bulk.deferTo")}
+        options={DEFER_OPTIONS.map((option) => ({ key: option.key, label: t(option.labelKey) }))}
+        onSelect={(key) => {
+          setDeferSheetOpen(false);
+          void interactions.deferSelected(key as DeferPreset);
+        }}
+        onClose={() => setDeferSheetOpen(false)}
+      />
+
+      <OptionSheet
+        visible={viewsSheetOpen}
+        title={t("view.more")}
+        options={[{ key: "calendar", label: t("view.calendar") }]}
+        onSelect={(key) => {
+          setViewsSheetOpen(false);
+          setView(key as TodayView);
+        }}
+        onClose={() => setViewsSheetOpen(false)}
+      />
 
       <OptionSheet
         visible={moveSheetOpen}
@@ -213,3 +295,31 @@ export default function TodayScreen() {
     </View>
   );
 }
+
+/** 顶部日期：中文「11月1日 · 周六」/ 英文「Nov 1 · Sat」 */
+function formatDateLabel(now: number): string {
+  const locale = getLang() === "en" ? "en-US" : "zh-CN";
+  try {
+    const date = new Date(now);
+    const monthDay = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" }).format(date);
+    const weekday = new Intl.DateTimeFormat(locale, { weekday: "short" }).format(date);
+    return `${monthDay} · ${weekday}`;
+  } catch {
+    return new Date(now).toLocaleDateString();
+  }
+}
+
+const styles = StyleSheet.create({
+  countRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.xs,
+  },
+  trailing: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+  },
+});

@@ -1,38 +1,42 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import {
   AppText,
+  Badge,
   Button,
   Card,
   Divider,
+  SectionHeader,
+  showToast,
   useAppStore,
   useTheme,
   useT,
-  setLang,
-  getLang,
+  hit,
+  radius,
+  space,
+  type,
 } from "@gtd/ui";
-import { getSyncConfig, getSqliteExecutor, getWaitingTasks, getSomedayTasks, runCommand } from "@gtd/core";
+import {
+  getSyncConfig,
+  getSqliteExecutor,
+  getWaitingTasks,
+  getSomedayTasks,
+  runCommand,
+} from "@gtd/core";
 import type { SyncConfig } from "@gtd/core";
 import {
-  backupCount,
-  backupNow,
   decryptSecret,
-  exportAllToFile,
-  importFromFile,
   pickSyncFolder,
-  restoreLatestBackup,
   runManualSync,
   saveSyncConfig,
   testSyncConnection,
 } from "@/platform/desktop-actions";
 import { isDesktop } from "@/platform/env";
-import { exportOnMobile } from "@/platform/mobile-actions";
-import { ensureBuiltinFont } from "@/platform/font-loader";
 
-/** 同步预设：坚果云/WebDAV/S3/本地文件夹（坚果云本质走 WebDAV，endpoint 已预填） */
+/** 同步预设：坚果云/WebDAV/自托管 HTTP/S3/本地文件夹 */
 interface SyncPreset {
   key: string;
   /** SyncConfig.kind */
@@ -48,11 +52,20 @@ interface SyncPreset {
 const SYNC_PRESETS: SyncPreset[] = [
   { key: "nutstore", kind: "webdav", labelKey: "preset.nutstore", hintKey: "preset.nutstoreHint", endpointTemplate: "https://dav.jianguoyun.com/dav/" },
   { key: "webdav", kind: "webdav", labelKey: "preset.customWebdav", hintKey: "preset.customWebdavHint" },
+  { key: "selfHosted", kind: "http", labelKey: "app.more.preset.selfHosted", hintKey: "app.more.preset.selfHostedHint" },
   { key: "s3", kind: "s3", labelKey: "preset.s3", hintKey: "preset.s3Hint", showBucket: true, showRegion: true },
   { key: "folder", kind: "folder", labelKey: "preset.folder", hintKey: "preset.folderHint", desktopOnly: true },
 ];
 
-/** 更多：等待中/将来也许预览、语言、每周回顾入口、同步设置、数据导入导出 */
+/**
+ * 更多：只放「低频总入口」，不再是设置大杂烩。
+ *
+ * 1 今日回顾 / 2 任务状态（既有预览，保留） / 3 洞察 / 4 清理 / 5 同步（折叠）
+ * / 6 数据 →「数据与记录」页 / 7 设置 →「设置」页。
+ *
+ * 拆分原则：本页每个分组最多一行入口（EntryRow），高频项（同步配置）保留为折叠块；
+ * 导出/导入/备份搬去 `/data`，主题/字体/语言/关于搬去 `/settings`。
+ */
 export default function MoreScreen() {
   const waiting = useAppStore(getWaitingTasks);
   const someday = useAppStore(getSomedayTasks);
@@ -74,10 +87,9 @@ export default function MoreScreen() {
   });
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
-  const [lang, setLangUi] = useState(getLang());
-  const [backups, setBackups] = useState(0);
   const [selectedPreset, setSelectedPreset] = useState("nutstore");
   const [testing, setTesting] = useState(false);
+  const [syncOpen, setSyncOpen] = useState(false);
 
   const syncLog = useMemo(() => {
     const raw = kv["sync.log"];
@@ -111,7 +123,6 @@ export default function MoreScreen() {
         }
         setConfig(saved);
       }
-      setBackups(await backupCount());
     })();
   }, []);
 
@@ -121,20 +132,24 @@ export default function MoreScreen() {
     kv["sync.last"] !== undefined
       ? new Date(Number(kv["sync.last"])).toLocaleString()
       : t("more.lastSyncNever");
+  const lastReviewAt = kv["review.lastAt"] !== undefined ? Number(kv["review.lastAt"]) : null;
   const lastReview =
-    kv["review.lastAt"] !== undefined
-      ? new Date(Number(kv["review.lastAt"])).toLocaleDateString()
-      : t("more.reviewNever");
-  // 距上次回顾 ≥7 天（或从未回顾）时提示，红点只出现在 More 页，不做全局打扰
-  const reviewDue =
-    kv["review.lastAt"] === undefined || Date.now() - Number(kv["review.lastAt"]) >= 7 * 86400000;
+    lastReviewAt !== null ? new Date(lastReviewAt).toLocaleDateString() : t("more.reviewNever");
+  // 距上次回顾 ≥7 天（或从未回顾）时提示；红点只在 More 页出现
+  const reviewDue = lastReviewAt === null || Date.now() - lastReviewAt >= 7 * 86_400_000;
+  const reviewDistance =
+    lastReviewAt === null
+      ? t("app.more.reviewNever")
+      : t("app.more.reviewDistance", {
+          days: Math.max(0, Math.floor((Date.now() - lastReviewAt) / 86_400_000)),
+        });
+  const syncStatus = config.enabled ? t("app.more.syncStatusOn") : t("app.more.syncStatusOff");
 
   const update = (patch: Partial<SyncConfig>) => setConfig((prev) => ({ ...prev, ...patch }));
 
-  const onSwitchLang = (next: "zh" | "en") => {
-    setLang(next);
-    setLangUi(next);
-    void runCommand("settings.set", { key: "lang", value: next }).catch(() => undefined);
+  const flash = (message: string, tone: "success" | "danger" | "info" | "warning") => {
+    setStatus(message);
+    showToast({ message, tone });
   };
 
   const onSyncNow = async () => {
@@ -143,8 +158,10 @@ export default function MoreScreen() {
     try {
       const outcome = await runManualSync();
       setStatus(outcome.message);
+      showToast({ message: outcome.message, tone: outcome.ok ? "success" : "warning" });
     } catch (err) {
-      setStatus(t("more.status.syncFailed") + (err instanceof Error ? err.message : String(err)));
+      const message = t("more.status.syncFailed") + (err instanceof Error ? err.message : String(err));
+      flash(message, "danger");
     } finally {
       setBusy(false);
     }
@@ -160,35 +177,13 @@ export default function MoreScreen() {
     try {
       await saveSyncConfig(config);
       setStatus(t("more.status.saved"));
+      showToast({ message: t("more.status.saved"), tone: "success" });
     } catch (err) {
-      setStatus(t("more.status.saveFailed") + (err instanceof Error ? err.message : String(err)));
+      const message = t("more.status.saveFailed") + (err instanceof Error ? err.message : String(err));
+      flash(message, "danger");
     } finally {
       setBusy(false);
     }
-  };
-
-  const onBackup = async () => {
-    setBusy(true);
-    try {
-      const outcome = await backupNow();
-      setStatus(outcome.message);
-      setBackups(await backupCount());
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onRestore = () => {
-    Alert.alert(t("more.backupSection"), t("more.backupConfirm"), [
-      { text: t("common.cancel"), style: "cancel" },
-      {
-        text: t("more.backupRestore"),
-        style: "destructive",
-        onPress: () => {
-          void restoreLatestBackup().then((outcome) => setStatus(outcome.message));
-        },
-      },
-    ]);
   };
 
   const onTestConnection = async () => {
@@ -196,58 +191,65 @@ export default function MoreScreen() {
     try {
       const outcome = await testSyncConnection(config);
       setStatus(outcome.message);
+      showToast({ message: outcome.message, tone: "info" });
     } catch (err) {
-      setStatus(t("sync.testFailed") + (err instanceof Error ? err.message : String(err)));
+      const message = t("sync.testFailed") + (err instanceof Error ? err.message : String(err));
+      flash(message, "danger");
     } finally {
       setTesting(false);
-    }
-  };
-
-  const onExport = async () => {
-    setBusy(true);
-    try {
-      if (isDesktop()) {
-        const target = await exportAllToFile();
-        setStatus(target === null ? t("more.status.canceled") : t("more.status.exported") + target);
-      } else {
-        // 移动端：系统分享面板导出（此前导出/备份是桌面专属，手机用户没有数据出口）
-        await exportOnMobile();
-        setStatus(t("more.status.exported") + t("more.exportMobileDone"));
-      }
-    } catch (err) {
-      setStatus(t("more.status.exportFailed") + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onImport = async () => {
-    setBusy(true);
-    setStatus(t("more.status.importing"));
-    try {
-      setStatus(await importFromFile());
-    } catch (err) {
-      setStatus(t("more.status.importFailed") + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setBusy(false);
     }
   };
 
   return (
     <ScrollView contentContainerStyle={styles.content} style={{ backgroundColor: colors.canvas }}>
       <View style={styles.column}>
-        {/* 任务状态：等待中 / 将来也许 */}
-        <GroupCard icon="layers-outline" title={t("more.group.status")}>
+        {/* 1 今日回顾 */}
+        <SectionHeader
+          title={t("app.more.group.review")}
+          trailing={
+            reviewDue ? (
+              <AppText variant="caption" color={colors.danger} lines={1}>
+                ● {t("review.dueBadge")}
+              </AppText>
+            ) : (
+              <AppText variant="caption" tone="tertiary" lines={1}>
+                {lastReview}
+              </AppText>
+            )
+          }
+        />
+        <Card variant="outline" padding="normal" style={styles.card}>
+          <View style={styles.reviewRow}>
+            <View style={styles.reviewText}>
+              <AppText variant="bodyStrong" lines={1}>
+                {reviewDistance}
+              </AppText>
+              {lastReviewAt !== null ? (
+                <AppText variant="caption" tone="tertiary" lines={1}>
+                  {lastReview}
+                </AppText>
+              ) : null}
+            </View>
+            <Button
+              label={t("more.reviewStart")}
+              icon="refresh-circle-outline"
+              variant="primary"
+              onPress={() => router.push("/review")}
+            />
+          </View>
+        </Card>
+
+        {/* 2 任务状态（保留 v1 预览能力） */}
+        <SectionHeader title={t("more.group.status")} />
+        <Card variant="outline" padding="normal" style={styles.card}>
           <View style={styles.subHeaderRow}>
             <AppText variant="caption" tone="secondary" lines={1}>
               {t("more.waiting")}
             </AppText>
-            <AppText variant="caption" tone="tertiary" lines={1}>
-              {String(waiting.length)}
-            </AppText>
+            <Badge label={String(waiting.length)} />
           </View>
           {waiting.length === 0 ? (
-            <AppText variant="label" tone="tertiary" lines={1} style={styles.groupEmpty}>
+            <AppText variant="label" tone="tertiary" lines={1}>
               {t("more.waitingEmpty")}
             </AppText>
           ) : (
@@ -265,262 +267,234 @@ export default function MoreScreen() {
             <AppText variant="caption" tone="secondary" lines={1}>
               {t("more.someday")}
             </AppText>
-            <AppText variant="caption" tone="tertiary" lines={1}>
-              {String(someday.length)}
-            </AppText>
+            <Badge label={String(someday.length)} />
           </View>
           {someday.length === 0 ? (
-            <AppText variant="label" tone="tertiary" lines={1} style={styles.groupEmpty}>
+            <AppText variant="label" tone="tertiary" lines={1}>
               {t("more.somedayEmpty")}
             </AppText>
           ) : (
             someday.slice(0, 3).map((task) => (
-              <PreviewRow
-                key={task.id}
-                title={task.title}
-                onPress={() => router.push(`/task/${task.id}`)}
-              />
+              <PreviewRow key={task.id} title={task.title} onPress={() => router.push(`/task/${task.id}`)} />
             ))
           )}
-        </GroupCard>
+        </Card>
 
-        {/* 外观：语言 / 主题 / 字体 */}
-        <GroupCard icon="color-palette-outline" title={t("more.appearance")}>
-          <AppText variant="caption" tone="tertiary" lines={1} style={styles.subLabel}>
-            {t("more.language")}
-          </AppText>
-          <View style={styles.pillRow}>
-            <SegPill label={t("more.lang.zh")} selected={lang === "zh"} onPress={() => onSwitchLang("zh")} />
-            <SegPill label={t("more.lang.en")} selected={lang === "en"} onPress={() => onSwitchLang("en")} />
-          </View>
-          <AppText variant="caption" tone="tertiary" lines={1} style={styles.subLabel}>
-            {t("more.themeSection")}
-          </AppText>
-          <View style={styles.pillRow}>
-            <SegPill label={t("more.theme.system")} selected={(kv["theme.mode"] ?? "system") === "system"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "system" }).catch(() => undefined)} />
-            <SegPill label={t("more.theme.light")} selected={kv["theme.mode"] === "light"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "light" }).catch(() => undefined)} />
-            <SegPill label={t("more.theme.dark")} selected={kv["theme.mode"] === "dark"} onPress={() => void runCommand("settings.set", { key: "theme.mode", value: "dark" }).catch(() => undefined)} />
-          </View>
-          <AppText variant="caption" tone="tertiary" lines={1} style={styles.subLabel}>
-            {t("more.fontSection")}
-          </AppText>
-          <View style={styles.pillRow}>
-            <SegPill label={t("more.font.wenkai")} selected={(kv["font.family"] ?? "system") === "LXGWWenKai"} onPress={() => void ensureBuiltinFont().then(() => runCommand("settings.set", { key: "font.family", value: "LXGWWenKai" }).catch(() => undefined)).catch(() => undefined)} />
-            <SegPill label={t("more.font.system")} selected={(kv["font.family"] ?? "system") === "system"} onPress={() => void runCommand("settings.set", { key: "font.family", value: "system" }).catch(() => undefined)} />
-          </View>
-        </GroupCard>
-
-        {/* 每周回顾 */}
-        <GroupCard
-          icon="refresh-circle-outline"
-          title={t("more.reviewSection")}
-          trailing={
-            reviewDue ? (
-              <AppText variant="caption" color={colors.danger} lines={1}>
-                ● {t("review.dueBadge")}
-              </AppText>
-            ) : (
-              <AppText variant="caption" tone="tertiary" lines={1}>
-                {lastReview}
-              </AppText>
-            )
-          }
-        >
-          <Button
-            label={t("more.reviewStart")}
-            icon="refresh-circle-outline"
-            variant="primary"
-            block
-            onPress={() => router.push("/review")}
+        {/* 3 洞察 */}
+        <SectionHeader title={t("app.more.group.insights")} />
+        <Card variant="outline" padding="none" style={styles.card}>
+          <EntryRow
+            icon="stats-chart-outline"
+            label={t("app.more.stats")}
+            hint={t("app.more.statsHint")}
+            onPress={() => router.push("/insights")}
           />
-        </GroupCard>
+          <Divider inset={space.lg} />
+          <EntryRow
+            icon="grid-outline"
+            label={t("app.more.matrix")}
+            hint={t("app.more.matrixHint")}
+            onPress={() => router.push("/matrix")}
+          />
+          <Divider inset={space.lg} />
+          <EntryRow
+            icon="search-outline"
+            label={t("app.more.search")}
+            hint={t("app.more.searchHint")}
+            onPress={() => router.push("/search")}
+          />
+          <Divider inset={space.lg} />
+          <EntryRow
+            icon="albums-outline"
+            label={t("app.more.templates")}
+            hint={t("app.more.templatesHint")}
+            onPress={() => router.push("/templates")}
+          />
+        </Card>
 
-        {/* 同步（可选） */}
-        <GroupCard icon="cloudy-outline" title={t("more.syncSection")}>
-          {/* 预设选择 */}
-          <View style={styles.inlineRow}>
-            {SYNC_PRESETS.map((preset) => (
-              <SegPill
-                key={preset.key}
-                label={t(preset.labelKey)}
-                selected={selectedPreset === preset.key}
-                disabled={preset.desktopOnly === true && !isDesktop()}
-                onPress={() => {
-                  setSelectedPreset(preset.key);
-                  update({
-                    kind: preset.kind,
-                    ...(preset.endpointTemplate !== undefined ? { endpoint: preset.endpointTemplate } : {}),
-                  });
-                }}
-              />
-            ))}
-          </View>
-          <AppText variant="caption" tone="tertiary" lines={3} style={styles.hintText}>
-            {t(SYNC_PRESETS.find((p) => p.key === selectedPreset)?.hintKey ?? "preset.nutstoreHint")}
-          </AppText>
-
-          {/* 字段 */}
-          {selectedPreset === "folder" ? (
-            <Button
-              label={t("more.pickFolder")}
-              icon="folder-open-outline"
-              disabled={busy || !isDesktop()}
-              block
-              onPress={() => void onPickFolder()}
-            />
-          ) : (
-            <>
-              <Field
-                label={t("more.server")}
-                value={config.endpoint}
-                onChangeText={(text) => update({ endpoint: text })}
-                placeholder={selectedPreset === "s3" ? "https://oss-cn-hangzhou.aliyuncs.com" : "https://dav.example.com/gtd/"}
-              />
-              {selectedPreset === "s3" ? (
-                <>
-                  <Field label={t("sync.bucket")} value={config.bucket ?? ""} onChangeText={(text) => update({ bucket: text })} />
-                  <Field label={t("sync.region")} value={config.region ?? ""} onChangeText={(text) => update({ region: text })} />
-                  <Field label={t("sync.accessKeyId")} value={config.accessKeyId ?? ""} onChangeText={(text) => update({ accessKeyId: text })} />
-                  <Field
-                    label={t("sync.secretAccessKey")}
-                    value={config.secretAccessKey ?? ""}
-                    onChangeText={(text) => update({ secretAccessKey: text })}
-                    secureTextEntry
-                  />
-                </>
-              ) : (
-                <>
-                  <Field label={t("more.username")} value={config.username ?? ""} onChangeText={(text) => update({ username: text })} />
-                  <Field
-                    label={t("more.password")}
-                    value={config.password ?? ""}
-                    onChangeText={(text) => update({ password: text })}
-                    secureTextEntry
-                  />
-                </>
-              )}
-            </>
-          )}
-
-          {/* 操作 */}
-          <View style={styles.inlineRow}>
-            <SegPill
-              label={config.enabled ? t("more.enabled") : t("more.disabled")}
-              selected={config.enabled}
-              onPress={() => update({ enabled: !config.enabled })}
-            />
-            <Button label={t("more.saveConfig")} disabled={busy} onPress={() => void onSave()} />
-            <Button label={t("more.syncNow")} variant="primary" disabled={busy} onPress={() => void onSyncNow()} />
-            <Button
-              label={testing ? t("sync.testing") : t("sync.testConnection")}
-              icon="wifi-outline"
-              disabled={busy}
-              onPress={() => void onTestConnection()}
-            />
-          </View>
-
-          <AppText variant="caption" tone="tertiary" lines={1}>
-            {t("more.lastSync")}
-            {lastSync}
-          </AppText>
-          <Divider style={styles.groupDivider} />
-          {/* 同步日志 */}
-          {syncLog === null ? (
-            <AppText variant="label" tone="tertiary" lines={1}>
-              {t("more.syncLogEmpty")}
-            </AppText>
-          ) : (
-            <>
-              <AppText variant="label" tone="secondary" lines={2}>
-                {t("more.syncLogSummary", {
-                  applied: syncLog.applied,
-                  local: syncLog.localWins,
-                  remote: syncLog.remoteWins,
-                })}
-              </AppText>
-              {syncLog.conflicts.length > 0 ? (
-                <>
-                  <AppText variant="caption" tone="tertiary" lines={1}>
-                    {t("more.syncLogConflicts")}
-                  </AppText>
-                  {syncLog.conflicts.slice(0, 5).map((conflict, index) => (
-                    <AppText key={`${conflict.label}-${index}`} variant="caption" tone="tertiary" lines={1}>
-                      {`· ${conflict.label}`}
-                    </AppText>
-                  ))}
-                </>
-              ) : null}
-            </>
-          )}
-        </GroupCard>
-
-        {/* 本地备份（桌面端） */}
-        {isDesktop() ? (
-          <GroupCard
-            icon="save-outline"
-            title={t("more.backupSection")}
-            trailing={
-              <AppText variant="caption" tone="tertiary" lines={1}>
-                {backups > 0 ? t("more.backupList", { n: backups }) : t("more.backupNever")}
-              </AppText>
-            }
-          >
-            <Button
-              label={t("more.backupNow")}
-              icon="save-outline"
-              disabled={busy}
-              block
-              onPress={() => void onBackup()}
-            />
-            <View style={styles.gap} />
-            <Button
-              label={t("more.backupRestore")}
-              icon="time-outline"
-              variant="danger"
-              disabled={busy || backups === 0}
-              block
-              onPress={onRestore}
-            />
-          </GroupCard>
-        ) : null}
-
-        {/* 数据与记录 */}
-        <GroupCard icon="server-outline" title={t("more.group.data")}>
-          <Button
-            label={t("more.completedEntry")}
+        {/* 4 清理 */}
+        <SectionHeader title={t("app.more.group.cleanup")} />
+        <Card variant="outline" padding="none" style={styles.card}>
+          <EntryRow
             icon="checkmark-done-outline"
-            block
+            label={t("more.completedEntry")}
             onPress={() => router.push("/completed")}
           />
-          <View style={styles.gap} />
-          <Button
-            label={t("more.trashEntry")}
+          <Divider inset={space.lg} />
+          <EntryRow
             icon="trash-outline"
-            block
+            label={t("more.trashEntry")}
             onPress={() => router.push("/trash")}
           />
-          <Divider style={styles.groupDivider} />
-          <Button
-            label={t("more.export")}
-            icon="download-outline"
-            disabled={busy}
-            block
-            onPress={() => void onExport()}
+          <Divider inset={space.lg} />
+          <EntryRow
+            icon="time-outline"
+            label={t("app.more.recent")}
+            hint={t("app.more.recentHint")}
+            onPress={() => router.push("/recent")}
           />
-          <View style={styles.gap} />
-          <Button
-            label={t("more.import")}
-            icon="cloud-upload-outline"
-            disabled={busy}
-            block
-            onPress={() => void onImport()}
-          />
-        </GroupCard>
+        </Card>
 
-        {/* 关于 */}
-        <GroupCard icon="information-circle-outline" title={t("more.about")}>
-          <Button label={t("more.about")} icon="information-circle-outline" block onPress={() => router.push("/about")} />
-        </GroupCard>
+        {/* 5 同步（默认收起） */}
+        <SectionHeader
+          title={t("app.more.group.sync")}
+          trailing={
+            <AppText variant="caption" tone="tertiary" lines={1}>
+              {syncStatus}
+            </AppText>
+          }
+        />
+        <Card variant="outline" padding="normal" style={styles.card}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={syncOpen ? t("app.more.syncExpanded") : t("app.more.syncCollapsed")}
+            accessibilityState={{ expanded: syncOpen }}
+            onPress={() => setSyncOpen((value) => !value)}
+            style={({ pressed }) => [styles.syncHeader, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons name="cloud-outline" size={18} color={colors.primary} />
+            <View style={styles.syncHeaderText}>
+              <AppText variant="bodyStrong" lines={1}>
+                {t("app.more.syncSummary", { time: lastSync, status: syncStatus })}
+              </AppText>
+              <AppText variant="caption" tone="tertiary" lines={1}>
+                {syncOpen ? t("app.more.syncExpanded") : t("app.more.syncCollapsed")}
+              </AppText>
+            </View>
+            <Ionicons name={syncOpen ? "chevron-up" : "chevron-down"} size={18} color={colors.textTertiary} />
+          </Pressable>
+
+          {syncOpen ? (
+            <View style={styles.syncBody}>
+              <View style={styles.pillRow}>
+                {SYNC_PRESETS.map((preset) => (
+                  <SegPill
+                    key={preset.key}
+                    label={t(preset.labelKey)}
+                    selected={selectedPreset === preset.key}
+                    disabled={preset.desktopOnly === true && !isDesktop()}
+                    onPress={() => {
+                      setSelectedPreset(preset.key);
+                      update({
+                        kind: preset.kind,
+                        ...(preset.endpointTemplate !== undefined ? { endpoint: preset.endpointTemplate } : {}),
+                      });
+                    }}
+                  />
+                ))}
+              </View>
+              <AppText variant="caption" tone="tertiary" lines={3}>
+                {t(SYNC_PRESETS.find((preset) => preset.key === selectedPreset)?.hintKey ?? "preset.nutstoreHint")}
+              </AppText>
+
+              {selectedPreset === "folder" ? (
+                <Button
+                  label={t("more.pickFolder")}
+                  icon="folder-open-outline"
+                  disabled={busy || !isDesktop()}
+                  block
+                  onPress={() => void onPickFolder()}
+                />
+              ) : (
+                <>
+                  <Field
+                    label={t("more.server")}
+                    value={config.endpoint}
+                    onChangeText={(text) => update({ endpoint: text })}
+                    placeholder={
+                      selectedPreset === "s3"
+                        ? "https://oss-cn-hangzhou.aliyuncs.com"
+                        : "https://dav.example.com/gtd/"
+                    }
+                  />
+                  {selectedPreset === "s3" ? (
+                    <>
+                      <Field label={t("sync.bucket")} value={config.bucket ?? ""} onChangeText={(text) => update({ bucket: text })} />
+                      <Field label={t("sync.region")} value={config.region ?? ""} onChangeText={(text) => update({ region: text })} />
+                      <Field label={t("sync.accessKeyId")} value={config.accessKeyId ?? ""} onChangeText={(text) => update({ accessKeyId: text })} />
+                      <Field
+                        label={t("sync.secretAccessKey")}
+                        value={config.secretAccessKey ?? ""}
+                        onChangeText={(text) => update({ secretAccessKey: text })}
+                        secureTextEntry
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <Field label={t("more.username")} value={config.username ?? ""} onChangeText={(text) => update({ username: text })} />
+                      <Field
+                        label={t("more.password")}
+                        value={config.password ?? ""}
+                        onChangeText={(text) => update({ password: text })}
+                        secureTextEntry
+                      />
+                    </>
+                  )}
+                </>
+              )}
+
+              <View style={styles.inlineRow}>
+                <SegPill
+                  label={config.enabled ? t("more.enabled") : t("more.disabled")}
+                  selected={config.enabled}
+                  onPress={() => update({ enabled: !config.enabled })}
+                />
+                <Button label={t("more.saveConfig")} disabled={busy} onPress={() => void onSave()} />
+                <Button label={t("more.syncNow")} variant="primary" disabled={busy} onPress={() => void onSyncNow()} />
+                <Button
+                  label={testing ? t("sync.testing") : t("sync.testConnection")}
+                  icon="wifi-outline"
+                  disabled={busy}
+                  onPress={() => void onTestConnection()}
+                />
+              </View>
+
+              <Divider style={styles.groupDivider} />
+              {syncLog === null ? (
+                <AppText variant="label" tone="tertiary" lines={1}>
+                  {t("more.syncLogEmpty")}
+                </AppText>
+              ) : (
+                <>
+                  <AppText variant="label" tone="secondary" lines={2}>
+                    {t("more.syncLogSummary", {
+                      applied: syncLog.applied,
+                      local: syncLog.localWins,
+                      remote: syncLog.remoteWins,
+                    })}
+                  </AppText>
+                  {syncLog.conflicts.length > 0 ? (
+                    <>
+                      <AppText variant="caption" tone="tertiary" lines={1}>
+                        {t("more.syncLogConflicts")}
+                      </AppText>
+                      {syncLog.conflicts.slice(0, 5).map((conflict, index) => (
+                        <AppText key={`${conflict.label}-${index}`} variant="caption" tone="tertiary" lines={1}>
+                          {`· ${conflict.label}`}
+                        </AppText>
+                      ))}
+                    </>
+                  ) : null}
+                </>
+              )}
+            </View>
+          ) : null}
+        </Card>
+
+        {/* 6 数据 / 7 设置：一行跳转到独立页面 */}
+        <Card variant="outline" padding="none" style={styles.tailCard}>
+          <EntryRow
+            icon="server-outline"
+            label={t("more.group.data")}
+            onPress={() => router.push("/data")}
+          />
+          <Divider inset={space.lg} />
+          <EntryRow
+            icon="options-outline"
+            label={t("app.more.settings")}
+            onPress={() => router.push("/settings")}
+          />
+        </Card>
 
         {status.length > 0 ? (
           <AppText variant="label" tone="secondary" lines={3} style={styles.status}>
@@ -532,30 +506,39 @@ export default function MoreScreen() {
   );
 }
 
-/** 分组卡片：图标 + 标题 + 行尾信息 + 内容，More 页的信息架构单元 */
-function GroupCard({
+/** 入口行：图标 + 主文案 + 说明 + chevron（本页 / 数据页 / 设置页各自持有一份，不跨路由共享） */
+function EntryRow({
   icon,
-  title,
-  trailing,
-  children,
+  label,
+  hint,
+  onPress,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  trailing?: ReactNode;
-  children: ReactNode;
+  label: string;
+  hint?: string;
+  onPress: () => void;
 }) {
   const colors = useTheme();
   return (
-    <Card style={styles.group}>
-      <View style={styles.groupHeader}>
-        <Ionicons name={icon} size={16} color={colors.primary} />
-        <AppText variant="label" weight="600" lines={1} style={styles.groupTitle}>
-          {title}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={hint === undefined ? label : `${label}，${hint}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.entryRow, { opacity: pressed ? 0.65 : 1 }]}
+    >
+      <Ionicons name={icon} size={18} color={colors.primary} />
+      <View style={styles.entryText}>
+        <AppText variant="body" lines={1}>
+          {label}
         </AppText>
-        {trailing ?? null}
+        {hint !== undefined ? (
+          <AppText variant="caption" tone="tertiary" lines={1}>
+            {hint}
+          </AppText>
+        ) : null}
       </View>
-      {children}
-    </Card>
+      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+    </Pressable>
   );
 }
 
@@ -661,95 +644,108 @@ function Field({
 
 const styles = StyleSheet.create({
   content: {
-    paddingBottom: 40,
-    gap: 12,
+    paddingBottom: space.huge,
   },
   column: {
     width: "100%",
     maxWidth: 760,
     alignSelf: "center",
   },
-  group: {
-    marginHorizontal: 16,
-    gap: 8,
+  card: {
+    marginHorizontal: space.lg,
+    gap: space.sm,
   },
-  groupHeader: {
+  tailCard: {
+    marginHorizontal: space.lg,
+    marginTop: space.lg,
+  },
+  reviewRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    marginBottom: 2,
+    gap: space.md,
   },
-  groupTitle: {
+  reviewText: {
     flex: 1,
     minWidth: 0,
+    gap: space.xxs,
   },
   subHeaderRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginTop: 2,
-  },
-  subLabel: {
-    marginTop: 4,
-  },
-  pillRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: 8,
-  },
-  groupEmpty: {
-    paddingVertical: 2,
+    gap: space.sm,
   },
   groupDivider: {
-    marginVertical: 8,
+    marginVertical: space.xs,
   },
-  block: {
-    marginHorizontal: 16,
-  },
-  gap: {
-    height: 8,
-  },
-  inlineRow: {
+  entryRow: {
+    minHeight: hit.row,
     flexDirection: "row",
-    flexWrap: "wrap",
     alignItems: "center",
-    gap: 8,
-    marginHorizontal: 16,
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
   },
-  pill: {
-    height: 34,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    justifyContent: "center",
+  entryText: {
+    flex: 1,
+    minWidth: 0,
+    gap: space.xxs,
   },
   previewRow: {
-    minHeight: 36,
+    minHeight: hit.min,
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    gap: space.sm,
   },
   previewTitle: {
     flex: 1,
     minWidth: 0,
   },
+  pillRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.sm,
+  },
+  pill: {
+    minHeight: hit.min,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    justifyContent: "center",
+  },
+  inlineRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    gap: space.sm,
+  },
+  syncHeader: {
+    minHeight: hit.row,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+  },
+  syncHeaderText: {
+    flex: 1,
+    minWidth: 0,
+    gap: space.xxs,
+  },
+  syncBody: {
+    gap: space.sm,
+    paddingTop: space.xs,
+  },
   field: {
-    gap: 4,
+    gap: space.xxs,
   },
   input: {
-    height: 44,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    fontSize: 15,
-  },
-  hintText: {
-    fontSize: 12,
-    lineHeight: 17,
-    paddingHorizontal: 4,
+    height: hit.min,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: radius.sm,
+    paddingHorizontal: space.md,
+    fontSize: type.body.fontSize,
   },
   status: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
   },
 });

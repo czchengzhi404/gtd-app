@@ -14,7 +14,7 @@ export function useFocusStyle(radiusValue = 8): StyleProp<ViewStyle> {
     ":focus": {
       outlineStyle: "solid",
       outlineWidth: 2,
-      outlineColor: colors.primary,
+      outlineColor: colors.focusRing,
       outlineOffset: 2,
       borderRadius: radiusValue,
     },

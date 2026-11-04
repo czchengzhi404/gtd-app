@@ -107,3 +107,25 @@ export interface AttachmentMeta extends BaseRecord {
   /** 文件系统中的相对存储路径（二进制本体不入库） */
   storagePath: string;
 }
+
+/**
+ * 任务模板：一套可复用的任务骨架。
+ *
+ * 只保存"新建任务时需要预填的字段"——状态/日期/完成痕迹等由实例化时决定
+ * （status 默认 inbox，deferUntil/dueAt 留空，由用户按当下情境填写）。
+ * checklist 的子项 id 在实例化时必须重新生成，避免多条任务共享子项 id。
+ */
+export interface TaskTemplate extends BaseRecord {
+  /** 模板名（1..200），同名未删除模板视为同一条 */
+  name: string;
+  /** 任务标题模板（1..2000） */
+  title: string;
+  /** Markdown 笔记 */
+  notes: string;
+  priority: 0 | 1 | 2 | 3;
+  projectId: string | null;
+  contextIds: string[];
+  tags: string[];
+  checklist: ChecklistItem[];
+  recurrence: RecurrenceRule | null;
+}

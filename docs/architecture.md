@@ -1,3 +1,5 @@
+> ⚠️ **v1 历史文档**：内容对应 v0.11 之前的实现，已被 [technical-reference.md](./technical-reference.md)（v2）取代。保留仅为追溯设计演进，不要据此开发。
+
 # GTD 清单 — 架构文档
 
 本地优先（local-first）GTD 任务清单应用：Windows/macOS/Linux 桌面（Electron 壳）+ Android/iOS（Expo）。一套 UI（packages/ui，RN primitives，web 走 react-native-web），GTD 逻辑只写在 packages/core。

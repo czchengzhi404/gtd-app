@@ -1,10 +1,21 @@
 import { useEffect, useState } from "react";
-import { Stack } from "expo-router";
+import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import { StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
-import { Screen, ThemeProvider, useTheme, useT, PromptHost } from "@gtd/ui";
-import { appStore, bootstrapStore } from "@gtd/core";
+import {
+  AppText,
+  Screen,
+  ThemeProvider,
+  ToastHost,
+  UndoHost,
+  space,
+  useAppStore,
+  useTheme,
+  useT,
+  PromptHost,
+} from "@gtd/ui";
+import { appStore, bootstrapStore, runCommand } from "@gtd/core";
 import { initPlatform } from "@/platform/bootstrap";
 import { installFontScaleOverride } from "@/platform/font-scale";
 import { ensureBuiltinFont, isBuiltinFontSelected } from "@/platform/font-loader";
@@ -19,6 +30,7 @@ installFontScaleOverride();
  */
 export default function RootLayout() {
   const [error, setError] = useState<string | null>(null);
+  const loaded = useAppStore((s) => s.loaded);
 
   useEffect(() => {
     let cancelled = false;
@@ -45,6 +57,18 @@ export default function RootLayout() {
     };
   }, []);
 
+  // 首次启动：只在「从没用过」（无任务）时展示引导；老用户升级不打扰，直接补标记
+  useEffect(() => {
+    if (!loaded || error !== null) return;
+    const state = appStore.getState();
+    if (state.kv["onboarding.done"] === "1") return;
+    if (Object.keys(state.tasks).length > 0) {
+      void runCommand("settings.set", { key: "onboarding.done", value: 1 }).catch(() => undefined);
+      return;
+    }
+    router.replace("/onboarding");
+  }, [loaded, error]);
+
   return (
     <ThemeProvider>
       <StatusBar style="auto" />
@@ -55,6 +79,8 @@ export default function RootLayout() {
           <StackScreens />
           <CommandPaletteHost />
           <PromptHost />
+          <UndoHost />
+          <ToastHost bottomOffset={132} />
         </>
       )}
     </ThemeProvider>
@@ -67,6 +93,7 @@ function StackScreens() {
   return (
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false, gestureEnabled: false }} />
       <Stack.Screen name="task/[id]" options={{ title: t("detail.title") }} />
       <Stack.Screen name="project/[id]" options={{ title: t("nav.projects") }} />
       <Stack.Screen name="review" options={{ title: t("review.title") }} />
@@ -74,6 +101,15 @@ function StackScreens() {
       <Stack.Screen name="trash" options={{ title: t("trash.title") }} />
       <Stack.Screen name="add" options={{ title: t("nav.inbox"), headerShown: false }} />
       <Stack.Screen name="about" options={{ title: t("more.about") }} />
+      <Stack.Screen name="process" options={{ title: t("app.route.process") }} />
+      <Stack.Screen name="search" options={{ title: t("app.route.search") }} />
+      <Stack.Screen name="insights" options={{ title: t("app.route.insights") }} />
+      <Stack.Screen name="matrix" options={{ title: t("app.route.matrix") }} />
+      <Stack.Screen name="import" options={{ title: t("app.route.importPage") }} />
+      <Stack.Screen name="templates" options={{ title: t("template.routeTitle") }} />
+      <Stack.Screen name="recent" options={{ title: t("app.more.recent") }} />
+      <Stack.Screen name="settings" options={{ title: t("app.more.settings") }} />
+      <Stack.Screen name="data" options={{ title: t("more.group.data") }} />
     </Stack>
   );
 }
@@ -84,8 +120,12 @@ function BootError({ message }: { message: string }) {
   return (
     <Screen>
       <View style={styles.errorWrap}>
-        <Text style={[styles.errorTitle, { color: colors.danger }]}>{t("boot.error")}</Text>
-        <Text style={[styles.errorBody, { color: colors.text }]}>{message}</Text>
+        <AppText variant="subtitle" color={colors.danger} lines={2}>
+          {t("boot.error")}
+        </AppText>
+        <AppText variant="body" lines={6}>
+          {message}
+        </AppText>
       </View>
     </Screen>
   );
@@ -94,16 +134,8 @@ function BootError({ message }: { message: string }) {
 const styles = StyleSheet.create({
   errorWrap: {
     flex: 1,
-    padding: 24,
-    gap: 8,
+    padding: space.xxl,
+    gap: space.sm,
     justifyContent: "center",
-  },
-  errorTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  errorBody: {
-    fontSize: 16,
-    lineHeight: 24,
   },
 });

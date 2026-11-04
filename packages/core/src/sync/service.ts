@@ -9,6 +9,7 @@ import {
   getSections,
   getContexts,
   getAreas,
+  getTemplates,
   getAttachmentsForTask,
 } from "../db/queries";
 import type { TaggedRecord } from "../models/commands";
@@ -45,12 +46,14 @@ export function buildLocalManifest(executor: SqliteExecutor): Promise<Manifest> 
 
 /** 本地全量记录（含墓碑）——附件元数据随任务分批查询 */
 export async function collectLocalRecords(executor: SqliteExecutor): Promise<TaggedRecord[]> {
-  const [tasks, projects, sections, contexts, areas] = await Promise.all([
+  const [tasks, projects, sections, contexts, areas, templates] = await Promise.all([
     getTasks(executor, { includeDone: true }),
     getProjects(executor),
     getSections(executor),
     getContexts(executor),
     getAreas(executor),
+    // includeDeleted：模板墓碑必须参与同步，删除才能传播
+    getTemplates(executor, true),
   ]);
   const records: TaggedRecord[] = [
     ...tasks.map((record) => ({ type: "task", record }) as TaggedRecord),
@@ -58,6 +61,7 @@ export async function collectLocalRecords(executor: SqliteExecutor): Promise<Tag
     ...sections.map((record) => ({ type: "section", record }) as TaggedRecord),
     ...contexts.map((record) => ({ type: "context", record }) as TaggedRecord),
     ...areas.map((record) => ({ type: "area", record }) as TaggedRecord),
+    ...templates.map((record) => ({ type: "template", record }) as TaggedRecord),
   ];
   // 墓碑任务不在 getTasks 结果里：附件只挂活跃任务，元数据量小，按任务逐个查
   for (const task of tasks) {

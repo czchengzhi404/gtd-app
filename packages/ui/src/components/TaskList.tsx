@@ -37,6 +37,8 @@ export interface TaskListProps {
   emptyAction?: EmptyStateAction;
   /** 空态插画变体（透传 EmptyState.illustration） */
   emptyIllustration?: EmptyStateProps["illustration"];
+  /** 空态示例片段（透传 EmptyState.suggestions） */
+  emptySuggestions?: EmptyStateProps["suggestions"];
   /** 卡片化容器（列表页默认开；嵌在其他卡片内时可关） */
   carded?: boolean;
   /** 多选模式 */
@@ -78,6 +80,7 @@ export function TaskList({
   emptyHint,
   emptyAction,
   emptyIllustration,
+  emptySuggestions,
   carded = true,
   selectionMode = false,
   selectedIds,
@@ -116,6 +119,7 @@ export function TaskList({
         hint={emptyHint ?? t("empty.listHint")}
         action={emptyAction}
         illustration={emptyIllustration}
+        suggestions={emptySuggestions}
       />
     );
   }
@@ -197,6 +201,13 @@ export function TaskList({
       ListHeaderComponent={header ?? null}
       ListFooterComponent={footer ?? null}
       keyboardShouldPersistTaps="handled"
+      // 性能：只渲染视口附近的行。行高不固定（标题最多两行 + 元信息），
+      // 因此不设 getItemLayout（固定行高会让长标题行错位）。
+      initialNumToRender={14}
+      maxToRenderPerBatch={12}
+      updateCellsBatchingPeriod={50}
+      windowSize={9}
+      removeClippedSubviews={Platform.OS === "android"}
       style={[
         styles.list,
         carded

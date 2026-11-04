@@ -2,7 +2,15 @@ import { useEffect, useState } from "react";
 import { useLocalSearchParams, router } from "expo-router";
 import { View } from "react-native";
 
-import { Screen, TaskDetailContent, showConfirm, useAppStore, useT } from "@gtd/ui";
+import {
+  Screen,
+  TaskDetailContent,
+  showConfirm,
+  showPrompt,
+  showToast,
+  useAppStore,
+  useT,
+} from "@gtd/ui";
 import {
   getAllTags,
   getAttachmentsForTask,
@@ -62,6 +70,31 @@ export default function TaskDetailScreen() {
     if (router.canGoBack()) router.back();
   };
 
+  const saveAsTemplate = async () => {
+    const name = await showPrompt({
+      title: t("template.savePrompt"),
+      placeholder: task.title,
+    });
+    if (name === null || name.trim().length === 0) return;
+    try {
+      await runCommand("template.upsert", {
+        name: name.trim(),
+        title: task.title,
+        notes: task.notes,
+        priority: task.priority,
+        projectId: task.projectId,
+        contextIds: task.contextIds,
+        tags: task.tags,
+        checklist: task.checklist,
+        recurrence: task.recurrence,
+      });
+      showToast({ message: t("template.saved"), tone: "success" });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      showToast({ message: t("template.useFailed", { message }), tone: "danger" });
+    }
+  };
+
   const pickAttachment = async () => {
     if (isDesktop()) {
       await addAttachmentFromDialog(task);
@@ -97,6 +130,7 @@ export default function TaskDetailScreen() {
               () => undefined,
             )
           }
+          onSaveAsTemplate={() => void saveAsTemplate()}
           onSetTags={(tags) =>
             void runCommand("task.update", { id: task.id, patch: { tags } }).catch(() => undefined)
           }

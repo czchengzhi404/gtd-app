@@ -2,13 +2,14 @@ import { useMemo } from "react";
 import { router } from "expo-router";
 import { ScrollView, StyleSheet, View } from "react-native";
 
-import { Divider, EmptyState, Screen, SectionHeader, TaskRow, useAppStore, useT } from "@gtd/ui";
+import { Divider, EmptyState, Screen, SectionHeader, TaskRow, useAppStore, useT, useTheme } from "@gtd/ui";
 import { runCommand } from "@gtd/core";
 
 /** 完成记录：按完成日期分组归档，可一键恢复 */
 export default function CompletedScreen() {
   const allTasks = useAppStore((s) => s.tasks);
   const t = useT();
+  const colors = useTheme();
 
   const groups = useMemo(() => {
     const done = Object.values(allTasks)
@@ -63,7 +64,7 @@ export default function CompletedScreen() {
                     </View>
                   }
                 />
-                <View style={[styles.card, { borderColor: "#0000001A" }]}>
+                <View style={[styles.card, { borderColor: colors.border }]}>
                   {tasks.map((task, index) => (
                     <View key={task.id}>
                       {index > 0 ? <Divider inset={16} /> : null}

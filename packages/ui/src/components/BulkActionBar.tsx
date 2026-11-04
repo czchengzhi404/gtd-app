@@ -13,6 +13,8 @@ export interface BulkActionBarProps {
   onDelete: () => void;
   onMove: () => void;
   onClear: () => void;
+  /** 批量推迟（改到期时间）：周回顾后最高频的批量动作 */
+  onDefer?: () => void;
   /** 长按进入多选后退出 */
   onExit?: () => void;
   busy?: boolean;
@@ -22,7 +24,16 @@ export interface BulkActionBarProps {
  * 批量操作条：底部悬浮，覆盖在内容之上（不挤压列表高度）。
  * 只在多选模式下出现，退出后完全移除，避免残留可访问节点。
  */
-export function BulkActionBar({ count, onComplete, onDelete, onMove, onClear, onExit, busy = false }: BulkActionBarProps) {
+export function BulkActionBar({
+  count,
+  onComplete,
+  onDelete,
+  onMove,
+  onClear,
+  onDefer,
+  onExit,
+  busy = false,
+}: BulkActionBarProps) {
   const colors = useTheme();
   const focus = useFocusStyle(radius.sm);
 
@@ -77,8 +88,8 @@ export function BulkActionBar({ count, onComplete, onDelete, onMove, onClear, on
       <View style={styles.actionsRow}>
         {item("checkmark-done-outline", t("bulk.complete"), onComplete)}
         {item("return-down-forward-outline", t("bulk.moveTo"), onMove)}
+        {onDefer !== undefined ? item("calendar-outline", t("bulk.deferTo"), onDefer) : null}
         {item("trash-outline", t("bulk.delete"), onDelete, true)}
-        {item("close-circle-outline", t("bulk.clear"), onClear)}
       </View>
     </View>
   );

@@ -45,6 +45,8 @@ export interface TaskDetailContentProps {
   onOpenAttachment?: (item: AttachmentMeta) => void;
   /** 标签编辑（不传则只展示） */
   onSetTags?: (tags: string[]) => void;
+  /** 另存为模板（不传则不显示入口） */
+  onSaveAsTemplate?: () => void;
   /** 常用标签建议（来自全库在用标签） */
   tagSuggestions?: string[];
 }
@@ -68,6 +70,7 @@ export function TaskDetailContent({
   onRemoveAttachment,
   onOpenAttachment,
   onSetTags,
+  onSaveAsTemplate,
   tagSuggestions = [],
 }: TaskDetailContentProps) {
   const colors = useTheme();
@@ -196,6 +199,16 @@ export function TaskDetailContent({
         />
         <Button label={t("detail.delete")} icon="trash-outline" variant="danger" onPress={onDelete} />
       </View>
+      {onSaveAsTemplate !== undefined ? (
+        <View style={styles.buttonRow}>
+          <Button
+            label={t("template.saveAs")}
+            icon="duplicate-outline"
+            variant="ghost"
+            onPress={onSaveAsTemplate}
+          />
+        </View>
+      ) : null}
 
       {onToggleChecklist !== undefined &&
       onAddChecklist !== undefined &&

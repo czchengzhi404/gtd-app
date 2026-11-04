@@ -5,14 +5,26 @@ import type { Manifest, ManifestEntry } from "./types";
  * 合并规则（定稿 v7 §3）：
  * ① revision 高者胜（单调本地计数器，不依赖时钟）
  * ② revision 并列 → updatedAt 新者胜（仅 tiebreak，容忍时钟偏差）
- * ③ 再并列 → id 字典序（同一 id 场景恒等，理论不可达，保留为最终决胜）
+ * ③ 再并列 → id 字典序（较小 id 胜；同一 id 场景恒等，理论不可达，保留为最终决胜）
  * 墓碑作为普通记录参与比较：被更高 revision 的编辑击败则"复活"，预期行为。
  */
 
-export function compareEntries(a: ManifestEntry, b: ManifestEntry): number {
+/**
+ * 单条 entry 比较：a 胜返回 >0，b 胜返回 <0，完全并列返回 0。
+ * 规则：① revision 高者胜；② revision 并列 → updatedAt 新者胜；
+ * ③ 再并列 → id 字典序（较小 id 胜）。ManifestEntry 本身不含 id，
+ * 因此最终决胜的 id 必须由调用方显式传入（公开 API 已同步此签名）。
+ */
+export function compareEntries(
+  a: ManifestEntry,
+  b: ManifestEntry,
+  aId: string,
+  bId: string,
+): number {
   if (a.revision !== b.revision) return a.revision > b.revision ? 1 : -1;
   if (a.updatedAt !== b.updatedAt) return a.updatedAt > b.updatedAt ? 1 : -1;
-  return a === b ? 0 : 1;
+  if (aId !== bId) return aId < bId ? 1 : -1;
+  return 0;
 }
 
 /** entry → record 的描述（用于反查谁赢了） */
@@ -38,7 +50,7 @@ export function mergeOne(
   }
   const localEntry = entryOf(local);
   const remoteEntry = entryOf(remote);
-  const cmp = compareEntries(localEntry, remoteEntry);
+  const cmp = compareEntries(localEntry, remoteEntry, local.record.id, remote.record.id);
   if (cmp >= 0) {
     return { winner: local, localNeedsUpdate: false };
   }
@@ -50,7 +62,7 @@ export function mergeManifests(mine: Manifest, theirs: Manifest): Manifest {
   const result: Manifest = { ...mine };
   for (const [id, entry] of Object.entries(theirs)) {
     const current = result[id];
-    if (current === undefined || compareEntries(current, entry) < 0) {
+    if (current === undefined || compareEntries(current, entry, id, id) < 0) {
       result[id] = entry;
     }
   }
