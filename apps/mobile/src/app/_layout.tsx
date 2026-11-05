@@ -6,6 +6,7 @@ import { StyleSheet, View } from "react-native";
 import {
   AppText,
   Screen,
+  ErrorBoundary,
   ThemeProvider,
   ToastHost,
   UndoHost,
@@ -21,8 +22,11 @@ import { startSyncScheduler } from "@/platform/sync-scheduler";
 import { installFontScaleOverride } from "@/platform/font-scale";
 import { ensureBuiltinFont, isBuiltinFontSelected } from "@/platform/font-loader";
 import { CommandPaletteHost } from "@/platform/CommandPaletteHost";
+import { installGlobalErrorHandler, recordCrash } from "@/platform/crash-log";
 
 installFontScaleOverride();
+// 先装全局错误捕获：任何后续初始化/渲染错误都至少能留下记录，而不是直接闪退
+installGlobalErrorHandler();
 
 /**
  * 根布局：注入平台端口 → 迁移（原生）→ 种子 → bootstrap → 事件/通知接线。
@@ -75,7 +79,10 @@ export default function RootLayout() {
   }, [loaded, error]);
 
   return (
-    <ThemeProvider>
+    <ErrorBoundary
+      onError={(error, info) => void recordCrash("render", error, info.componentStack ?? "")}
+    >
+      <ThemeProvider>
       <StatusBar style="auto" />
       {error !== null ? (
         <BootError message={error} />
@@ -88,7 +95,8 @@ export default function RootLayout() {
           <ToastHost bottomOffset={132} />
         </>
       )}
-    </ThemeProvider>
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 }
 

@@ -273,8 +273,10 @@ const styles = StyleSheet.create({
  * 每次渲染新建箭头函数，比较引用必然不等——但它们的行为只依赖当前 task，
  * 而 task 已参与比较，所以跳过它们是安全的。
  *
- * meta / actions 参与比较：父级（TaskList）已按 task 缓存它们，
- * 引用稳定；若父级不缓存，memo 会退化为“总是重渲染”，不会出错。
+ * meta / actions 不参与比较：它们每帧都是新节点/新数组，比较必然不等。
+ * 其内容全部派生自 task（已参与比较）与 now（分钟级变化，不影响
+ * “今天/明天”这类文案）。跳过它们才能让 memo 真正生效，
+ * 同时避免“为每一行预生成 React 元素”带来的内存膨胀。
  */
 export const TaskRow = memo(TaskRowImpl, (prev, next) => {
   if (prev.title !== next.title) return false;
@@ -283,7 +285,5 @@ export const TaskRow = memo(TaskRowImpl, (prev, next) => {
   if (prev.selectionMode !== next.selectionMode) return false;
   if (prev.reorderMode !== next.reorderMode) return false;
   if (prev.accent !== next.accent) return false;
-  if (prev.meta !== next.meta) return false;
-  if (prev.actions !== next.actions) return false;
   return true;
 });

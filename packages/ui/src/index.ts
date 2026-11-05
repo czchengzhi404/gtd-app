@@ -12,6 +12,7 @@ export * from "./components/TaskList";
 export * from "./components/TaskDetailContent";
 export * from "./components/QuickAddBar";
 export * from "./components/EmptyState";
+export * from "./components/ErrorBoundary";
 export * from "./components/Chip";
 export * from "./components/PriorityBadge";
 export * from "./components/DueDateChip";

@@ -1,7 +1,7 @@
 {
   "name": "@gtd/mobile",
   "main": "expo-router/entry",
-  "version": "2.5.0",
+  "version": "2.5.1",
   "private": true,
   "scripts": {
     "start": "expo start",
@@ -15,7 +15,6 @@
     "@expo/metro-runtime": "~57.0.17",
     "@gtd/core": "workspace:*",
     "@gtd/ui": "workspace:*",
-    "@shopify/flash-list": "^2.3.3",
     "expo": "~57.0.31",
     "expo-constants": "~57.0.22",
     "expo-document-picker": "~57.0.3",

@@ -19,10 +19,15 @@ export function useNowMinute(): number {
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // 卸载标记：原实现只清"当前那一个" timer，但回调内部会立刻再排一个，
+    // 卸载恰好发生在回调执行期间时会漏掉一个（继续跑、继续 setState）。
+    let cancelled = false;
 
     const schedule = () => {
+      if (cancelled) return;
       const remaining = 60_000 - (Date.now() % 60_000);
       timer = setTimeout(() => {
+        if (cancelled) return;
         setNow(minuteStart(Date.now()));
         schedule();
       }, remaining + 20);
@@ -30,6 +35,7 @@ export function useNowMinute(): number {
     schedule();
 
     return () => {
+      cancelled = true;
       if (timer !== null) clearTimeout(timer);
     };
   }, []);
