@@ -2,7 +2,7 @@
 
 本地优先（local-first）的 GTD 任务清单应用：一套 UI，四端运行 —— Windows / macOS / Linux（Electron 壳）、Android / iOS（Expo）。数据默认留在设备上，无账号即可使用；同步为可选增强（WebDAV / 自托管 / 桌面本地文件夹）。
 
-架构与阶段验收详见 [docs/architecture.md](docs/architecture.md)；**全功能技术文档（数据模型/命令架构/功能规格/同步/安全/发布）见 [docs/technical-reference.md](docs/technical-reference.md)**；**面向使用者的推荐功能指南见 [docs/user-feature-guide.md](docs/user-feature-guide.md)**；**导入导出格式规格见 [docs/import-export-formats.md](docs/import-export-formats.md)**，**同步一览见 [docs/sync-overview.md](docs/sync-overview.md)**。
+架构与阶段验收详见 [docs/architecture.md](docs/architecture.md)；**新手先看 [docs/dev-quickstart.md](docs/dev-quickstart.md)（30 分钟跑起来 + 跟通一条调用链）**；**全功能技术文档（数据模型/命令架构/功能规格/同步/安全/发布）见 [docs/technical-reference.md](docs/technical-reference.md)**；**功能全集与实现说明见 [docs/features-implementation.md](docs/features-implementation.md)**；**写作者视角的功能评判与改进路线见 [docs/persona-writer-review.md](docs/persona-writer-review.md)**；**面向使用者的推荐功能指南见 [docs/user-feature-guide.md](docs/user-feature-guide.md)**；**性能优化与基准见 [docs/performance.md](docs/performance.md)（`bun bench/perf-baseline.ts` 可复现）**；**导入导出格式规格见 [docs/import-export-formats.md](docs/import-export-formats.md)**，**同步一览见 [docs/sync-overview.md](docs/sync-overview.md)**。
 
 ## 功能（v2.0）
 

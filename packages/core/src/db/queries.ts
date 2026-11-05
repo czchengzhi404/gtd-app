@@ -198,6 +198,22 @@ export async function findTemplateByName(
   return rows.length > 0 ? templateFromRow(rows[0] as SqliteRow) : null;
 }
 
+/**
+ * 全部未删除的附件（一次全表查）。
+ *
+ * 为什么需要：同步的 `collectLocalRecords` 原先按任务逐个查附件，形成 N+1——
+ * 800 个任务就是 800 次查询。内存 SQLite 上只有 3ms，但在手机上每次 query 都要
+ * 跨 JS↔原生桥，800 次往返能到几百毫秒甚至秒级。一次全表查把往返压到 1 次。
+ */
+export async function getAllActiveAttachments(
+  executor: SqliteExecutor,
+): Promise<AttachmentMeta[]> {
+  const rows = await executor.query<SqliteRow>(
+    "SELECT * FROM attachments WHERE deleted_at IS NULL ORDER BY created_at ASC",
+  );
+  return rows.map(attachmentFromRow);
+}
+
 export async function getAttachmentsForTask(
   executor: SqliteExecutor,
   taskId: string,
@@ -242,9 +258,67 @@ export interface BootstrapData {
   kv: Record<string, string>;
 }
 
-export async function loadBootstrapData(executor: SqliteExecutor): Promise<BootstrapData> {
+export interface TaskPageOptions {
+  /** 每页条数（默认 200） */
+  limit?: number;
+  /** 偏移（默认 0） */
+  offset?: number;
+  /** 排序：updated=最近改动优先（默认）；order=按手动排序键 */
+  orderBy?: "updated" | "order";
+}
+
+export interface TaskPage {
+  tasks: Task[];
+  /** 是否还有下一页 */
+  hasMore: boolean;
+}
+
+/**
+ * 任务分页查询（数据库层分页）。
+ *
+ * 为什么默认不用：当前架构（同步合并、全文搜索、统计）都以"store 里是全量"为前提，
+ * 贸然改成增量加载会让这些功能算出错误结果。分页是给**大库模式**准备的基础设施——
+ * 当任务数超过几千条、启动时间成为问题时，可以按页把最近的任务先灌进 store，
+ * 其余按需追加（配合 `hasMore` 做"加载更多"）。
+ *
+ * 现在的调用方：`loadBootstrapData` 的 `taskLimit` 选项（默认不启用）。
+ */
+export async function getTasksPage(
+  executor: SqliteExecutor,
+  options: TaskPageOptions = {},
+): Promise<TaskPage> {
+  const limit = Math.max(1, Math.min(2000, Math.trunc(options.limit ?? 200)));
+  const offset = Math.max(0, Math.trunc(options.offset ?? 0));
+  const orderBy = options.orderBy ?? "updated";
+  const orderClause = orderBy === "order" ? "order_key ASC" : "updated_at DESC";
+
+  // 多取一条用于判断 hasMore，避免额外的 COUNT 查询
+  const rows = await executor.query<SqliteRow>(
+    `SELECT * FROM tasks WHERE deleted_at IS NULL ORDER BY ${orderClause} LIMIT ? OFFSET ?`,
+    [limit + 1, offset],
+  );
+  const hasMore = rows.length > limit;
+  return { tasks: rows.slice(0, limit).map(taskFromRow), hasMore };
+}
+
+/** 任务总数（不含墓碑）——分页 UI 显示"共 N 条"用 */
+export async function countTasks(executor: SqliteExecutor): Promise<number> {
+  const rows = await executor.query<SqliteRow>(
+    "SELECT COUNT(*) AS total FROM tasks WHERE deleted_at IS NULL",
+  );
+  const total = rows[0]?.["total"];
+  return typeof total === "number" ? total : Number(total ?? 0);
+}
+
+export async function loadBootstrapData(
+  executor: SqliteExecutor,
+  options: { taskLimit?: number } = {},
+): Promise<BootstrapData> {
+  const taskLimit = options.taskLimit;
   const [tasks, projects, sections, contexts, areas, templates, kv] = await Promise.all([
-    getTasks(executor, { includeDone: true }),
+    taskLimit === undefined
+      ? getTasks(executor, { includeDone: true })
+      : getTasksPage(executor, { limit: taskLimit, orderBy: "updated" }).then((page) => page.tasks),
     getProjects(executor),
     getSections(executor),
     getContexts(executor),

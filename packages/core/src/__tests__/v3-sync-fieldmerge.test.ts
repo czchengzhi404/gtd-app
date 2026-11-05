@@ -4,7 +4,7 @@ import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { executeCommand } from "../db/commands";
 import type { CommandContext } from "../db/commands";
 import { taskFromRow } from "../db/mappers";
-import { migrate } from "../db/migrations";
+import { LATEST_SCHEMA_VERSION, migrate } from "../db/migrations";
 import { captureRecordBases, readRecordBase } from "../db/record-base";
 import type { FieldMergeSummary, TaggedRecord } from "../models/commands";
 import type { Task } from "../models/task";
@@ -208,7 +208,7 @@ describe("migrations · v6 record_base 基线快照表", () => {
     const db = new Database(":memory:");
     const executor = makeExecutor(db);
 
-    expect(await migrate(executor)).toBe(6);
+    expect(await migrate(executor)).toBe(LATEST_SCHEMA_VERSION);
     // 再跑一次：已是最新版本，不重复应用（幂等）
     expect(await migrate(executor)).toBe(0);
 
@@ -218,7 +218,7 @@ describe("migrations · v6 record_base 基线快照表", () => {
     const version = db
       .query("SELECT value FROM meta WHERE key = 'schema_version'")
       .get() as { value: string };
-    expect(version.value).toBe("6");
+    expect(version.value).toBe(String(LATEST_SCHEMA_VERSION));
 
     db.close();
   });

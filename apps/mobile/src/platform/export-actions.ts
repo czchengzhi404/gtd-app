@@ -141,11 +141,34 @@ export async function saveTextFile(
   return { path: uri, mode: "shared", fileName };
 }
 
-/** 未完成任务清单（Markdown，含笔记摘要） */
-export async function exportMarkdown(target: SaveTarget = "save"): Promise<SaveResult | null> {
+/** 未完成任务清单（Markdown，含笔记摘要）；includeCompleted 时连已完成的稿子一起导出 */
+export async function exportMarkdown(
+  target: SaveTarget = "save",
+  includeCompleted = false,
+): Promise<SaveResult | null> {
   const now = Date.now();
-  const content = toMarkdown(appStore.getState(), { includeNotes: true });
+  const content = toMarkdown(appStore.getState(), { includeNotes: true, includeCompleted });
   return saveTextFile(fileNameFor("markdown", now), content, MIME_BY_KIND.markdown, target);
+}
+
+/**
+ * 导出单条正文（写作者最常用：把这篇稿子发给别人 / 存到别处）。
+ * 文件名取任务标题（去掉文件系统非法字符），内容就是 notes 原文。
+ */
+export async function exportNote(
+  title: string,
+  notes: string,
+  target: SaveTarget = "save",
+): Promise<SaveResult | null> {
+  const safeTitle =
+    title
+      .replace(/[\\/:*?"<>|\r\n\t]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 60) || "note";
+  const now = Date.now();
+  const stamp = `${now}`;
+  return saveTextFile(`${safeTitle}-${stamp}.md`, notes, MIME_BY_KIND.markdown, target);
 }
 
 /** 有到期日的任务 → iCalendar（可直接导入系统日历） */

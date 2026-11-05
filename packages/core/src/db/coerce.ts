@@ -122,13 +122,24 @@ export function coerceTask(obj: Record<string, unknown>): Task | null {
   if (recurrenceRaw !== null && typeof recurrenceRaw === "object") {
     const r = recurrenceRaw as Record<string, unknown>;
     const freq = asString(r.freq);
-    if (freq === "daily" || freq === "weekly" || freq === "monthly" || freq === "yearly") {
+    // 必须覆盖 RecurrenceRule 声明的全部 6 种 freq：漏一种，同步/导入就会把
+    // 该重复规则的 recurrence 静默置为 null（规则丢失且没有任何报错）。
+    if (
+      freq === "daily" ||
+      freq === "weekly" ||
+      freq === "monthly" ||
+      freq === "yearly" ||
+      freq === "weekdays" ||
+      freq === "afterCompletion"
+    ) {
       recurrence = {
         freq,
         interval: Math.max(1, Math.trunc(asNumber(r.interval) ?? 1)),
         byWeekday: asStringArray(r.byWeekday).length > 0
           ? asStringArray(r.byWeekday).map((x) => Number(x)).filter((n) => n >= 0 && n <= 6)
           : undefined,
+        lastWeekday: asBool(r.lastWeekday) || undefined,
+        remainingCount: asNumber(r.remainingCount),
         until: asNumber(r.until),
       };
     }

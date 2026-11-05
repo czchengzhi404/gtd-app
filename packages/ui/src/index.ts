@@ -44,6 +44,7 @@ export * from "./lib/fuzzy";
 export * from "./lib/shortcuts";
 export * from "./lib/undo-stack";
 export * from "./hooks/useFocusStyle";
+export * from "./hooks/useNowMinute";
 export * from "./platform/useKeyboardShortcuts";
 
 /* ---------------- v2 ---------------- */

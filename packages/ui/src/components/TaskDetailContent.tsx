@@ -1,6 +1,8 @@
-import { ScrollView, StyleSheet, View } from "react-native";
+import { useState } from "react";
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { AttachmentMeta, Task, TaskStatusInput } from "@gtd/core";
+import { countText } from "@gtd/core";
 
 import { SectionHeader } from "./Screen";
 import { Chip } from "./Chip";
@@ -10,11 +12,12 @@ import { ChecklistEditor } from "./ChecklistEditor";
 import { AttachmentList } from "./AttachmentList";
 import { MarkdownView } from "./MarkdownView";
 import { TagEditor } from "./TagEditor";
+import { showConfirm } from "./PromptHost";
 import { Button, Divider } from "../theme/primitives";
 import { AppText } from "../theme/AppText";
 import { useTheme } from "../hooks/useTheme";
 import { useT } from "../i18n";
-import { radius, space } from "../theme/tokens";
+import { hit, radius, space } from "../theme/tokens";
 
 const STATUS_KEYS: { status: TaskStatusInput; labelKey: string }[] = [
   { status: "inbox", labelKey: "detail.status.inbox" },
@@ -49,6 +52,15 @@ export interface TaskDetailContentProps {
   onSaveAsTemplate?: () => void;
   /** 常用标签建议（来自全库在用标签） */
   tagSuggestions?: string[];
+  /**
+   * 保存正文（不传则正文只读展示）。
+   * 写作场景的主入口：多行编辑 + 实时字数 + Markdown 预览切换。
+   */
+  onSaveNotes?: (notes: string) => void | Promise<void>;
+  /** 导出正文（不传则不显示入口）；仅当正文非空时显示 */
+  onExportNotes?: () => void;
+  /** 打开正文版本历史（不传则不显示入口） */
+  onOpenHistory?: () => void;
 }
 
 /** 任务详情（移动全屏 / 桌面右栏复用） */
@@ -72,9 +84,48 @@ export function TaskDetailContent({
   onSetTags,
   onSaveAsTemplate,
   tagSuggestions = [],
+  onSaveNotes,
+  onExportNotes,
+  onOpenHistory,
 }: TaskDetailContentProps) {
   const colors = useTheme();
   const t = useT();
+
+  // 正文编辑：进入编辑态时把当前正文拷进草稿，退出时按需丢弃
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [notesDraft, setNotesDraft] = useState("");
+  const [savingNotes, setSavingNotes] = useState(false);
+  const notesCount = countText(task.notes);
+  const draftCount = countText(notesDraft);
+
+  const startEditNotes = () => {
+    setNotesDraft(task.notes);
+    setEditingNotes(true);
+  };
+
+  const cancelEditNotes = async () => {
+    if (notesDraft !== task.notes) {
+      const discard = await showConfirm({
+        title: t("detail.notesDiscard"),
+        confirmLabel: t("detail.notesDiscardConfirm"),
+      });
+      if (!discard) return;
+    }
+    setEditingNotes(false);
+    setNotesDraft("");
+  };
+
+  const saveNotes = async () => {
+    if (onSaveNotes === undefined) return;
+    setSavingNotes(true);
+    try {
+      await onSaveNotes(notesDraft);
+      setEditingNotes(false);
+      setNotesDraft("");
+    } finally {
+      setSavingNotes(false);
+    }
+  };
 
   return (
     <ScrollView
@@ -207,6 +258,22 @@ export function TaskDetailContent({
             variant="ghost"
             onPress={onSaveAsTemplate}
           />
+          {onExportNotes !== undefined && task.notes.length > 0 ? (
+            <Button
+              label={t("detail.notesExport")}
+              icon="share-outline"
+              variant="ghost"
+              onPress={onExportNotes}
+            />
+          ) : null}
+          {onOpenHistory !== undefined ? (
+            <Button
+              label={t("history.title")}
+              icon="time-outline"
+              variant="ghost"
+              onPress={onOpenHistory}
+            />
+          ) : null}
         </View>
       ) : null}
 
@@ -240,14 +307,109 @@ export function TaskDetailContent({
         </>
       ) : null}
 
-      {task.notes.length > 0 ? (
+      {/* 正文：查看 / 编辑双模式。onSaveNotes 未接线时保持只读（兼容旧调用方） */}
+      {editingNotes ? (
         <>
-          <SectionHeader title={t("detail.notes")} />
-          <View style={[styles.notesCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <MarkdownView source={task.notes} />
+          <SectionHeader
+            title={t("detail.notes")}
+            trailing={
+              <AppText variant="caption" tone="tertiary" lines={1}>
+                {t("detail.notesWords", { n: draftCount.words })}
+              </AppText>
+            }
+          />
+          <View style={[styles.notesCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+            <TextInput
+              multiline
+              autoFocus
+              value={notesDraft}
+              onChangeText={setNotesDraft}
+              placeholder={t("detail.notesPlaceholder")}
+              placeholderTextColor={colors.textTertiary}
+              allowFontScaling={false}
+              maxFontSizeMultiplier={1}
+              textAlignVertical="top"
+              accessibilityLabel={t("detail.notes")}
+              style={[styles.notesInput, { color: colors.text }]}
+            />
+          </View>
+          <View style={styles.notesToolbar}>
+            <AppText variant="caption" tone="tertiary" lines={1}>
+              {t("detail.notesReading", { n: draftCount.readingMinutes })}
+            </AppText>
+            <View style={styles.notesActions}>
+              <Button
+                label={t("common.cancel")}
+                variant="ghost"
+                size="sm"
+                disabled={savingNotes}
+                onPress={() => void cancelEditNotes()}
+              />
+              <Button
+                label={savingNotes ? t("common.saving") : t("common.save")}
+                variant="primary"
+                size="sm"
+                disabled={savingNotes}
+                onPress={() => void saveNotes()}
+              />
+            </View>
           </View>
         </>
-      ) : null}
+      ) : (
+        <>
+          <SectionHeader
+            title={t("detail.notes")}
+            trailing={
+              <View style={styles.notesHeaderTrailing}>
+                {task.notes.length > 0 ? (
+                  <AppText variant="caption" tone="tertiary" lines={1}>
+                    {t("detail.notesWords", { n: notesCount.words })}
+                  </AppText>
+                ) : null}
+                {onSaveNotes !== undefined ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={t("detail.notesEditA11y")}
+                    onPress={startEditNotes}
+                    hitSlop={8}
+                    style={({ pressed }) => [styles.notesEditHit, { opacity: pressed ? 0.6 : 1 }]}
+                  >
+                    <Ionicons name="create-outline" size={16} color={colors.primary} />
+                    <AppText variant="caption" color={colors.primary} lines={1}>
+                      {t("common.edit")}
+                    </AppText>
+                  </Pressable>
+                ) : null}
+              </View>
+            }
+          />
+          {task.notes.length > 0 ? (
+            <View style={[styles.notesCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <MarkdownView source={task.notes} />
+            </View>
+          ) : (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("detail.notesEditA11y")}
+              disabled={onSaveNotes === undefined}
+              onPress={startEditNotes}
+              style={({ pressed }) => [
+                styles.notesCard,
+                styles.notesEmpty,
+                {
+                  backgroundColor: colors.surfaceMuted,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                },
+              ]}
+            >
+              <AppText variant="label" tone="tertiary" lines={2} align="center">
+                {onSaveNotes !== undefined ? t("detail.notesEmptyHint") : t("detail.notesEmpty")}
+              </AppText>
+            </Pressable>
+          )}
+        </>
+      )}
 
       <Divider />
     </ScrollView>
@@ -303,5 +465,43 @@ const styles = StyleSheet.create({
   notes: {
     fontSize: 14,
     lineHeight: 22,
+  },
+  notesHeaderTrailing: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+  },
+  notesEditHit: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    minHeight: hit.min,
+    paddingHorizontal: space.xs,
+    justifyContent: "center",
+  },
+  notesInput: {
+    minHeight: 180,
+    maxHeight: 520,
+    fontSize: 16,
+    lineHeight: 26,
+    padding: 0,
+  },
+  notesToolbar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.sm,
+    marginHorizontal: space.lg,
+    marginTop: space.xs,
+  },
+  notesActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.xs,
+  },
+  notesEmpty: {
+    minHeight: 72,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

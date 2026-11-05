@@ -1837,6 +1837,7 @@ sync.applyRemote / import.merge
 | 合并 | 任务升级为**字段级 3-way**（`record_base` 基线 + `sync/fieldmerge.ts` 纯函数），其它类型仍记录级 LWW；冲突字段名进 `SyncReport.conflictFields` |
 | 迁移 / 测试 | 新增 v6 迁移（`record_base`）+ 原生依赖 `expo-secure-store`；测试 291 → 337（+13 字段合并、+5 设备列表、+7 调度、+13 加密向量） |
 | 移动端运行时 | 新增 `sync/crypto.ts`（纯 JS SHA-256 / HMAC-SHA256 / UTF-8 / Base64）：Hermes 没有 `btoa`、`TextEncoder`、`crypto.subtle`，此前**手机端 WebDAV 认证与 S3 签名必崩**；改后全仓不再依赖这些运行时全局（NIST / RFC 向量 13 例兜底） |
+| 数据修正 | `coerceTask` 此前只接受 6 种重复频率中的 4 种、且完全没读 `lastWeekday`/`remainingCount`——经同步或 JSON 导入的「每工作日」「完成后 N 天」「每月最后工作日」「重复 N 次」会**静默丢规则**。已补全并用 `v3-coerce-recurrence.test.ts`（9 例）兜住 |
 
 > ⚠️ 破坏性提醒：`expo-secure-store` 是原生模块，**必须重新构建安装包**才会生效；2.2.0 及更早的 APK 装上后手机端同步仍会失败。
 

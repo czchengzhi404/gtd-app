@@ -21,6 +21,7 @@ import {
   space,
   useAppStore,
   useBreakpoint,
+  useNowMinute,
   useTheme,
   useT,
 } from "@gtd/ui";
@@ -28,6 +29,7 @@ import {
   applyListFilter,
   getAllTags,
   getInboxTasks,
+  getAllTasks,
   getTodayTasks,
   getUpcomingGroups,
   runCommand,
@@ -57,9 +59,10 @@ const DEFER_OPTIONS = [
 
 /** 今天：今日到期 + 逾期；列表 / 日历 / Timeline（≥1440） */
 export default function TodayScreen() {
-  const tasks = useAppStore((s) => getTodayTasks(s, Date.now()));
-  const upcomingGroups = useAppStore((s) => getUpcomingGroups(s, Date.now()));
-  const allTasks = useAppStore((s) => Object.values(s.tasks));
+  const nowMinute = useNowMinute();
+  const tasks = useAppStore((s) => getTodayTasks(s, nowMinute));
+  const upcomingGroups = useAppStore((s) => getUpcomingGroups(s, nowMinute));
+  const allTasks = useAppStore(getAllTasks);
   const inboxTasks = useAppStore(getInboxTasks);
   const contexts = useAppStore(selectContexts);
   const allTags = useAppStore(getAllTags);

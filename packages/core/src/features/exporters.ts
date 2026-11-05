@@ -31,6 +31,19 @@ function formatLocalDate(ms: number): string {
   return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
 }
 
+/**
+ * 到期时间：只有日期时输出 `2026-11-07`；带具体时刻时输出 `2026-11-07 15:30`。
+ *
+ * 18:00 是"只写日期"的约定时刻（快速添加与 CSV 导入的默认），
+ * 因此 18:00 仍按纯日期输出——否则所有任务都会多出一个假的时刻，
+ * 来回导入导出后全部变味。
+ */
+function formatDueStamp(ms: number): string {
+  const date = new Date(ms);
+  if (date.getHours() === 18 && date.getMinutes() === 0) return formatLocalDate(ms);
+  return `${formatLocalDate(ms)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
+}
+
 function byOrder(a: Task, b: Task): number {
   if (a.orderKey !== b.orderKey) return a.orderKey < b.orderKey ? -1 : 1;
   if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
@@ -98,7 +111,7 @@ export function toMarkdown(state: AppState, opts?: MarkdownExportOptions): strin
   const appendTask = (task: Task): void => {
     const checkbox = task.status === "done" ? "x" : " ";
     const parts = [`- [${checkbox}] ${escapeMarkdownText(task.title)}`];
-    if (task.dueAt !== null) parts.push(`📅 ${formatLocalDate(task.dueAt)}`);
+    if (task.dueAt !== null) parts.push(`📅 ${formatDueStamp(task.dueAt)}`);
     if (task.priority === 3) parts.push("!!!");
     else if (task.priority === 2) parts.push("!!");
     else if (task.priority === 1) parts.push("!");

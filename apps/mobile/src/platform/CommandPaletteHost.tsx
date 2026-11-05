@@ -2,7 +2,7 @@ import { useCallback, useMemo } from "react";
 import { router } from "expo-router";
 import { useStore } from "zustand";
 import { CommandPalette, useAppStore, useKeyboardShortcuts } from "@gtd/ui";
-import { quickAdd } from "@gtd/core";
+import { getAllTasks, quickAdd } from "@gtd/core";
 
 import { closePalette, openPalette, paletteStore, togglePalette } from "./palette-store";
 
@@ -16,7 +16,7 @@ import { closePalette, openPalette, paletteStore, togglePalette } from "./palett
  */
 export function CommandPaletteHost() {
   const visible = useStore(paletteStore, (state) => state.visible);
-  const tasks = useAppStore((state) => Object.values(state.tasks));
+  const tasks = useAppStore(getAllTasks);
   const projects = useAppStore((state) => Object.values(state.projects));
 
   const activeTasks = useMemo(() => tasks.filter((task) => task.deletedAt === null), [tasks]);

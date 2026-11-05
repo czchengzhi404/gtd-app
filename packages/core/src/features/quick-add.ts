@@ -401,7 +401,15 @@ export function parseQuickAdd(input: string, now: number): QuickAddParseResult {
     dueDayStart = atTime(startOfDay(dueDayStart), DEFAULT_DUE_HOUR, 0);
   }
 
-  const title = text.replace(/\s+/gu, " ").trim();
+  /**
+   * 日期 emoji 是"这个字段是日期"的装饰符号（导出 Markdown 时会写 `📅 2026-11-07`），
+   * 日期本体被抽走后它就成了标题里的垃圾字符。这里统一丢掉，保证
+   * "导出 → 导入"往返后标题干净。
+   */
+  const title = text
+    .replace(/[\u{1F4C5}\u{1F4C6}\u{1F5D3}\u{1F5D3}\uFE0F]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim();
 
   return {
     title: title.length > 0 ? title : input.trim(),

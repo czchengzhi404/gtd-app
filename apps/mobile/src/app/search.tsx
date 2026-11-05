@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import {
   Pressable,
@@ -18,6 +18,7 @@ import {
   Highlight,
   IconButton,
   SectionHeader,
+  SegmentedControl,
   Skeleton,
   hit,
   radius,
@@ -29,7 +30,7 @@ import {
   useT,
 } from "@gtd/ui";
 import { quickAdd, searchAll } from "@gtd/core";
-import type { SearchHit, SearchMatchedField } from "@gtd/core";
+import type { SearchHit, SearchMatchedField, SearchScope } from "@gtd/core";
 
 /**
  * 全局搜索：任务 / 项目分组 + 命中字段徽标 + 最近搜索。
@@ -56,13 +57,21 @@ export default function SearchScreen() {
   const state = useAppStore((s) => s);
   const loaded = useAppStore((s) => s.loaded);
 
+  // 输入框即时响应；真正的搜索延后 250ms（2000 条库单次扫描约 27ms，
+  // 每键都算会让输入法明显发涩）
+  const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
+  // 搜索范围：写作者常需要"只在正文里找"，避免标题里的词把结果冲淡
+  const [scope, setScope] = useState<SearchScope>("all");
   const [selected, setSelected] = useState(0);
   const [recent, setRecent] = useState<string[]>(recentQueries);
 
   const results = useMemo(
-    () => (query.trim().length === 0 ? { tasks: [], projects: [], total: 0 } : searchAll(state, query, Date.now())),
-    [state, query],
+    () =>
+      query.trim().length === 0
+        ? { tasks: [], projects: [], total: 0 }
+        : searchAll(state, query, Date.now(), { scope }),
+    [state, query, scope],
   );
 
   const rows = useMemo(
@@ -137,9 +146,18 @@ export default function SearchScreen() {
   useKeyboardShortcuts(shortcuts, onKey);
 
   const updateQuery = (value: string) => {
-    setQuery(value);
+    setInput(value);
     setSelected(0);
   };
+
+  useEffect(() => {
+    if (input.length === 0) {
+      setQuery("");
+      return;
+    }
+    const timer = setTimeout(() => setQuery(input), 250);
+    return () => clearTimeout(timer);
+  }, [input]);
 
   if (!loaded) {
     return (
@@ -160,7 +178,19 @@ export default function SearchScreen() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.canvas }]}>
       <View style={styles.searchRow}>
-        <SearchField value={query} onChangeText={updateQuery} autoFocus placeholder={t("app.search.placeholder")} />
+        <SearchField value={input} onChangeText={updateQuery} autoFocus placeholder={t("app.search.placeholder")} />
+      </View>
+      <View style={styles.scopeRow}>
+        <SegmentedControl<SearchScope>
+          accessibilityLabel={t("app.search.scope")}
+          value={scope}
+          onChange={setScope}
+          items={[
+            { key: "all", label: t("app.search.scopeAll") },
+            { key: "title", label: t("app.search.scopeTitle") },
+            { key: "notes", label: t("app.search.scopeNotes") },
+          ]}
+        />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -376,6 +406,10 @@ function HitRow({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+  },
+  scopeRow: {
+    paddingHorizontal: space.lg,
+    paddingBottom: space.sm,
   },
   searchRow: {
     paddingHorizontal: space.lg,

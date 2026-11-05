@@ -3,6 +3,7 @@ import type { ChecklistItem, RecurrenceRule, Task } from "../../models/task";
 import type { SqliteRow } from "../../platform/executor";
 import { nextOccurrence } from "../../features/recurrence";
 import { taskFromRow, taskToParams } from "../mappers";
+import { pushNoteVersion } from "../note-versions";
 import { uuidv7 } from "../ids";
 import {
   getTaskRow,
@@ -58,6 +59,10 @@ const updateTask: Handler<"task.update"> = async (tx, payload, ctx) => {
   const existing = await getTaskRow(tx, payload.id);
   if (!existing) throw new Error(`task not found: ${payload.id}`);
   const patch = payload.patch;
+  // 正文变更前先存旧版本：撤销栈只有 60 秒，覆盖不了"手滑全选删掉又保存"
+  if (patch.notes !== undefined && patch.notes !== existing.notes) {
+    await pushNoteVersion(tx, existing.id, existing.notes, ctx.now()).catch(() => null);
+  }
   const task: Task = {
     ...existing,
     title: patch.title ?? existing.title,

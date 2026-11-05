@@ -12,14 +12,18 @@ import {
   useT,
 } from "@gtd/ui";
 import {
+  appStore,
   getAllTags,
   getAttachmentsForTask,
   getSqliteExecutor,
+  recordDailyWords,
+  runCommand,
   selectActiveProjects,
   selectContexts,
   selectTaskById,
-  runCommand,
+  totalBodyWords,
 } from "@gtd/core";
+import type { WritingHistory } from "@gtd/core";
 import type { AttachmentMeta, TaskStatusInput } from "@gtd/core";
 import {
   addAttachmentFromDialog,
@@ -29,6 +33,7 @@ import {
   removeChecklistItem,
   toggleChecklistItem,
 } from "@/lib/task-ops";
+import { exportNote } from "@/platform/export-actions";
 import { isDesktop } from "@/platform/env";
 
 /** 任务详情：状态流转、优先级、标签、专注、清单子项、附件、删除（可撤销） */
@@ -68,6 +73,23 @@ export default function TaskDetailScreen() {
     if (!ok) return;
     await deleteTaskWithUndo(task);
     if (router.canGoBack()) router.back();
+  };
+
+  /** 保存正文后记录"当天全库字数"快照，供写作统计画曲线 */
+  const recordWritingSnapshot = async () => {
+    const state = appStore.getState();
+    let history: WritingHistory = {};
+    try {
+      const raw = state.kv["writing.daily"];
+      if (raw !== undefined && raw.length > 0) history = JSON.parse(raw) as WritingHistory;
+    } catch {
+      history = {};
+    }
+    const total = totalBodyWords(Object.values(state.tasks));
+    await runCommand("settings.set", {
+      key: "writing.daily",
+      value: JSON.stringify(recordDailyWords(history, total, Date.now())),
+    }).catch(() => undefined);
   };
 
   const saveAsTemplate = async () => {
@@ -131,6 +153,28 @@ export default function TaskDetailScreen() {
             )
           }
           onSaveAsTemplate={() => void saveAsTemplate()}
+          onOpenHistory={() => router.push(`/history?taskId=${task.id}`)}
+          onExportNotes={() => {
+            void exportNote(task.title, task.notes).then((result) => {
+              if (result === null) return;
+              showToast({
+                message:
+                  result.mode === "saved"
+                    ? t("app.more.exportSaved", { name: result.fileName })
+                    : t("app.more.exportShared", { name: result.fileName }),
+                tone: "success",
+              });
+            });
+          }}
+          onSaveNotes={async (notes) => {
+            try {
+              await runCommand("task.update", { id: task.id, patch: { notes } });
+              await recordWritingSnapshot();
+            } catch (err) {
+              const message = err instanceof Error ? err.message : String(err);
+              showToast({ message: t("detail.notesSaveFailed", { message }), tone: "danger" });
+            }
+          }}
           onSetTags={(tags) =>
             void runCommand("task.update", { id: task.id, patch: { tags } }).catch(() => undefined)
           }

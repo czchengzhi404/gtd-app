@@ -172,7 +172,8 @@ describe("searchAll · 空 query / snippet / 中英混排", () => {
     const tasks = [task({ id: "t1", title: "修复 Bug 报告" })];
     expect(searchAll(state(tasks), "BUG", NOW).tasks[0]?.score).toBe(50);
     expect(searchAll(state(tasks), "修复", NOW).tasks[0]?.score).toBe(70);
-    expect(searchAll(state(tasks), "修复 bug", NOW).tasks[0]?.score).toBe(70);
+    // v2.4：多词按 AND 匹配，分数取"最弱词"——「修复」标题前缀 70、「bug」标题包含 50 → 50
+    expect(searchAll(state(tasks), "修复 bug", NOW).tasks[0]?.score).toBe(50);
     expect(searchAll(state(tasks), "bug 报告", NOW).tasks[0]?.score).toBe(50);
   });
 });

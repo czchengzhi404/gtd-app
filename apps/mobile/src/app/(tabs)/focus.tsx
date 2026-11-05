@@ -2,20 +2,41 @@ import { useMemo } from "react";
 import { router } from "expo-router";
 import { View } from "react-native";
 
-import { EmptyState, Pomodoro, SectionHeader, TaskList, useAppStore, useT } from "@gtd/ui";
-import { getTodayTasks, selectContexts } from "@gtd/core";
+import {
+  EmptyState,
+  Pomodoro,
+  Screen,
+  SectionHeader,
+  SegmentedControl,
+  TaskList,
+  space,
+  useAppStore,
+  useNowMinute,
+  useT,
+} from "@gtd/ui";
+import { getAllTasks, getTodayTasks, runCommand, selectContexts } from "@gtd/core";
 import { useTaskActions } from "@/hooks/useRowActions";
 import { openTaskContextMenu } from "@/lib/context-menu";
 import { completeTaskWithUndo } from "@/lib/task-ops";
 
+/** 专注时长预设：25 番茄钟 / 45 中块 / 90 深度块（写作者常用 45–90） */
+type FocusMinutes = "25" | "45" | "90";
+const FOCUS_MINUTES: FocusMinutes[] = ["25", "45", "90"];
+
 /** 专注：番茄钟 + 已选中的下一步行动 + 今日到期 */
 export default function FocusScreen() {
-  const allTasks = useAppStore((s) => Object.values(s.tasks));
-  const todayTasks = useAppStore((s) => getTodayTasks(s, Date.now()));
+  const allTasks = useAppStore(getAllTasks);
+  const nowMinute = useNowMinute();
+  const todayTasks = useAppStore((s) => getTodayTasks(s, nowMinute));
   const contexts = useAppStore(selectContexts);
   const loaded = useAppStore((s) => s.loaded);
+  const storedMinutes = useAppStore((s) => s.kv["focus.minutes"]);
   const t = useT();
   const actions = useTaskActions();
+
+  const focusMinutes = (FOCUS_MINUTES.includes(storedMinutes as FocusMinutes)
+    ? storedMinutes
+    : "25") as FocusMinutes;
 
   const contextNameById = useMemo(() => {
     const map: Record<string, string> = {};
@@ -34,7 +55,23 @@ export default function FocusScreen() {
 
   return (
     <View style={{ flex: 1 }}>
+      <View style={{ paddingHorizontal: space.lg, paddingTop: space.sm }}>
+        <SegmentedControl<FocusMinutes>
+          accessibilityLabel={t("focus.minutesA11y")}
+          value={focusMinutes}
+          onChange={(key) =>
+            void runCommand("settings.set", { key: "focus.minutes", value: key }).catch(
+              () => undefined,
+            )
+          }
+          items={FOCUS_MINUTES.map((key) => ({
+            key,
+            label: t("focus.minutesItem", { n: key }),
+          }))}
+        />
+      </View>
       <Pomodoro
+        minutes={Number(focusMinutes)}
         currentTask={starred[0]}
         onCompleteTask={(current) => {
           // Pomodoro 回调是宽松的 {id,title} 结构；这里换回完整 Task 再走撤销式完成

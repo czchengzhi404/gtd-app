@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { FlatList, LayoutAnimation, Platform, StyleSheet, UIManager, View, type ListRenderItemInfo } from "react-native";
+import { FlashList } from "@shopify/flash-list";
 import type { Task } from "@gtd/core";
 import { startOfDay } from "@gtd/core";
 
@@ -137,7 +138,47 @@ export function TaskList({
     return undefined;
   };
 
-  const renderItem = ({ item, index }: ListRenderItemInfo<Task>) => (
+  // 按任务缓存行内 meta 与 actions：TaskRow 是 memo 组件，这两个 prop 的引用稳定
+  // 才能真正跳过重渲染（否则每次渲染都是新节点/新数组，memo 形同虚设）。
+  const rowMetaById = useMemo(() => {
+    const map = new Map<string, React.ReactNode>();
+    for (const task of tasks) {
+      map.set(
+        task.id,
+        <>
+          <PriorityBadge priority={task.priority} />
+          <DueDateChip task={task} now={now} />
+          {task.contextIds.slice(0, 2).map((id) => {
+            const name = contextNameById[id];
+            return name !== undefined ? <Chip key={id} label={name} /> : null;
+          })}
+          {task.tags.slice(0, 2).map((tag) => (
+            <Chip key={tag} label={tag} prefix="#" />
+          ))}
+        </>,
+      );
+    }
+    return map;
+  }, [tasks, now, contextNameById]);
+
+  const rowActionsById = useMemo(() => {
+    if (actions === undefined) return undefined;
+    const map = new Map<string, { key: string; label: string; danger?: boolean; onSelect: () => void }[]>();
+    for (const task of tasks) {
+      map.set(
+        task.id,
+        actions.map((action) => ({
+          key: action.key,
+          label: action.label,
+          danger: action.danger,
+          onSelect: () => action.onSelect(task),
+        })),
+      );
+    }
+    return map;
+  }, [tasks, actions]);
+
+  const renderItem = ({ item, index }: { item: Task; index: number }) => (
     <TaskRow
       title={item.title}
       done={item.status === "done"}
@@ -170,34 +211,49 @@ export function TaskList({
       }
       reorderMode={reorderMode}
       accent={accentOf(item)}
-      actions={actions?.map((action) => ({
-        key: action.key,
-        label: action.label,
-        danger: action.danger,
-        onSelect: () => action.onSelect(item),
-      }))}
-      meta={
-        <>
-          <PriorityBadge priority={item.priority} />
-          <DueDateChip task={item} now={now} />
-          {item.contextIds.slice(0, 2).map((id) => {
-            const name = contextNameById[id];
-            return name !== undefined ? <Chip key={id} label={name} /> : null;
-          })}
-          {item.tags.slice(0, 2).map((tag) => (
-            <Chip key={tag} label={tag} prefix="#" />
-          ))}
-        </>
-      }
+      actions={rowActionsById?.get(item.id)}
+      meta={rowMetaById.get(item.id)}
     />
   );
+
+  const listStyle = [
+    styles.list,
+    carded
+      ? {
+          backgroundColor: colors.surface,
+          borderColor: colors.border,
+          borderRadius: radius.md,
+          borderWidth: StyleSheet.hairlineWidth,
+        }
+      : undefined,
+  ];
+  const contentStyle = carded ? styles.content : undefined;
+  const separator = () => <Divider inset={space.lg} />;
+
+  // 原生用 FlashList（回收复用行组件，长列表内存与滚动更稳）；
+  // web 保持 FlatList —— FlashList 的 web 支持依赖原生测量，在 react-native-web 上不可靠。
+  if (Platform.OS !== "web") {
+    return (
+      <FlashList
+        data={tasks}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        ItemSeparatorComponent={separator}
+        ListHeaderComponent={header ?? null}
+        ListFooterComponent={footer ?? null}
+        keyboardShouldPersistTaps="handled"
+        style={listStyle}
+        contentContainerStyle={contentStyle}
+      />
+    );
+  }
 
   return (
     <FlatList
       data={tasks}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
-      ItemSeparatorComponent={() => <Divider inset={space.lg} />}
+      ItemSeparatorComponent={separator}
       ListHeaderComponent={header ?? null}
       ListFooterComponent={footer ?? null}
       keyboardShouldPersistTaps="handled"
@@ -207,19 +263,9 @@ export function TaskList({
       maxToRenderPerBatch={12}
       updateCellsBatchingPeriod={50}
       windowSize={9}
-      removeClippedSubviews={Platform.OS === "android"}
-      style={[
-        styles.list,
-        carded
-          ? {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-              borderRadius: radius.md,
-              borderWidth: StyleSheet.hairlineWidth,
-            }
-          : undefined,
-      ]}
-      contentContainerStyle={carded ? styles.content : undefined}
+      removeClippedSubviews={(Platform.OS as string) === "android"}
+      style={listStyle}
+      contentContainerStyle={contentStyle}
     />
   );
 }

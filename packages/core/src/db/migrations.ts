@@ -184,7 +184,29 @@ const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_record_base_captured ON record_base(captured_at)`,
     ],
   },
+  {
+    version: 7,
+    statements: [
+      // 正文历史快照：每次正文变更前把"旧内容"存一份，供误覆盖后回滚。
+      // 每任务只保留最近 20 条（写入时顺手裁剪）；不参与同步——它是本机编辑历史，
+      // 跨设备价值低，且会显著放大同步体积。
+      `CREATE TABLE IF NOT EXISTS note_versions (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        content TEXT NOT NULL,
+        word_count INTEGER NOT NULL,
+        created_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_note_versions_task ON note_versions(task_id, created_at DESC)`,
+    ],
+  },
 ];
+
+/**
+ * 最新 schema 版本（= 最后一条迁移的 version）。
+ * 测试与诊断据此判断"升到最新要跑几条"，新增迁移时无需再改测试里的魔法数字。
+ */
+export const LATEST_SCHEMA_VERSION: number = MIGRATIONS[MIGRATIONS.length - 1]?.version ?? 0;
 
 export async function migrate(executor: SqliteExecutor): Promise<number> {
   let current = 0;

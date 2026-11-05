@@ -35,6 +35,36 @@ export function getSomedayTasks(state: AppState): Task[] {
   return getTasksByStatus(state, "someday");
 }
 
+/**
+ * 素材库：someday 状态的条目，按最近改动排序。
+ *
+ * 为什么复用 someday 而不新建实体：写作者的"素材"就是"还没决定用在哪儿的东西"，
+ * 与 GTD 的 someday 语义一致。新建独立实体要动 schema/命令/同步/合并四层，
+ * 而现有模型已经能承载（正文 + 标签 + 来源）。
+ * 顺序按 updatedAt 倒序——刚记下的素材通常最相关。
+ */
+/**
+ * 全部任务（含已完成、含墓碑）的稳定数组。
+ *
+ * 为什么不直接 `Object.values(state.tasks)`：那每次都返回**新数组**，
+ * zustand 用 Object.is 比较快照 → 任何 store 变化都被判成"变了"，
+ * 列表与派生计算无法被 memo 命中。这里按 `state.tasks` 的对象引用缓存：
+ * 同一快照多次调用返回同一数组，store 真变了才重新求值。
+ */
+const allTasksCache = new WeakMap<Record<string, Task>, Task[]>();
+
+export function getAllTasks(state: AppState): Task[] {
+  const cached = allTasksCache.get(state.tasks);
+  if (cached !== undefined) return cached;
+  const list = Object.values(state.tasks);
+  allTasksCache.set(state.tasks, list);
+  return list;
+}
+
+export function getMaterials(state: AppState): Task[] {
+  return getTasksByStatus(state, "someday").sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
 export function getTodayTasks(state: AppState, now: number): Task[] {
   const end = endOfDayOf(now);
   return liveTasks(state)

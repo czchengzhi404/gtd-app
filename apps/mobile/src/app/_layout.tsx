@@ -115,6 +115,9 @@ function StackScreens() {
       <Stack.Screen name="recent" options={{ title: t("app.more.recent") }} />
       <Stack.Screen name="settings" options={{ title: t("app.more.settings") }} />
       <Stack.Screen name="data" options={{ title: t("more.group.data") }} />
+      <Stack.Screen name="materials" options={{ title: t("materials.title") }} />
+      <Stack.Screen name="writing" options={{ title: t("writing.title") }} />
+      <Stack.Screen name="history" options={{ title: t("history.title") }} />
     </Stack>
   );
 }

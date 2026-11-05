@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import { useMemo, useRef } from "react";
 import { Animated, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -45,7 +45,7 @@ const SWIPE_TRIGGER = 72;
  * - 拖拽手柄独立于整行点击，避免与滚动/点击冲突
  * - 所有手势都不改变行高，避免列表跳动
  */
-export function TaskRow({
+function TaskRowImpl({
   title,
   done = false,
   onToggle,
@@ -264,4 +264,26 @@ const styles = StyleSheet.create({
     gap: space.sm,
     overflow: "hidden",
   },
+});
+
+/**
+ * 行级 memo：列表滚动/多选切换时，未变化的任务行不再重渲染。
+ *
+ * 比较策略（为什么跳过函数 props）：onToggle / onPress 这类回调由父级
+ * 每次渲染新建箭头函数，比较引用必然不等——但它们的行为只依赖当前 task，
+ * 而 task 已参与比较，所以跳过它们是安全的。
+ *
+ * meta / actions 参与比较：父级（TaskList）已按 task 缓存它们，
+ * 引用稳定；若父级不缓存，memo 会退化为“总是重渲染”，不会出错。
+ */
+export const TaskRow = memo(TaskRowImpl, (prev, next) => {
+  if (prev.title !== next.title) return false;
+  if (prev.done !== next.done) return false;
+  if (prev.selected !== next.selected) return false;
+  if (prev.selectionMode !== next.selectionMode) return false;
+  if (prev.reorderMode !== next.reorderMode) return false;
+  if (prev.accent !== next.accent) return false;
+  if (prev.meta !== next.meta) return false;
+  if (prev.actions !== next.actions) return false;
+  return true;
 });

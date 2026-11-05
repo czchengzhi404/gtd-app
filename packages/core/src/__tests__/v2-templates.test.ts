@@ -4,7 +4,7 @@ import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { executeCommand } from "../db/commands";
 import { padOrderKey } from "../db/commands/shared";
 import { coerceTaggedRecords } from "../db/coerce";
-import { migrate } from "../db/migrations";
+import { LATEST_SCHEMA_VERSION, migrate } from "../db/migrations";
 import { getTasks, getTemplateById, getTemplates, loadBootstrapData } from "../db/queries";
 import { AppError } from "../models/errors";
 import type { TaggedRecord, TemplateUpsertPayload } from "../models/commands";
@@ -322,7 +322,7 @@ describe("migrations · v5 任务模板表", () => {
 
     const applied = await migrate(executor);
     // v5（task_templates）与 v6（record_base 基线快照）各一条
-    expect(applied).toBe(2);
+    expect(applied).toBe(LATEST_SCHEMA_VERSION - 4);
 
     const columns = db.query("PRAGMA table_info(task_templates)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toEqual([
@@ -350,7 +350,7 @@ describe("migrations · v5 任务模板表", () => {
     const version = db
       .query("SELECT value FROM meta WHERE key = 'schema_version'")
       .get() as { value: string };
-    expect(version.value).toBe("6");
+    expect(version.value).toBe(String(LATEST_SCHEMA_VERSION));
 
     db.close();
   });

@@ -342,6 +342,20 @@ export default function MoreScreen() {
             hint={t("app.more.templatesHint")}
             onPress={() => router.push("/templates")}
           />
+          <Divider inset={space.lg} />
+          <EntryRow
+            icon="library-outline"
+            label={t("materials.title")}
+            hint={t("materials.subtitle")}
+            onPress={() => router.push("/materials")}
+          />
+          <Divider inset={space.lg} />
+          <EntryRow
+            icon="stats-chart-outline"
+            label={t("writing.title")}
+            hint={t("writing.subtitle")}
+            onPress={() => router.push("/writing")}
+          />
         </Card>
 
         {/* 4 清理 */}

@@ -1,6 +1,8 @@
+import { useMemo } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Area, Project, Section, Task } from "@gtd/core";
+import { countWords } from "@gtd/core";
 
 import { SectionHeader } from "./Screen";
 import { TaskRow } from "./TaskRow";
@@ -44,6 +46,12 @@ export function ProjectDetailContent({
   const open = tasks.filter((task) => task.status !== "done");
   const done = tasks.length - open.length;
   const percent = tasks.length === 0 ? 0 : Math.round((done / tasks.length) * 100);
+  // 写作进度：项目内所有正文字数合计（写作者用它衡量"这个项目写了多少"）
+  // useMemo：列表每次滚动/选中都会重渲染，不缓存就等于每次都全量统计
+  const projectWords = useMemo(
+    () => tasks.reduce((sum, task) => sum + countWords(task.notes), 0),
+    [tasks],
+  );
 
   const groups: { key: string; title: string | null; items: Task[] }[] = [];
   const grouped = new Set<string>();
@@ -69,6 +77,11 @@ export function ProjectDetailContent({
             <AppText variant="caption" tone="tertiary" lines={1}>
               {t("projects.openCount", { n: open.length })}
             </AppText>
+            {projectWords > 0 ? (
+              <AppText variant="caption" tone="tertiary" lines={1}>
+                {t("projects.wordCount", { n: projectWords })}
+              </AppText>
+            ) : null}
           </View>
 
           <AppText variant="title" lines={2}>

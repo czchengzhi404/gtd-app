@@ -11,6 +11,7 @@ import {
   PageHeader,
   Screen,
   SectionHeader,
+  SegmentedControl,
   showConfirm,
   showToast,
   useT,
@@ -54,6 +55,8 @@ export default function DataScreen() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState("");
   const [exportSheetKind, setExportSheetKind] = useState<ExportKind | null>(null);
+  // Markdown 导出范围：默认只导未完成；写作者归档已完成的稿子时需要"含已完成"
+  const [includeCompleted, setIncludeCompleted] = useState(false);
   const [backups, setBackups] = useState(0);
 
   useEffect(() => {
@@ -93,7 +96,7 @@ export default function DataScreen() {
     try {
       const result =
         kind === "markdown"
-          ? await exportMarkdown(target)
+          ? await exportMarkdown(target, includeCompleted)
           : kind === "ics"
             ? await exportICS(target)
             : await exportBackupJSON(target);
@@ -205,6 +208,15 @@ export default function DataScreen() {
                 onPress={() => startTextExport("markdown")}
               />
             </View>
+            <SegmentedControl<"open" | "all">
+              accessibilityLabel={t("app.more.exportScope")}
+              value={includeCompleted ? "all" : "open"}
+              onChange={(key) => setIncludeCompleted(key === "all")}
+              items={[
+                { key: "open", label: t("app.more.exportScopeOpen") },
+                { key: "all", label: t("app.more.exportScopeAll") },
+              ]}
+            />
             <View style={styles.buttonRow}>
               <Button
                 label={t("app.more.exportICS")}

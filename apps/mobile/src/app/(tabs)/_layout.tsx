@@ -1,7 +1,7 @@
 import { Tabs, usePathname, router } from "expo-router";
 import { View } from "react-native";
 
-import { AppTabBar, AppText, NAV_ITEMS, Sidebar, useTheme, useT, useBreakpoint, useAppStore } from "@gtd/ui";
+import { AppTabBar, AppText, NAV_ITEMS, Sidebar, useTheme, useT, useBreakpoint, useNowMinute, useAppStore } from "@gtd/ui";
 import { getInboxTasks, getTodayTasks } from "@gtd/core";
 
 /**
@@ -17,7 +17,8 @@ export default function TabsLayout() {
   const tr = useT();
   const activeRoute = (pathname?.split("/")[1] ?? "index") || "index";
   const inboxCount = useAppStore((s) => getInboxTasks(s).length);
-  const todayCount = useAppStore((s) => getTodayTasks(s, Date.now()).length);
+  const nowMinute = useNowMinute();
+  const todayCount = useAppStore((s) => getTodayTasks(s, nowMinute).length);
   const badges: Record<string, number> = { index: inboxCount, today: todayCount };
 
   const headingOptions = {

@@ -14,7 +14,7 @@
     },
     "apps/desktop": {
       "name": "@gtd/desktop",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "dependencies": {
         "better-sqlite3": "13.0.3",
         "electron-updater": "^6.8.11",
@@ -29,11 +29,12 @@
     },
     "apps/mobile": {
       "name": "@gtd/mobile",
-      "version": "2.2.0",
+      "version": "2.3.0",
       "dependencies": {
         "@expo/metro-runtime": "~57.0.17",
         "@gtd/core": "workspace:*",
         "@gtd/ui": "workspace:*",
+        "@shopify/flash-list": "^2.3.3",
         "expo": "~57.0.31",
         "expo-constants": "~57.0.22",
         "expo-document-picker": "~57.0.3",
@@ -483,6 +484,8 @@
     "@react-native/normalize-colors": ["@react-native/normalize-colors@0.86.3", "https://registry.npmmirror.com/@react-native/normalize-colors/-/normalize-colors-0.86.3.tgz", {}, "sha512-Cv3CDkprb67GrzuaS9BGbBJC/6G4lIw3nyKOHRKTqTTum4bn37y5+R0Z04L8mcbQN85eEohNrRwb7IOM4j6uvg=="],
 
     "@react-native/virtualized-lists": ["@react-native/virtualized-lists@0.86.3", "https://registry.npmmirror.com/@react-native/virtualized-lists/-/virtualized-lists-0.86.3.tgz", { "dependencies": { "invariant": "^2.2.4", "nullthrows": "^1.1.1" }, "peerDependencies": { "@types/react": "^19.2.0", "react": "*", "react-native": "0.86.3" }, "optionalPeers": ["@types/react"] }, "sha512-1j44NEyNn05Ut40vHAmoSWbsIcybFkMAOBTwQt1PrESyfSS+qBoyU1LGIogNva0VIa0rQyEC5PzbA7R4/7Nhyw=="],
+
+    "@shopify/flash-list": ["@shopify/flash-list@2.3.3", "https://registry.npmmirror.com/@shopify/flash-list/-/flash-list-2.3.3.tgz", { "peerDependencies": { "@babel/runtime": "*", "react": "*", "react-native": "*" } }, "sha512-77MXV5YKMo3B3XZtgNXBaELZVQOE0bDcQxH4D/qf0i3o6YkZWBoHeR0CkFXZBdyoZqgvsUe3kkr0qhQE9lVqtg=="],
 
     "@sinclair/typebox": ["@sinclair/typebox@0.27.12", "https://registry.npmmirror.com/@sinclair/typebox/-/typebox-0.27.12.tgz", {}, "sha512-hhyNJ+nbR6ZR7pToHvllEFun9TL0sbL+tk/ON75lo+Xas054uez98qRbsuNt7MBCyZKK4+8Yli/OAGZhmfBZ/g=="],
 

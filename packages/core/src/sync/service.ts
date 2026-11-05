@@ -10,7 +10,7 @@ import {
   getContexts,
   getAreas,
   getTemplates,
-  getAttachmentsForTask,
+  getAllActiveAttachments,
 } from "../db/queries";
 import type { TaggedRecord } from "../models/commands";
 import type { SqliteExecutor } from "../platform/executor";
@@ -75,17 +75,68 @@ export async function collectLocalRecords(executor: SqliteExecutor): Promise<Tag
     ...areas.map((record) => ({ type: "area", record }) as TaggedRecord),
     ...templates.map((record) => ({ type: "template", record }) as TaggedRecord),
   ];
-  // 墓碑任务不在 getTasks 结果里：附件只挂活跃任务，元数据量小，按任务逐个查
-  for (const task of tasks) {
-    const attachments = await getAttachmentsForTask(executor, task.id);
-    for (const record of attachments) {
-      records.push({ type: "attachment", record });
-    }
+  // 附件一次全表查（原先是按任务逐个查的 N+1：真机上每次 query 都要跨原生桥）。
+  // 全表查同时补上了旧实现的漏洞——墓碑任务下未删除的附件此前不会被收集。
+  const attachments = await getAllActiveAttachments(executor);
+  for (const record of attachments) {
+    records.push({ type: "attachment", record });
   }
   // 墓碑记录：直接扫全表（含墓碑），保证删除能传播
   const tombstones = await queryTombstones(executor);
   records.push(...tombstones);
   return records;
+}
+
+/**
+ * 记录集指纹（FNV-1a 32 位）。
+ *
+ * 用途：自动同步会**频繁**触发（前后台切换、定时器），但绝大多数时候本地没有任何
+ * 改动。此时仍然上传一份完整的 records.json 纯属浪费——尤其走 WebDAV/S3 时是实打实的
+ * 流量与耗时。用指纹比对上次推送的内容，没变就跳过写入。
+ *
+ * 为什么用哈希而不是直接存 JSON：指纹只有 8 个字符，放进 kv 不占空间，
+ * 也不需要把上百万字符的记录集再读回来比对。
+ */
+function fingerprintRecords(records: TaggedRecord[]): string {
+  let hash = 0x811c9dc5;
+  for (const record of records) {
+    const text = `${record.type}:${record.record.id}:${record.record.revision}:${record.record.updatedAt};`;
+    for (let i = 0; i < text.length; i += 1) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 0x01000193);
+    }
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+const FINGERPRINT_KEY = "sync.lastPushFingerprint";
+
+function finishedNow(deps: SyncDeps): number {
+  return deps.now?.() ?? Date.now();
+}
+
+async function readKvValue(executor: SqliteExecutor, key: string): Promise<string | null> {
+  const rows = await executor.query<{ value: string }>(
+    "SELECT value FROM kv WHERE key = ?",
+    [key],
+  );
+  return rows[0]?.value ?? null;
+}
+
+async function writeKvValue(
+  executor: SqliteExecutor,
+  key: string,
+  value: string,
+  now: number,
+): Promise<void> {
+  void now;
+  // 注意：kv 表只有 (key, value) 两列——早先按 (key, value, updated_at) 写入会被 SQLite
+  // 直接拒绝，而调用方又把异常吞掉了，导致"跳过推送"永远不生效。这里对齐真实 schema。
+  await executor.run(
+    `INSERT INTO kv (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+    [key, value],
+  );
 }
 
 /** 查询各表墓碑（deleted_at IS NOT NULL）——getTasks 系列默认排除墓碑 */
@@ -271,9 +322,25 @@ export async function syncNow(deps: SyncDeps): Promise<SyncReport> {
   const finalManifest = await buildLocalManifest(executor);
   const finalRecords = await collectLocalRecords(executor);
   emit({ phase: "push", done: 0, total: finalRecords.length });
+
+  // 增量推送：记录集与上次推送完全一致时跳过写 records。
+  // 自动同步会被前后台切换/定时器频繁触发，而多数时候本地毫无改动——
+  // 走 WebDAV/S3 时，省下的是整份快照的上传流量与延迟。
+  // manifest 仍然写（体积小，且设备在线状态要更新）。
+  const fingerprint = fingerprintRecords(finalRecords);
+  const lastFingerprint = await readKvValue(executor, FINGERPRINT_KEY).catch(() => null);
+  const recordsUnchanged = lastFingerprint === fingerprint;
+
   await deps.provider.writeManifest(deps.deviceId, finalManifest);
-  await deps.provider.writeRecords(deps.deviceId, finalRecords);
-  emit({ phase: "push", done: finalRecords.length, total: finalRecords.length });
+  if (recordsUnchanged) {
+    emit({ phase: "push", done: finalRecords.length, total: finalRecords.length });
+  } else {
+    await deps.provider.writeRecords(deps.deviceId, finalRecords);
+    await writeKvValue(executor, FINGERPRINT_KEY, fingerprint, finishedNow(deps)).catch(
+      () => undefined,
+    );
+    emit({ phase: "push", done: finalRecords.length, total: finalRecords.length });
+  }
 
   const finishedAt = deps.now?.() ?? Date.now();
 
