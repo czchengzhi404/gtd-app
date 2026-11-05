@@ -1,12 +1,15 @@
 import type {
   CommandMap,
   CommandOp,
+  FieldMergeEntry,
+  FieldMergeSummary,
   RecordsApplyPayload,
   TaggedRecord,
 } from "../../models/commands";
 import type { Task } from "../../models/task";
 import type { SqliteExecutor, SqliteRow } from "../../platform/executor";
 import { coerceTaggedRecords } from "../coerce";
+import { readRecordBase, upsertRecordBase } from "../record-base";
 import {
   areaFromRow,
   areaToParams,
@@ -23,7 +26,8 @@ import {
   templateFromRow,
   templateToParams,
 } from "../mappers";
-import { mergeOne } from "../../sync/merge";
+import { isTaskRecord, mergeTaskFields } from "../../sync/fieldmerge";
+import { compareEntries, entryOf } from "../../sync/merge";
 
 /**
  * 命令层共享设施。
@@ -44,11 +48,23 @@ export interface CommandContext {
   now: () => number;
 }
 
+/**
+ * handler 可选返回形状：除了受影响记录，还能携带与合并有关的汇总
+ * （目前只有 sync.applyRemote / import.merge 会带 mergeSummary）。
+ * 返回裸数组仍然合法——executeCommand 会归一化，既有 handler 无需改动。
+ */
+export interface HandlerOutcome {
+  records: TaggedRecord[];
+  mergeSummary?: FieldMergeSummary;
+}
+
+export type HandlerResult = TaggedRecord[] | HandlerOutcome;
+
 export type Handler<K extends CommandOp> = (
   tx: SqliteExecutor,
   payload: CommandMap[K],
   ctx: CommandContext,
-) => Promise<TaggedRecord[]>;
+) => Promise<HandlerResult>;
 
 export function tagTask(task: Task): TaggedRecord {
   return { type: "task", record: task };
@@ -190,25 +206,129 @@ export async function writeRawRecord(tx: SqliteExecutor, tagged: TaggedRecord): 
   }
 }
 
+/** applyRemoteRecords 的返回：写回记录 + 字段级合并汇总 */
+export interface ApplyRemoteOutcome {
+  applied: TaggedRecord[];
+  mergeSummary: FieldMergeSummary;
+}
+
 /**
- * 应用一批远端/导入记录：逐条按 revision → updatedAt → id 规则合并，
- * 胜出者原样写入。返回实际应用的记录（本地被远端更新的那些）。
+ * 应用一批远端/导入记录。逐条决策（顺序即优先级）：
+ *
+ * ① 本地没有该记录 → 整条应用，并更新基线；
+ * ② 远端胜（revision 更高，或 revision 并列时 updatedAt 更新）→ 整条应用，
+ *    并更新基线（此前行为不变，只是多记一份 base）；
+ * ③ revision 并列且 updatedAt 不更新 → 不动（此前行为不变）；
+ * ④ 本地 revision 更高：
+ *    a. task + 两端都非墓碑 + 有基线 → **字段级 3-way**（mergeTaskFields）：
+ *       合并结果与 local 不同时写回，revision = local.revision + 1、
+ *       updatedAt = now，并更新基线；相同则只记录冲突字段名；
+ *    b. task 但无基线 → 保持本地（整条 LWW），记入 noBaseConflicts；
+ *    c. 非 task 类型，或任一端是墓碑 → 保持本地（整条 LWW），记入 unmergeable。
+ *       墓碑不参与字段合并：把已删记录的字段搬进活记录，等于半复活。
+ *
+ * 返回实际写入本地的记录（含字段级合并写回的记录），以及字段级合并汇总。
  * 调用方（SyncService）按 200–500 条/批分块，每批 = 本命令 = 一个独立
  * immediate 事务；绝不与用户命令共享事务边界。
  */
 export async function applyRemoteRecords(
   tx: SqliteExecutor,
   payload: RecordsApplyPayload,
-): Promise<TaggedRecord[]> {
+  ctx: CommandContext,
+): Promise<ApplyRemoteOutcome> {
   const incoming = coerceTaggedRecords(payload.records);
   const applied: TaggedRecord[] = [];
+  const entries: FieldMergeEntry[] = [];
+  const noBaseConflicts: string[] = [];
+  const unmergeable: string[] = [];
+  const staleRemotes: string[] = [];
+  const mergedFieldNames = new Set<string>();
+  const conflictFieldNames = new Set<string>();
+
   for (const remote of incoming) {
     const local = await readAnyRecord(tx, remote.type, remote.record.id);
-    const { localNeedsUpdate } = mergeOne(local ?? undefined, remote);
-    if (localNeedsUpdate) {
+
+    // ① 本地没有 → 整条应用
+    if (local === null) {
       await writeRawRecord(tx, remote);
+      await upsertRecordBase(tx, remote, ctx.now());
       applied.push(remote);
+      continue;
     }
+
+    // ② 远端胜 → 整条应用
+    const cmp = compareEntries(entryOf(local), entryOf(remote), local.record.id, remote.record.id);
+    if (cmp < 0) {
+      await writeRawRecord(tx, remote);
+      await upsertRecordBase(tx, remote, ctx.now());
+      applied.push(remote);
+      continue;
+    }
+
+    // ③ revision 并列 → 不动（并列的 updatedAt tiebreak 已在 ② 处理完毕）
+    if (remote.record.revision === local.record.revision) continue;
+
+    // ④ 本地 revision 更高：只有"任务 + 两端活 + 有基线"才做字段级合并
+    if (
+      !isTaskRecord(local) ||
+      !isTaskRecord(remote) ||
+      local.record.deletedAt !== null ||
+      remote.record.deletedAt !== null
+    ) {
+      unmergeable.push(local.record.id);
+      continue;
+    }
+
+    const base = await readRecordBase(tx, local.record.id);
+    if (base === null) {
+      noBaseConflicts.push(local.record.id);
+      continue;
+    }
+
+    // 基线必须"严格早于"这份远端记录，它才是可用的共同祖先：
+    // 若 base.revision >= remote.revision，说明对方还没拉到我们上一次推送，
+    // 这份远端记录是陈旧副本——它与 base 的差异是我们早已消化过的旧值，
+    // 合并回来只会把本地新值改回旧值（并制造 revision 抖动）。
+    const baseRevision = typeof base.revision === "number" ? base.revision : 0;
+    if (baseRevision >= remote.record.revision) {
+      staleRemotes.push(local.record.id);
+      continue;
+    }
+
+    const merged = mergeTaskFields(base, local.record, remote.record);
+    if (merged.mergedFields.length > 0 || merged.conflictFields.length > 0) {
+      entries.push({
+        recordId: local.record.id,
+        mergedFields: [...merged.mergedFields],
+        conflictFields: [...merged.conflictFields],
+      });
+      for (const field of merged.mergedFields) mergedFieldNames.add(field);
+      for (const field of merged.conflictFields) conflictFieldNames.add(field);
+    }
+
+    if (!merged.changed) continue;
+
+    // 合并结果与 local 不同 → 写回并推进 revision（本地胜出，故 +1 覆盖远端）
+    const next: Task = {
+      ...merged.record,
+      revision: local.record.revision + 1,
+      updatedAt: ctx.now(),
+    };
+    const tagged: TaggedRecord = { type: "task", record: next };
+    await writeRawRecord(tx, tagged);
+    await upsertRecordBase(tx, tagged, ctx.now());
+    applied.push(tagged);
   }
-  return applied;
+
+  return {
+    applied,
+    mergeSummary: {
+      entries,
+      mergedFields: [...mergedFieldNames].sort(),
+      conflictFields: [...conflictFieldNames].sort(),
+      noBaseConflicts,
+      unmergeable,
+      staleRemotes,
+    },
+  };
 }

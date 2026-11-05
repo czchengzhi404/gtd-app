@@ -314,14 +314,15 @@ describe("template.softDelete · 墓碑", () => {
 });
 
 describe("migrations · v5 任务模板表", () => {
-  test("v4 → v5：建表 + 索引 + 版本号推进，v1–v4 不受影响", async () => {
+  test("v4 → 最新：建表 + 索引 + 版本号推进，v1–v4 不受影响", async () => {
     const db = new Database(":memory:");
     db.run("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
     db.run("INSERT INTO meta (key, value) VALUES ('schema_version', '4')");
     const executor = makeExecutor(db);
 
     const applied = await migrate(executor);
-    expect(applied).toBe(1);
+    // v5（task_templates）与 v6（record_base 基线快照）各一条
+    expect(applied).toBe(2);
 
     const columns = db.query("PRAGMA table_info(task_templates)").all() as { name: string }[];
     expect(columns.map((column) => column.name)).toEqual([
@@ -349,7 +350,7 @@ describe("migrations · v5 任务模板表", () => {
     const version = db
       .query("SELECT value FROM meta WHERE key = 'schema_version'")
       .get() as { value: string };
-    expect(version.value).toBe("5");
+    expect(version.value).toBe("6");
 
     db.close();
   });

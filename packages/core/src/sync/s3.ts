@@ -1,8 +1,9 @@
 /**
  * S3 兼容存储 Provider（阿里云 OSS / 腾讯云 COS / MinIO / AWS S3 / Backblaze B2）。
  *
- * 使用 AWS Signature V4 签名，基于 Web Crypto API（crypto.subtle）——
- * 桌面渲染进程（Chromium）与 Bun 均原生支持，无需 Node crypto。
+ * 使用 AWS Signature V4 签名。签名原语是**纯 JS** 实现（`./crypto`）：
+ * 手机端跑在 Hermes 上，既没有 `crypto.subtle` 也没有 `TextEncoder`，
+ * 依赖 WebCrypto 会让移动端 S3 同步直接崩掉。
  *
  * 路径结构：{endpoint}/{bucket}/devices/{deviceId}/{manifest.json, records.json}
  * （path-style 寻址，兼容所有 S3 兼容服务）
@@ -11,6 +12,7 @@ import type { Manifest, SyncProvider, SyncConfig } from "./types";
 import { SYNC_FILE_LAYOUT } from "./types";
 import type { FilesPort } from "../platform/ports";
 import type { TaggedRecord } from "../models/commands";
+import { hmacSha256, sha256Hex, toHex, utf8ToBytes } from "./crypto";
 
 export interface S3Config extends SyncConfig {
   kind: "s3";
@@ -31,31 +33,13 @@ export interface S3ConfigInput {
 
 /* ---------------- AWS SigV4 签名 ---------------- */
 
-const encoder = new TextEncoder();
 /** 兼容无 DOM lib 的环境：fetch body 类型 */
 type Body = Parameters<typeof fetch>[1] extends { body?: infer B } ? B : never;
 
-async function sha256Hex(data: string | Uint8Array): Promise<string> {
-  const bytes = typeof data === "string" ? encoder.encode(data) : data;
-  const hash = await crypto.subtle.digest("SHA-256", bytes as unknown as ArrayBuffer);
-  return [...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function hmacSha256(key: Uint8Array | string, data: string): Promise<Uint8Array> {
-  const raw = typeof key === "string" ? encoder.encode(key) : key;
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    raw as unknown as ArrayBuffer,
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign("HMAC", cryptoKey, encoder.encode(data));
-  return new Uint8Array(sig);
-}
-
-function toHex(bytes: Uint8Array): string {
-  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+/** SigV4 需要的是字节级 HMAC（key 与 data 都可能是文本） */
+function hmac(key: Uint8Array | string, data: string): Uint8Array {
+  const keyBytes = typeof key === "string" ? utf8ToBytes(key) : key;
+  return hmacSha256(keyBytes, utf8ToBytes(data));
 }
 
 interface SigV4Result {
@@ -67,7 +51,7 @@ interface SigV4Result {
 /** 导出供测试使用（AWS SigV4 签名是纯计算，不含网络 IO） */
 export { signRequest };
 
-async function signRequest(
+function signRequest(
   method: string,
   url: URL,
   payload: string | Uint8Array | null,
@@ -75,11 +59,11 @@ async function signRequest(
   secretAccessKey: string,
   region: string,
   service = "s3",
-): Promise<SigV4Result> {
+): SigV4Result {
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
   const dateStamp = amzDate.slice(0, 8);
-  const payloadHash = await sha256Hex(payload ?? "");
+  const payloadHash = sha256Hex(payload ?? "");
 
   const host = url.host;
   const path = decodeURIComponent(url.pathname);
@@ -105,14 +89,14 @@ async function signRequest(
     "AWS4-HMAC-SHA256",
     amzDate,
     scope,
-    await sha256Hex(canonicalRequest),
+    sha256Hex(canonicalRequest),
   ].join("\n");
 
-  let signingKey = await hmacSha256(`AWS4${secretAccessKey}`, dateStamp);
-  signingKey = await hmacSha256(signingKey, region);
-  signingKey = await hmacSha256(signingKey, service);
-  signingKey = await hmacSha256(signingKey, "aws4_request");
-  const signature = toHex(await hmacSha256(signingKey, stringToSign));
+  let signingKey = hmac(`AWS4${secretAccessKey}`, dateStamp);
+  signingKey = hmac(signingKey, region);
+  signingKey = hmac(signingKey, service);
+  signingKey = hmac(signingKey, "aws4_request");
+  const signature = toHex(hmac(signingKey, stringToSign));
 
   return {
     authorization: `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${scope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
@@ -131,7 +115,7 @@ export function createS3Provider(config: S3ConfigInput): SyncProvider {
     `${bucketPath}/${SYNC_FILE_LAYOUT.devicesDir}/${encodeURIComponent(deviceId)}/${file}`;
   const listUrl = () => `${bucketPath}/${SYNC_FILE_LAYOUT.devicesDir}/`;
 
-  const sign = async (method: string, url: string, payload: string | Uint8Array | null) => {
+  const sign = (method: string, url: string, payload: string | Uint8Array | null) => {
     const parsed = new URL(url);
     const keyId = config.accessKeyId ?? "";
     const secret = config.secretAccessKey ?? "";
@@ -150,8 +134,7 @@ export function createS3Provider(config: S3ConfigInput): SyncProvider {
     url: string,
     payload: string | Uint8Array | null,
   ): Promise<{ status: number; body: string }> {
-    const sig = await sign(method, url, payload);
-    const body = payload === null ? undefined : new Uint8Array(encoder.encode(typeof payload === "string" ? payload : "")).length > 0 && typeof payload === "string" ? payload : payload;
+    const sig = sign(method, url, payload);
     const res = await fetch(url, {
       method,
       headers: {
@@ -171,7 +154,7 @@ export function createS3Provider(config: S3ConfigInput): SyncProvider {
     listDevices: async () => {
       // S3 ListObjectsV2：列出 devices/ 前缀下的对象 key，提取 deviceId
       const url = `${bucketPath}?list-type=2&prefix=${SYNC_FILE_LAYOUT.devicesDir}/&delimiter=/`;
-      const sig = await sign("GET", url, null);
+      const sig = sign("GET", url, null);
       const res = await fetch(url, { headers: headers(sig) });
       if (res.status === 404) return [];
       if (!res.ok) throw new Error(`S3 ListObjectsV2 失败: HTTP ${res.status}`);

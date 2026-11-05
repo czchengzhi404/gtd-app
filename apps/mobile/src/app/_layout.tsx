@@ -17,6 +17,7 @@ import {
 } from "@gtd/ui";
 import { appStore, bootstrapStore, runCommand } from "@gtd/core";
 import { initPlatform } from "@/platform/bootstrap";
+import { startSyncScheduler } from "@/platform/sync-scheduler";
 import { installFontScaleOverride } from "@/platform/font-scale";
 import { ensureBuiltinFont, isBuiltinFontSelected } from "@/platform/font-loader";
 import { CommandPaletteHost } from "@/platform/CommandPaletteHost";
@@ -35,6 +36,7 @@ export default function RootLayout() {
   useEffect(() => {
     let cancelled = false;
     let cleanup: (() => void) | undefined;
+    let stopSync: (() => void) | undefined;
     void (async () => {
       try {
         const result = await initPlatform();
@@ -43,6 +45,8 @@ export default function RootLayout() {
         if (isBuiltinFontSelected()) {
           await ensureBuiltinFont();
         }
+        // 自动同步：启动/回前台/本地改动（20s 合并）触发；未配置时自动空转
+        if (!cancelled) stopSync = startSyncScheduler();
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : String(err);
@@ -53,6 +57,7 @@ export default function RootLayout() {
     })();
     return () => {
       cancelled = true;
+      stopSync?.();
       cleanup?.();
     };
   }, []);

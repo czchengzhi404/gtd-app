@@ -7,6 +7,10 @@ import type { Manifest, ManifestEntry } from "./types";
  * ② revision 并列 → updatedAt 新者胜（仅 tiebreak，容忍时钟偏差）
  * ③ 再并列 → id 字典序（较小 id 胜；同一 id 场景恒等，理论不可达，保留为最终决胜）
  * 墓碑作为普通记录参与比较：被更高 revision 的编辑击败则"复活"，预期行为。
+ *
+ * 本文件只描述"整条记录取舍"。任务的进一步处理在命令层：当本地 revision 更高、
+ * 两端都不是墓碑、且存在基线快照（record_base）时，`sync.applyRemote` 会改用
+ * 字段级 3-way 合并（见 sync/fieldmerge.ts）；其余类型始终是整条 LWW。
  */
 
 /**
@@ -27,8 +31,8 @@ export function compareEntries(
   return 0;
 }
 
-/** entry → record 的描述（用于反查谁赢了） */
-function entryOf(record: TaggedRecord): ManifestEntry {
+/** entry → record 的描述（用于反查谁赢了；命令层合并前也需要同一份 entry） */
+export function entryOf(record: TaggedRecord): ManifestEntry {
   return {
     revision: record.record.revision,
     updatedAt: record.record.updatedAt,

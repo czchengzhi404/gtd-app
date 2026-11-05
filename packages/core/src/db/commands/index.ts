@@ -44,7 +44,8 @@ import type { CommandContext, Handler } from "./shared";
  * 1. 先做 schema 校验（失败不进入事务，包装为 AppError(validation_failed)）；
  * 2. 再在 executor.transaction(..., "immediate") 中执行 handler；
  * 3. handler 内部不做与数据库无关的异步等待，保证桌面主进程同线程串行语义；
- * 4. 返回值固定为 { ids, records, serverTime }，records 为可结构化克隆快照。
+ * 4. 返回值固定为 { ids, records, serverTime }，records 为可结构化克隆快照；
+ *    同步类命令额外可选带 mergeSummary（字段级合并汇总）。
  *
  * SQL 纪律：所有 SQL 都是单一静态字符串字面量 + 参数绑定，禁止拼接；
  * 动态排序/字段必须走白名单映射（当前命令层没有动态列）。
@@ -134,14 +135,18 @@ export async function executeCommand<K extends CommandOp>(
   }
 
   try {
-    const records = await executor.transaction(
+    const outcome = await executor.transaction(
       (tx) => definition.handler(tx, parsed, ctx),
       "immediate",
     );
+    // handler 可返回裸记录数组（绝大多数命令）或 { records, mergeSummary }
+    const records = Array.isArray(outcome) ? outcome : outcome.records;
+    const mergeSummary = Array.isArray(outcome) ? undefined : outcome.mergeSummary;
     return {
       ids: records.map((record) => record.record.id),
       records,
       serverTime: ctx.now(),
+      ...(mergeSummary === undefined ? {} : { mergeSummary }),
     };
   } catch (err) {
     throw toAppError(err);

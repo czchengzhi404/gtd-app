@@ -3,6 +3,7 @@ import { SYNC_FILE_LAYOUT } from "./types";
 import type { FilesPort } from "../platform/ports";
 import type { TaggedRecord } from "../models/commands";
 import { createS3Provider } from "./s3";
+import { base64FromString } from "./crypto";
 
 /**
  * 三种 Provider 共用同一文件布局（devices/<deviceId>/{manifest.json, records.json}）。
@@ -21,7 +22,8 @@ async function ensureOk(res: Response, what: string): Promise<void> {
 
 function authHeaders(config: SyncConfig): Record<string, string> {
   if (config.username !== undefined || config.password !== undefined) {
-    const token = btoa(`${config.username ?? ""}:${config.password ?? ""}`);
+    // 用自带 Base64：手机端跑在 Hermes 上，没有全局 btoa
+    const token = base64FromString(`${config.username ?? ""}:${config.password ?? ""}`);
     return { Authorization: `Basic ${token}` };
   }
   return {};

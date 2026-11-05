@@ -15,22 +15,23 @@ import {
   collectLocalRecords,
   chunkRecords,
   getKvValue,
+  describePeerDevices,
+  base64FromString,
 } from "@gtd/core";
-import type { SyncConfig } from "@gtd/core";
+import type { PeerDeviceInfo, SyncConfig, SyncProgress } from "@gtd/core";
 import { t } from "@gtd/ui";
 import { gtd } from "./gtd-api";
 import { isDesktop } from "./env";
+import { openSecret, sealSecret } from "./secret-store";
 
-/** 敏感字段加密（桌面端 safeStorage，OS 级加密） */
-async function encryptSecret(plaintext: string): Promise<string> {
-  if (!isDesktop()) return plaintext;
-  return gtd().secret.encrypt(plaintext);
+/** 敏感字段加密：桌面走 safeStorage，移动端进系统安全存储（kv 只留指针） */
+async function encryptSecret(plaintext: string, slot: "password" | "s3"): Promise<string> {
+  return sealSecret(plaintext, slot);
 }
 
-/** 敏感字段解密 */
+/** 敏感字段解密（保留旧签名，内部统一走 secret-store） */
 export async function decryptSecret(ciphertext: string): Promise<string> {
-  if (!isDesktop()) return ciphertext;
-  return gtd().secret.decrypt(ciphertext);
+  return (await openSecret(ciphertext, "password")) ?? "";
 }
 
 export interface SyncOutcome {
@@ -38,32 +39,61 @@ export interface SyncOutcome {
   message: string;
 }
 
+/** 把底层异常翻译成人能看懂的原因（网络 / 认证 / 路径 / 其它） */
+export function classifySyncError(err: unknown): string {
+  const raw = err instanceof Error ? err.message : String(err);
+  if (/\b(401|403)\b|unauthor|forbidden|invalid_?token|认证/i.test(raw)) return t("sync.errAuth");
+  if (/\b404\b|not found|找不到/i.test(raw)) return t("sync.errNotFound");
+  if (/ECONN|ETIMEDOUT|ENOTFOUND|network|fetch failed|timeout|abort/i.test(raw)) return t("sync.errNetwork");
+  if (/ENOSPC|quota|space/i.test(raw)) return t("sync.errQuota");
+  return t("sync.errUnknown", { message: raw });
+}
+
 /* ---------------- 手动同步 ---------------- */
 
-export async function runManualSync(): Promise<SyncOutcome> {
+/**
+ * 读取同步配置并把敏感字段还原成明文（提供者需要真密码）。
+ * 这是唯一允许拿到明文的地方：供 runManualSync / testSyncConnection / 云备份使用。
+ */
+export async function resolveSyncConfig(): Promise<SyncConfig | null> {
+  const config = await getSyncConfig(getSqliteExecutor());
+  if (config === null) return null;
+  const password = await openSecret(config.password, "password");
+  const secretAccessKey = await openSecret(config.secretAccessKey, "s3");
+  return { ...config, password, secretAccessKey };
+}
+
+export async function runManualSync(
+  onProgress?: (progress: SyncProgress) => void,
+): Promise<SyncOutcome> {
   const executor = getSqliteExecutor();
-  const config = await getSyncConfig(executor);
+  const config = await resolveSyncConfig();
   if (config === null || !config.enabled) {
     return { ok: false, message: t("sync.notEnabled") };
   }
   const deviceId = await getOrCreateDeviceId(executor);
   const provider = createProvider(config, getFilesPort() ?? undefined);
-  const report = await syncNow({
-    provider,
-    executor,
-    deviceId,
-    apply: createSyncApplyForRenderer(),
-  });
-  await runCommand("settings.set", { key: "sync.last", value: String(report.finishedAt) });
-  await bootstrapStore();
-  return {
-    ok: true,
-    message: t("sync.report", {
-      applied: report.applied,
-      pushed: report.pushed,
-      devices: report.devices + 1,
-    }),
-  };
+  try {
+    const report = await syncNow({
+      provider,
+      executor,
+      deviceId,
+      apply: createSyncApplyForRenderer(),
+      onProgress,
+    });
+    await runCommand("settings.set", { key: "sync.last", value: String(report.finishedAt) });
+    await bootstrapStore();
+    return {
+      ok: true,
+      message: t("sync.report", {
+        applied: report.applied,
+        pushed: report.pushed,
+        devices: report.devices + 1,
+      }),
+    };
+  } catch (err) {
+    return { ok: false, message: classifySyncError(err) };
+  }
 }
 
 /* ---------------- 同步配置 ---------------- */
@@ -76,10 +106,10 @@ export async function saveSyncConfig(config: SyncConfig): Promise<void> {
   }
   const encrypted = { ...final };
   if (encrypted.password !== undefined && encrypted.password.length > 0) {
-    encrypted.password = await encryptSecret(encrypted.password);
+    encrypted.password = await encryptSecret(encrypted.password, "password");
   }
   if (encrypted.secretAccessKey !== undefined && encrypted.secretAccessKey.length > 0) {
-    encrypted.secretAccessKey = await encryptSecret(encrypted.secretAccessKey);
+    encrypted.secretAccessKey = await encryptSecret(encrypted.secretAccessKey, "s3");
   }
   await runCommand("settings.set", { key: "sync.config", value: JSON.stringify(encrypted) });
 }
@@ -121,10 +151,23 @@ export async function restoreLatestBackup(): Promise<BackupOutcome> {
 /* ---------------- 连接测试 ---------------- */
 
 export async function testSyncConnection(config: SyncConfig): Promise<SyncOutcome> {
-  const executor = getSqliteExecutor();
-  const provider = createProvider(config, getFilesPort() ?? undefined);
+  const resolved: SyncConfig = {
+    ...config,
+    password: await openSecret(config.password, "password"),
+    secretAccessKey: await openSecret(config.secretAccessKey, "s3"),
+  };
+  const provider = createProvider(resolved, getFilesPort() ?? undefined);
   const devices = await provider.listDevices();
   return { ok: true, message: `${devices.length + 1}` };
+}
+
+/** 其他设备概览（记录数 + 最后活动时间），用于同步页的「其他设备」列表 */
+export async function listPeerDevices(): Promise<PeerDeviceInfo[]> {
+  const config = await resolveSyncConfig();
+  if (config === null || !config.enabled) return [];
+  const provider = createProvider(config, getFilesPort() ?? undefined);
+  const deviceId = await getOrCreateDeviceId(getSqliteExecutor());
+  return describePeerDevices(provider, deviceId);
 }
 
 /* ---------------- JSON 导出导入 ---------------- */
@@ -164,8 +207,8 @@ function backupFileName(): string {
 }
 
 function b64(str: string): string {
-  // 浏览器环境无 Buffer，用 btoa
-  return btoa(str);
+  // 手机端 Hermes 没有全局 btoa：走 core 的纯 JS 实现
+  return base64FromString(str);
 }
 
 async function generateBackupJSON(): Promise<string> {
@@ -174,7 +217,13 @@ async function generateBackupJSON(): Promise<string> {
 }
 
 /** 上传 JSON 备份到已配置的云端存储 */
-export async function backupToCloud(config: SyncConfig): Promise<SyncOutcome> {
+export async function backupToCloud(rawConfig: SyncConfig): Promise<SyncOutcome> {
+  // 配置里的密码可能是 sec:/enc: 指针，这里统一还原成明文
+  const config: SyncConfig = {
+    ...rawConfig,
+    password: await openSecret(rawConfig.password, "password"),
+    secretAccessKey: await openSecret(rawConfig.secretAccessKey, "s3"),
+  };
   const content = await generateBackupJSON();
   const fileName = backupFileName();
 

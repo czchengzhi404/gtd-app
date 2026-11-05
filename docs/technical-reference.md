@@ -1220,32 +1220,94 @@ const groups = useAppStore(selectProjectsByArea);
 ### 13.3 同步流程
 
 ```
-syncNow({provider, executor, deviceId, apply})
+syncNow({provider, executor, deviceId, apply, onProgress})
  ① 本地 manifest = collectLocalRecords(executor)（含墓碑，全表扫描）
  ② 列出 devices/ 下其他设备目录，逐个 GET manifest.json
  ③ idsToFetch(本地 manifest, 远端 manifest) → 待取 id
  ④ 若待取非空：GET 远端 records.json，pickRecords 挑出待取记录
  ⑤ 按 300 条/批调用 sync.applyRemote（每批独立 immediate 事务）
  ⑥ PUT 自己的 manifest.json + records.json
- ⑦ 写 kv["sync.last"]、kv["sync.log"]（应用条数 / 本地胜 / 远端胜 / 冲突清单）
+ ⑦ 写 kv["sync.last"]、kv["sync.log"]（应用条数 / 本地胜 / 远端胜 / 冲突清单 / 耗时）
 ```
+
+`onProgress` 在 ④⑤⑥ 阶段回调 `{phase, done, total, device?, deviceCount?}`，同步页据此显示
+「正在合并记录 120/480」，避免大库首次同步看起来像卡死。
 
 关键设计：
 - **不信任时间窗**：只要 revision/updatedAt/deletedAt 任一不同就取整条，避免"设备时钟差 5 分钟就漏同步"；
 - **批间释放事务**：绝不与用户命令共享事务，同步中途用户仍可正常操作；
 - **幂等**：重复执行同一批 `applyRemote` 结果不变（revision 决胜）。
 
+### 13.3.1 自动同步（v2.3）
+
+调度逻辑在 `packages/core/src/sync/auto.ts`（纯函数 + 注入定时器，可测），接线在
+`apps/mobile/src/platform/sync-scheduler.ts`（RN `AppState` + store 订阅）。
+
+| 触发点 | 行为 |
+|---|---|
+| 应用启动 | 立即 markDirty（新设备第一次打开就能拉到云端数据） |
+| 回到前台 | `AppState → active` 时 markDirty |
+| 本地改动 | store 中 `tasks/projects/sections/contexts/areas/templates` 引用变化时 markDirty |
+| 合并窗口 | 改动后 **20 秒** 合并，避免连续操作打爆网盘 |
+| 最小间隔 | 两次自动同步至少 **60 秒** |
+| 失败退避 | 5 分钟 × 失败次数，上限 30 分钟（退避结束自动重试一次） |
+| 并发保护 | 同一时刻只允许一次同步；同步自身引起的 store 重建不算用户改动 |
+
+开关：`kv["sync.auto"]`，缺省开启，`"0"` 为仅手动（更多 → 同步 → 自动同步）。
+
+### 13.3.2 其他设备可见性（v2.3）
+
+同步目录里只有 `devices/<id>/manifest.json` 与 records 快照，没有额外的"设备名片"。因此
+`sync/devices.ts#describePeerDevices(provider, selfId)` 完全从已有产物推导，不新增文件格式：
+
+| 展示项 | 推导方式 |
+|---|---|
+| 设备标识 | `device_id` 末 6 位（不伪造设备名） |
+| 记录数 | 该设备 manifest 的 key 数量（含墓碑） |
+| 最后活动时间 | manifest 里最大的 `updatedAt`（比文件 mtime 可靠：网盘会改写 mtime） |
+
+同步页展开时与每次手动同步成功后各刷新一次；读不到 manifest（损坏/被删）的设备跳过，不阻塞其他设备。
+
 ### 13.4 冲突语义
 
-- 无 CRDT、无字段级合并：**记录级 last-writer-wins**（revision 优先）。
-- 同一任务两端同时改不同字段，revision 高的一方整条覆盖——会丢掉另一端的字段修改。这是明确取舍：GTD 场景单人使用，冲突概率低，字段级合并的复杂度（需要 per-field revision 与 merge UI）不值得。
-- 冲突可见：同步日志记录"本地胜/远端胜"清单，More 页可查；用户可据此判断是否需要手动恢复。
+**分两层：任务走字段级 3-way，其它类型仍是记录级 LWW。**
+
+#### 13.4.1 任务：字段级 3-way（v2.3）
+
+前提：`record_base` 里存在该记录的基线快照（= 上次同步后写出的那份），且
+`base.revision < remote.revision`、两端都不是墓碑、类型是 `task`。
+
+| 字段情况 | 结果 |
+|---|---|
+| 只有本地变 | 取本地 |
+| 只有远端变 | 取远端（计入 `mergedFields`） |
+| 两边都没变 | 取本地 |
+| 两边都变且值不同 | **冲突**：取本地（revision 高的一侧），字段名进 `conflictFields` |
+
+- 合并结果与本地不同时写回：`revision = local.revision + 1`、`updatedAt = now`，并刷新基线；
+- 数组/对象字段（`contextIds`、`tags`、`checklist`、`recurrence`）按**整值**比较，不做元素级合并
+  （`checklist` 元素级合并需要子项身份与删除语义，本版明确不做）；
+- 相等判定用结构化深比较（`sameFieldValue`），不用 `JSON.stringify`——否则 recurrence 键顺序不同
+  会被误判成"改了"，造成 revision 抖动；
+- 保护性守卫（实现时被测试逼出来的）：若基线 revision ≥ 远端 revision，说明远端是**陈旧副本**，
+  不做字段合并（否则会把本地新值按旧基线改回去），这类记录退回整条 LWW 并计入 `staleRemotes`。
+
+`SyncReport` 暴露：`fieldMergedRecords` / `fieldMerges[]`（≤10 条明细）/ `mergedFields` /
+`conflictFields` / `fieldMergeSkipped` / `baseSnapshotFailed`，同步页可据此显示"哪条记录的哪个字段被本机覆盖"。
+
+#### 13.4.2 其它类型与边界
+
+- 项目 / 分区 / 情境 / 区域 / 模板 / 附件：**记录级 LWW**（revision 优先），与 v2.0 一致。
+- 任一端是墓碑 → 不做字段合并（把已删记录的字段搬进活记录等于半复活），墓碑只走 LWW 复活规则（§8.9）。
+- 首次升级后第一轮同步没有基线（退化为 LWW），之后每次同步刷新基线；设备长期不同步会使基线变旧。
+- 冲突可见：同步日志记录"本地胜/远端胜"清单、合并/冲突字段与耗时，More 页可查。
 - 墓碑复活：见 §8.9，属预期语义。
 
 ### 13.5 凭据与加密
 
 - 同步密码/密钥字段在桌面端经 `safeStorage` 加密后存 kv：`enc:<base64>`（DPAPI/Keychain/libsecret）；无 safeStorage 时降级 `b64:`（仅编码，不加密——会在 UI 明确提示）。
-- 移动端不落地明文密码：配置随 kv 存，依赖系统应用沙箱；导出 JSON 不含 `sync.config`（kv 不同步）。
+- 移动端把密码/S3 密钥写进**系统安全存储**（iOS Keychain / Android Keystore，`expo-secure-store`），kv 里只留指针 `sec:<slot>`——导出 JSON、同步日志、崩溃日志都不会带明文；安全存储不可用时降级明文并保留 UI 提示。
+- **唯一取明文的地方是 `resolveSyncConfig()`**（`platform/desktop-actions.ts`）：`runManualSync` / `testSyncConnection` / `listPeerDevices` / `backupToCloud` 都经它还原。此前桌面端只在保存时加密、同步时却直接把 `enc:...` 当密码用，属于真实缺陷，v2.3 一并修掉；`openSecret` 对明文幂等，老配置无缝升级。
 - 服务端只看到 manifest 与 records 的明文 JSON——**同步通道不加密**，依赖 HTTPS。若需端到端加密，应作为独立的可选层（未实现，见 §20）。
 
 ### 13.6 云备份
@@ -1268,6 +1330,19 @@ syncNow({provider, executor, deviceId, apply})
 | 单批写入失败 | 事务回滚该批，已成功批次保留（可重入） |
 | 磁盘空间不足 | `storage_failed`，提示清理备份 |
 | 时钟偏差（S3 签名失败） | 提示校时；重试不解决时给出原始错误码 |
+
+错误分类（`classifySyncError`，见 `platform/desktop-actions.ts`）：原始异常被翻成人能看懂的四类 +
+兜底，避免把 `TypeError: fetch failed` 直接甩给用户：
+
+| 分类 | 识别特征 | 文案 |
+|---|---|---|
+| 网络 | `ECONN/ETIMEDOUT/ENOTFOUND/fetch failed/timeout` | 网络不通：检查连接或网盘地址后重试 |
+| 认证 | `401/403/unauthorized/forbidden/invalid_token` | 认证失败：账号或密码/令牌不对 |
+| 路径 | `404/not found` | 路径不存在：检查同步目录是否已被删除 |
+| 配额 | `ENOSPC/quota/space` | 空间不足：网盘配额已满 |
+| 其它 | 兜底 | 同步失败：{原始 message} |
+
+自动同步模式下失败**不打扰用户**（不弹 toast），只记录 `AutoSyncStatus.lastError` 并按 §13.3.1 退避重试。
 
 ---
 
@@ -1749,6 +1824,21 @@ sync.applyRemote / import.merge
 | 导出 | 移动端可选「保存到手机文件夹」（Android SAF，写入用户选定目录）或「分享给其他应用」；提示改为文件名；删除重复实现 `platform/mobile-actions.ts` |
 | 清理 | 删除未接线的 `Fab`、`TwoPaneLayout` 组件 |
 | 测试 | 291 → 299（新增 `deferTargetTime` 5 例 + `planBulkDefer` 3 例） |
+
+### 21.4.2 v2.3 增量（同步专项）
+
+| 类别 | 变更 |
+|---|---|
+| 自动同步 | 新增 `sync/auto.ts` 纯逻辑调度器（防抖 20s / 最小间隔 60s / 失败退避 5min×n 上限 30min / 并发保护），启动、回前台、本地改动三处触发；开关 `kv["sync.auto"]` |
+| 进度 | `syncNow({onProgress})` 回调 manifest/pull/apply/push 四阶段 `done/total`；`SyncReport` 增 `durationMs`、`conflictSamples` |
+| 设备可见 | `sync/devices.ts#describePeerDevices`：对方设备短 id、记录数、最后活动时间（从 manifest 推导，不新增文件格式） |
+| 凭据 | 移动端密码/S3 密钥进系统安全存储（`expo-secure-store`），kv 只留 `sec:` 指针；新增 `resolveSyncConfig()` 作为**唯一**取明文入口——顺带修掉"桌面端保存时加密、同步时却把 `enc:...` 当密码用"的缺陷 |
+| 错误 | `classifySyncError()` 把异常分五类（网络/认证/路径/配额/其它）给成人话；自动同步失败不打扰用户，按退避重试 |
+| 合并 | 任务升级为**字段级 3-way**（`record_base` 基线 + `sync/fieldmerge.ts` 纯函数），其它类型仍记录级 LWW；冲突字段名进 `SyncReport.conflictFields` |
+| 迁移 / 测试 | 新增 v6 迁移（`record_base`）+ 原生依赖 `expo-secure-store`；测试 291 → 337（+13 字段合并、+5 设备列表、+7 调度、+13 加密向量） |
+| 移动端运行时 | 新增 `sync/crypto.ts`（纯 JS SHA-256 / HMAC-SHA256 / UTF-8 / Base64）：Hermes 没有 `btoa`、`TextEncoder`、`crypto.subtle`，此前**手机端 WebDAV 认证与 S3 签名必崩**；改后全仓不再依赖这些运行时全局（NIST / RFC 向量 13 例兜底） |
+
+> ⚠️ 破坏性提醒：`expo-secure-store` 是原生模块，**必须重新构建安装包**才会生效；2.2.0 及更早的 APK 装上后手机端同步仍会失败。
 
 ### 21.5 v2 交付指标
 

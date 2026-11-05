@@ -169,6 +169,21 @@ const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_task_templates_active ON task_templates(deleted_at)`,
     ],
   },
+  {
+    version: 6,
+    statements: [
+      // 基线快照：记录"上次与外部一致时"的记录内容（payload = 该记录的 JSON），
+      // 作为任务字段级 3-way 合并的 base。其它记录类型只写不读（仍是整条 LWW）。
+      // 幂等：IF NOT EXISTS；表内数据由 syncNow 每次同步后覆盖（upsert），
+      // 不参与同步本身，也不跨设备交换。
+      `CREATE TABLE IF NOT EXISTS record_base (
+        record_id TEXT PRIMARY KEY,
+        payload TEXT NOT NULL,
+        captured_at INTEGER NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_record_base_captured ON record_base(captured_at)`,
+    ],
+  },
 ];
 
 export async function migrate(executor: SqliteExecutor): Promise<number> {

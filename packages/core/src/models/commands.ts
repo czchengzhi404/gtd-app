@@ -254,6 +254,41 @@ export interface TaggedRecord {
   record: Task | Project | Section | Context | Area | AttachmentMeta | TaskTemplate;
 }
 
+/**
+ * 字段级 3-way 合并明细（单条记录）。
+ * 只有 task 类型会产生；其余类型仍是整条 LWW（不产生 entry）。
+ */
+export interface FieldMergeEntry {
+  recordId: string;
+  /** 采纳了远端值的字段名（本地未改、远端改了） */
+  mergedFields: string[];
+  /** 双方都改且值不同、最终保留本地值的字段名（真冲突） */
+  conflictFields: string[];
+}
+
+/**
+ * 一批记录应用后的字段级合并汇总（`sync.applyRemote` 返回值携带）。
+ * `mergedFields` / `conflictFields` 是全批并集（去重、字典序），
+ * 供 UI 直接说"标题来自另一台设备 / 标题被本机覆盖"。
+ */
+export interface FieldMergeSummary {
+  /** 逐条明细：仅包含发生过字段级判定的记录（冲突或合并） */
+  entries: FieldMergeEntry[];
+  /** 全批并集：采纳了远端值的字段名 */
+  mergedFields: string[];
+  /** 全批并集：保留本地值的冲突字段名 */
+  conflictFields: string[];
+  /** 任务但无基线 → 退回整条 LWW（本地胜）的记录 id */
+  noBaseConflicts: string[];
+  /** 非任务类型，或任一端为墓碑 → 不做字段合并（整条 LWW，本地胜）的记录 id */
+  unmergeable: string[];
+  /**
+   * 基线不比这份远端记录旧（base.revision >= remote.revision）→ 对方是陈旧副本，
+   * 不做字段合并（否则会把本地新值改回旧值）。
+   */
+  staleRemotes: string[];
+}
+
 /** IPC/命令结果：返回受影响记录的完整快照（可克隆数据），渲染进程据此 reconcile */
 export interface CommandResult {
   /** 受影响实体 id */
@@ -262,4 +297,9 @@ export interface CommandResult {
   records: TaggedRecord[];
   /** 命令执行时刻的时间戳，供渲染进程对齐时钟差 */
   serverTime: number;
+  /**
+   * 可选：字段级合并汇总。目前仅 `sync.applyRemote` / `import.merge` 会填，
+   * 其它命令为 undefined（既有消费方不受影响）。
+   */
+  mergeSummary?: FieldMergeSummary;
 }

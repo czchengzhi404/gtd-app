@@ -26,9 +26,11 @@ import {
   getSomedayTasks,
   runCommand,
 } from "@gtd/core";
-import type { SyncConfig } from "@gtd/core";
+import type { PeerDeviceInfo, SyncConfig } from "@gtd/core";
 import {
   decryptSecret,
+  listPeerDevices,
+  resolveSyncConfig,
   pickSyncFolder,
   runManualSync,
   saveSyncConfig,
@@ -90,6 +92,7 @@ export default function MoreScreen() {
   const [selectedPreset, setSelectedPreset] = useState("nutstore");
   const [testing, setTesting] = useState(false);
   const [syncOpen, setSyncOpen] = useState(false);
+  const [peers, setPeers] = useState<PeerDeviceInfo[] | null>(null);
 
   const syncLog = useMemo(() => {
     const raw = kv["sync.log"];
@@ -99,12 +102,19 @@ export default function MoreScreen() {
         applied?: number;
         localWins?: number;
         remoteWins?: number;
+        durationMs?: number;
+        at?: number;
+        mergedFields?: string[];
+        conflictFields?: string[];
         conflicts?: { label: string }[];
       };
       return {
         applied: parsed.applied ?? 0,
         localWins: parsed.localWins ?? 0,
         remoteWins: parsed.remoteWins ?? 0,
+        durationMs: parsed.durationMs ?? null,
+        mergedFields: parsed.mergedFields ?? [],
+        conflictFields: parsed.conflictFields ?? [],
         conflicts: parsed.conflicts ?? [],
       };
     } catch {
@@ -113,16 +123,25 @@ export default function MoreScreen() {
   }, [kv]);
 
   useEffect(() => {
+    if (!syncOpen) return;
+    let cancelled = false;
+    void listPeerDevices()
+      .then((list) => {
+        if (!cancelled) setPeers(list);
+      })
+      .catch(() => {
+        if (!cancelled) setPeers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [syncOpen]);
+
+  useEffect(() => {
     void (async () => {
-      const saved = await getSyncConfig(getSqliteExecutor());
-      if (saved !== null) {
-        // 解密敏感字段（桌面端 safeStorage）
-        if (isDesktop()) {
-          if (saved.password) saved.password = await decryptSecret(saved.password);
-          if (saved.secretAccessKey) saved.secretAccessKey = await decryptSecret(saved.secretAccessKey);
-        }
-        setConfig(saved);
-      }
+      // 敏感字段已经由 resolveSyncConfig 还原成明文（桌面 safeStorage / 移动 Keychain）
+      const saved = await resolveSyncConfig();
+      if (saved !== null) setConfig(saved);
     })();
   }, []);
 
@@ -156,9 +175,22 @@ export default function MoreScreen() {
     setBusy(true);
     setStatus(t("more.status.syncing"));
     try {
-      const outcome = await runManualSync();
+      const outcome = await runManualSync((progress) => {
+        setStatus(
+          t("sync.progress", {
+            phase: t(`sync.phase.${progress.phase}`),
+            done: progress.done,
+            total: progress.total,
+          }),
+        );
+      });
       setStatus(outcome.message);
       showToast({ message: outcome.message, tone: outcome.ok ? "success" : "warning" });
+      if (outcome.ok) {
+        void listPeerDevices()
+          .then(setPeers)
+          .catch(() => undefined);
+      }
     } catch (err) {
       const message = t("more.status.syncFailed") + (err instanceof Error ? err.message : String(err));
       flash(message, "danger");
@@ -449,6 +481,44 @@ export default function MoreScreen() {
                 />
               </View>
 
+              <View style={styles.inlineRow}>
+                <AppText variant="caption" tone="tertiary" lines={1}>
+                  {t("sync.autoLabel")}
+                </AppText>
+                <SegPill
+                  label={t("sync.autoOn")}
+                  selected={kv["sync.auto"] !== "0"}
+                  onPress={() => void runCommand("settings.set", { key: "sync.auto", value: "1" }).catch(() => undefined)}
+                />
+                <SegPill
+                  label={t("sync.autoOff")}
+                  selected={kv["sync.auto"] === "0"}
+                  onPress={() => void runCommand("settings.set", { key: "sync.auto", value: "0" }).catch(() => undefined)}
+                />
+              </View>
+
+              <AppText variant="caption" tone="tertiary" lines={1}>
+                {t("sync.peersTitle")}
+              </AppText>
+              {peers === null ? null : peers.length === 0 ? (
+                <AppText variant="caption" tone="tertiary" lines={2}>
+                  {t("sync.peersEmpty")}
+                </AppText>
+              ) : (
+                peers.map((peer) => (
+                  <AppText key={peer.id} variant="caption" tone="secondary" lines={1}>
+                    {t("sync.peerLine", {
+                      device: t("sync.deviceLabel", { id: peer.shortId }),
+                      n: peer.recordCount,
+                      time:
+                        peer.lastActivityAt === null
+                          ? t("sync.peerNever")
+                          : new Date(peer.lastActivityAt).toLocaleString(),
+                    })}
+                  </AppText>
+                ))
+              )}
+
               <Divider style={styles.groupDivider} />
               {syncLog === null ? (
                 <AppText variant="label" tone="tertiary" lines={1}>
@@ -463,6 +533,21 @@ export default function MoreScreen() {
                       remote: syncLog.remoteWins,
                     })}
                   </AppText>
+                  {syncLog.durationMs !== null ? (
+                    <AppText variant="caption" tone="tertiary" lines={1}>
+                      {t("sync.duration", { sec: Math.max(1, Math.round(syncLog.durationMs / 1000)) })}
+                    </AppText>
+                  ) : null}
+                  {syncLog.mergedFields.length > 0 ? (
+                    <AppText variant="caption" tone="tertiary" lines={2}>
+                      {t("sync.mergedFieldLine", { fields: syncLog.mergedFields.join(", ") })}
+                    </AppText>
+                  ) : null}
+                  {syncLog.conflictFields.length > 0 ? (
+                    <AppText variant="caption" tone="warning" lines={2}>
+                      {t("sync.conflictFieldLine", { fields: syncLog.conflictFields.join(", ") })}
+                    </AppText>
+                  ) : null}
                   {syncLog.conflicts.length > 0 ? (
                     <>
                       <AppText variant="caption" tone="tertiary" lines={1}>

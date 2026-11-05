@@ -114,8 +114,8 @@ describe("migrations · v4 索引与排序键回填", () => {
     ]);
 
     const applied = await migrate(executor);
-    // v4（索引 + 排序键回填）与 v5（task_templates）各一条
-    expect(applied).toBe(2);
+    // v4（索引 + 排序键回填）、v5（task_templates）、v6（record_base 基线快照）各一条
+    expect(applied).toBe(3);
 
     const indexes = db
       .query("SELECT name FROM sqlite_master WHERE type = 'index'")
@@ -137,7 +137,7 @@ describe("migrations · v4 索引与排序键回填", () => {
     const version = db
       .query("SELECT value FROM meta WHERE key = 'schema_version'")
       .get() as { value: string };
-    expect(version.value).toBe("5");
+    expect(version.value).toBe("6");
 
     db.close();
   });
