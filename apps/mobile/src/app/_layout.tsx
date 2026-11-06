@@ -126,6 +126,7 @@ function StackScreens() {
       <Stack.Screen name="materials" options={{ title: t("materials.title") }} />
       <Stack.Screen name="writing" options={{ title: t("writing.title") }} />
       <Stack.Screen name="history" options={{ title: t("history.title") }} />
+      <Stack.Screen name="sync" options={{ title: t("sync.pageTitle") }} />
     </Stack>
   );
 }

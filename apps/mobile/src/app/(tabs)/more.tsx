@@ -235,6 +235,36 @@ export default function MoreScreen() {
   return (
     <ScrollView contentContainerStyle={styles.content} style={{ backgroundColor: colors.canvas }}>
       <View style={styles.column}>
+        {/* 0 同步：独立页面入口，放在最顶部——它原先在第 5 组折叠块里，
+            手机上要滚过四组才看得到，会被误认为「只有电脑端有」。 */}
+        <SectionHeader
+          title={t("app.more.group.sync")}
+          trailing={
+            <AppText variant="caption" tone="tertiary" lines={1}>
+              {syncStatus}
+            </AppText>
+          }
+        />
+        <Card variant="outline" padding="normal" style={styles.card}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("sync.pageTitle")}
+            onPress={() => router.push("/sync")}
+            style={({ pressed }) => [styles.syncHeader, { opacity: pressed ? 0.7 : 1 }]}
+          >
+            <Ionicons name="cloud-outline" size={18} color={colors.primary} />
+            <View style={styles.syncHeaderText}>
+              <AppText variant="bodyStrong" lines={1}>
+                {t("sync.pageTitle")}
+              </AppText>
+              <AppText variant="caption" tone="tertiary" lines={1}>
+                {t("app.more.syncSummary", { time: lastSync, status: syncStatus })}
+              </AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+          </Pressable>
+        </Card>
+
         {/* 1 今日回顾 */}
         <SectionHeader
           title={t("app.more.group.review")}
