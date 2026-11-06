@@ -152,6 +152,11 @@ export default function TaskDetailScreen() {
               () => undefined,
             )
           }
+          onSetRecurrence={(rule) =>
+            void runCommand("task.update", { id: task.id, patch: { recurrence: rule } }).catch(
+              () => undefined,
+            )
+          }
           onSaveAsTemplate={() => void saveAsTemplate()}
           onOpenHistory={() => router.push(`/history?taskId=${task.id}`)}
           onExportNotes={() => {

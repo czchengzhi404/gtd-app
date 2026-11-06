@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { AttachmentMeta, Task, TaskStatusInput } from "@gtd/core";
+import type { AttachmentMeta, RecurrenceRule, Task, TaskStatusInput } from "@gtd/core";
 import { countText } from "@gtd/core";
 
 import { SectionHeader } from "./Screen";
@@ -18,6 +18,20 @@ import { AppText } from "../theme/AppText";
 import { useTheme } from "../hooks/useTheme";
 import { useT } from "../i18n";
 import { hit, radius, space } from "../theme/tokens";
+
+/** 重复预设：覆盖核心的 5 种（yearly 用「每年」在同一条里循环不现实，先用 interval=1 的常见档） */
+const RECURRENCE_OPTIONS: { key: string; labelKey: string; rule: RecurrenceRule | null }[] = [
+  { key: "none", labelKey: "recurrence.none", rule: null },
+  { key: "daily", labelKey: "recurrence.daily", rule: { freq: "daily", interval: 1 } },
+  { key: "weekly", labelKey: "recurrence.weekly", rule: { freq: "weekly", interval: 1 } },
+  { key: "monthly", labelKey: "recurrence.monthly", rule: { freq: "monthly", interval: 1 } },
+  { key: "weekdays", labelKey: "recurrence.weekdays", rule: { freq: "weekdays", interval: 1 } },
+  {
+    key: "afterCompletion",
+    labelKey: "recurrence.afterCompletion",
+    rule: { freq: "afterCompletion", interval: 1 },
+  },
+];
 
 const STATUS_KEYS: { status: TaskStatusInput; labelKey: string }[] = [
   { status: "inbox", labelKey: "detail.status.inbox" },
@@ -61,6 +75,8 @@ export interface TaskDetailContentProps {
   onExportNotes?: () => void;
   /** 打开正文版本历史（不传则不显示入口） */
   onOpenHistory?: () => void;
+  /** 设置重复规则（不传则不显示该区） */
+  onSetRecurrence?: (rule: RecurrenceRule | null) => void;
 }
 
 /** 任务详情（移动全屏 / 桌面右栏复用） */
@@ -87,6 +103,7 @@ export function TaskDetailContent({
   onSaveNotes,
   onExportNotes,
   onOpenHistory,
+  onSetRecurrence,
 }: TaskDetailContentProps) {
   const colors = useTheme();
   const t = useT();
@@ -240,6 +257,28 @@ export function TaskDetailContent({
         </>
       ) : null}
 
+      {onSetRecurrence !== undefined ? (
+        <>
+          <SectionHeader title={t("detail.recurrence")} />
+          <View style={styles.metaRow}>
+              {RECURRENCE_OPTIONS.map((option) => {
+                const selected =
+                  option.rule === null
+                    ? task.recurrence === null
+                    : task.recurrence !== null && task.recurrence.freq === option.rule.freq;
+                return (
+                  <Chip
+                    key={option.key}
+                    label={t(option.labelKey)}
+                    selected={selected}
+                    onPress={() => onSetRecurrence(option.rule)}
+                  />
+                );
+              })}
+          </View>
+        </>
+      ) : null}
+
       <SectionHeader title={t("detail.actions")} />
       <View style={styles.buttonRow}>
         <Button
@@ -363,7 +402,8 @@ export function TaskDetailContent({
               <View style={styles.notesHeaderTrailing}>
                 {task.notes.length > 0 ? (
                   <AppText variant="caption" tone="tertiary" lines={1}>
-                    {t("detail.notesWords", { n: notesCount.words })}
+                    {t("detail.notesWords", { n: notesCount.words })} ·{" "}
+                    {t("detail.notesReading", { n: notesCount.readingMinutes })}
                   </AppText>
                 ) : null}
                 {onSaveNotes !== undefined ? (
