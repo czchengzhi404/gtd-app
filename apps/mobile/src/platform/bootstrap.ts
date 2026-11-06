@@ -36,6 +36,21 @@ function createExpoExecutor(): SqliteExecutor {
   db.execSync("PRAGMA journal_mode = WAL");
   db.execSync("PRAGMA busy_timeout = 5000");
 
+  /**
+   * 事务串行队列（关键）。
+   *
+   * 背景：executeCommand 的 handler 是 async，而 expo-sqlite 的 execSync 是同步调用。
+   * 原实现直接 BEGIN IMMEDIATE → await fn() → COMMIT，await 期间会让出事件循环，
+   * 两个命令于是交错：A 开事务、让出；B 再开事务（已在事务中）、ROLLBACK（无事务可回滚），
+   * 原生层抛出 NativeDatabase.execSync 的 NullPointerException。
+   *
+   * 表现：新建任务没反应、保存正文失败、完成任务丢失——但界面不崩，
+   * 因为调用方把异常 catch 成了 toast。启动时 seed 能成功是因为它内部逐个 await（天然串行）。
+   *
+   * 用一条 Promise 链把事务排队：同一时刻只有一个事务在飞。
+   */
+  let chain: Promise<unknown> = Promise.resolve();
+
   const executor: SqliteExecutor = {
     query: async <T extends Record<string, unknown>>(sql: string, params: readonly unknown[] = []) =>
       db.getAllSync(sql, params as never[]) as T[],
@@ -47,15 +62,28 @@ function createExpoExecutor(): SqliteExecutor {
       fn: (tx: SqliteExecutor) => Promise<T>,
       mode: "immediate" | "deferred",
     ): Promise<T> => {
-      db.execSync(mode === "immediate" ? "BEGIN IMMEDIATE" : "BEGIN");
-      try {
-        const result = await fn(executor);
-        db.execSync("COMMIT");
-        return result;
-      } catch (err) {
-        db.execSync("ROLLBACK");
-        throw err;
-      }
+      const run = chain.then(async () => {
+        db.execSync(mode === "immediate" ? "BEGIN IMMEDIATE" : "BEGIN");
+        try {
+          const result = await fn(executor);
+          db.execSync("COMMIT");
+          return result;
+        } catch (err) {
+          // ROLLBACK 也可能失败（事务已被自动回滚），不能让它掩盖真正的错误
+          try {
+            db.execSync("ROLLBACK");
+          } catch {
+            /* 忽略 */
+          }
+          throw err;
+        }
+      });
+      // 队列继续往下走，失败不阻塞后续事务
+      chain = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      return run;
     },
   };
   return executor;
