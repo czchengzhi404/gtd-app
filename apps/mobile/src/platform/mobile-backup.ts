@@ -1,4 +1,5 @@
-﻿import * as FileSystem from "expo-file-system/legacy";
+﻿import { Paths } from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 
 import { getSqliteExecutor } from "@gtd/core";
 
@@ -31,16 +32,48 @@ interface DatabaseListRow extends Record<string, unknown> {
   file: string;
 }
 
-/** 问 SQLite 要主库文件的真实路径 */
+/**
+ * 解析数据库文件的**绝对**路径。
+ *
+ * 坑：`PRAGMA database_list` 在 expo-sqlite 上返回的 `file` 可能是**相对路径**
+ * （如 `gtd.db`），直接拿去做 copyAsync 会抛
+ * `FileNotFoundException: No resource found`。
+ *
+ * 所以这里收集多个候选、逐个探测存在性：
+ * 1. PRAGMA 报告绝对路径 → 直接用
+ * 2. PRAGMA 报告相对路径 → 拼上文档目录
+ * 3. expo-sqlite 的常见落盘位置（`SQLite/` 与 `databases/`）
+ */
+let lastTriedPaths: string[] = [];
+
 async function resolveDbPath(): Promise<string | null> {
+  const candidates: string[] = [];
+  const docDir = Paths.document.uri.endsWith("/") ? Paths.document.uri : `${Paths.document.uri}/`;
+
   try {
     const rows = await getSqliteExecutor().query<DatabaseListRow>("PRAGMA database_list", []);
     const main = rows.find((row) => row.name === "main");
-    const file = main?.file ?? "";
-    return file.length > 0 ? file : null;
+    const reported = (main?.file ?? "").trim();
+    if (reported.length > 0) {
+      if (reported.startsWith("/") || reported.startsWith("file:")) candidates.push(reported);
+      else candidates.push(`${docDir}${reported}`);
+    }
   } catch {
-    return null;
+    /* 忽略：走下面的默认候选 */
   }
+
+  candidates.push(`${docDir}SQLite/gtd.db`, `${docDir}databases/gtd.db`, `${docDir}gtd.db`);
+
+  for (const candidate of candidates) {
+    try {
+      const info = await FileSystem.getInfoAsync(candidate);
+      if (info.exists) return candidate;
+    } catch {
+      /* 继续试下一个 */
+    }
+  }
+  lastTriedPaths = candidates;
+  return null;
 }
 
 async function ensureDir(): Promise<void> {
@@ -60,7 +93,10 @@ async function listBackups(): Promise<string[]> {
 export async function mobileBackupNow(): Promise<MobileBackupResult> {
   const dbPath = await resolveDbPath();
   if (dbPath === null) {
-    return { ok: false, message: "找不到数据库文件路径" };
+    return {
+      ok: false,
+      message: `找不到数据库文件。试过：${lastTriedPaths.join(" | ")}`,
+    };
   }
 
   // 关键：把 WAL 合并进主库，否则备份可能缺最近写入

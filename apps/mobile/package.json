@@ -1,7 +1,7 @@
 {
   "name": "@gtd/mobile",
   "main": "expo-router/entry",
-  "version": "2.5.6",
+  "version": "2.5.7",
   "private": true,
   "scripts": {
     "start": "expo start",
