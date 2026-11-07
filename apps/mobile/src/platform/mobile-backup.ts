@@ -91,32 +91,41 @@ async function listBackups(): Promise<string[]> {
 
 /** 立即备份一份；返回当前保留的份数 */
 export async function mobileBackupNow(): Promise<MobileBackupResult> {
-  const dbPath = await resolveDbPath();
-  if (dbPath === null) {
-    return {
-      ok: false,
-      message: `找不到数据库文件。试过：${lastTriedPaths.join(" | ")}`,
-    };
-  }
-
-  // 关键：把 WAL 合并进主库，否则备份可能缺最近写入
-  try {
-    await getSqliteExecutor().run("PRAGMA wal_checkpoint(TRUNCATE)", []);
-  } catch {
-    // checkpoint 失败也继续：至少主库文件是完整的历史数据
-  }
-
   await ensureDir();
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const target = `${BACKUP_DIR}gtd-${stamp}.db`;
+  // VACUUM INTO 需要普通文件路径（不带 file://），由 SQLite 自己写文件
+  const docPath = Paths.document.uri.replace(/^file:\/\//, "");
+  const targetPath = `${docPath}backups/gtd-${stamp}.db`;
 
   try {
-    await FileSystem.copyAsync({ from: dbPath, to: target });
-  } catch (err) {
-    return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    // 首选：VACUUM INTO —— 由 SQLite 内部生成一致快照（含 WAL 未落盘部分），
+    // 不需要知道源库文件路径，也不需要 FileSystem.copyAsync。
+    await getSqliteExecutor().run(`VACUUM INTO '${targetPath}'`, []);
+  } catch (vacuumError) {
+    // 兜底：VACUUM INTO 不可用（旧 SQLite 或路径限制）时退回文件复制。
+    // 注意先 checkpoint，否则 -wal 里的最新写入不会进主库。
+    try {
+      await getSqliteExecutor().run("PRAGMA wal_checkpoint(TRUNCATE)", []);
+    } catch {
+      /* 尽力而为 */
+    }
+    const dbPath = await resolveDbPath();
+    if (dbPath === null) {
+      return {
+        ok: false,
+        message: `VACUUM INTO 失败（${vacuumError instanceof Error ? vacuumError.message : String(vacuumError)}），且找不到数据库文件。试过：${lastTriedPaths.join(" | ")}`,
+      };
+    }
+    try {
+      await FileSystem.copyAsync({ from: dbPath, to: `${FileSystem.documentDirectory}backups/gtd-${stamp}.db` });
+    } catch (err) {
+      return {
+        ok: false,
+        message: `备份失败（源 ${dbPath}）：${err instanceof Error ? err.message : String(err)}`,
+      };
+    }
   }
 
-  // 轮转：只留最近 KEEP 份
   const names = await listBackups();
   const excess = names.length - KEEP;
   for (let i = 0; i < excess; i += 1) {
