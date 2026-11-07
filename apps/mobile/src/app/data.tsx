@@ -252,7 +252,7 @@ export default function DataScreen() {
                 label={t("more.backupNow")}
                 icon="save-outline"
                 size="sm"
-                disabled={busy || !isDesktop()}
+                disabled={busy}
                 onPress={() => void onBackup()}
               />
               <Button
@@ -267,11 +267,6 @@ export default function DataScreen() {
             <AppText variant="caption" tone="tertiary" lines={1}>
               {backups > 0 ? t("more.backupList", { n: backups }) : t("more.backupNever")}
             </AppText>
-            {isDesktop() ? null : (
-              <AppText variant="caption" tone="tertiary" lines={1}>
-                {t("more.backupDesktopOnly")}
-              </AppText>
-            )}
           </Card>
 
           {/* 云备份 */}
