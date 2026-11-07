@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 桌面端动作：手动同步、同步配置、导入导出、本地与云端备份。
  * 运行在 Electron 渲染进程（浏览器环境）——文件操作走 gtd() 桥或 fetch。
  */
@@ -23,6 +23,7 @@ import { t } from "@gtd/ui";
 import { gtd } from "./gtd-api";
 import { isDesktop } from "./env";
 import { openSecret, sealSecret } from "./secret-store";
+import { mobileBackupCount, mobileBackupNow, mobileRestoreLatest } from "./mobile-backup";
 
 /** 敏感字段加密：桌面走 safeStorage，移动端进系统安全存储（kv 只留指针） */
 async function encryptSecret(plaintext: string, slot: "password" | "s3"): Promise<string> {
@@ -124,10 +125,15 @@ export async function pickSyncFolder(): Promise<string | null> {
 export interface BackupOutcome {
   ok: boolean;
   message: string;
+  /** 备份份数（移动端本地备份会返回） */
+  count?: number;
 }
 
 export async function backupNow(): Promise<BackupOutcome> {
-  if (!isDesktop()) return { ok: false, message: t("more.backupDesktopOnly") };
+  if (!isDesktop()) {
+    const result = await mobileBackupNow();
+    return { ok: result.ok, message: result.message, count: result.count };
+  }
   const result = await gtd().backup.now();
   return result.ok
     ? { ok: true, message: t("more.backupDone", { count: result.count ?? 0 }) }
@@ -135,13 +141,16 @@ export async function backupNow(): Promise<BackupOutcome> {
 }
 
 export async function backupCount(): Promise<number> {
-  if (!isDesktop()) return 0;
+  if (!isDesktop()) return mobileBackupCount();
   const info = await gtd().backup.list().catch(() => ({ count: 0, latest: null }));
   return info.count;
 }
 
 export async function restoreLatestBackup(): Promise<BackupOutcome> {
-  if (!isDesktop()) return { ok: false, message: t("more.backupDesktopOnly") };
+  if (!isDesktop()) {
+    const result = await mobileRestoreLatest();
+    return { ok: result.ok, message: result.message };
+  }
   const result = await gtd().backup.restore();
   return result.ok
     ? { ok: true, message: t("more.backupRestoring") }
