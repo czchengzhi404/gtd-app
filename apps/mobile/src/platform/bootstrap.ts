@@ -51,40 +51,54 @@ function createExpoExecutor(): SqliteExecutor {
    */
   let chain: Promise<unknown> = Promise.resolve();
 
+  /** 所有数据库操作排队执行：同一时刻只有一件事碰原生层 */
+  const enqueue = <T>(task: () => Promise<T> | T): Promise<T> => {
+    const run = chain.then(task);
+    chain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  };
+
   const executor: SqliteExecutor = {
+    // 读也进队列：事务进行中时，外部读会撞上原生层（同样抛 execSync NPE）
     query: async <T extends Record<string, unknown>>(sql: string, params: readonly unknown[] = []) =>
-      db.getAllSync(sql, params as never[]) as T[],
-    run: async (sql: string, params: readonly unknown[] = []) => {
-      const info = db.runSync(sql, params as never[]);
-      return { changes: info.changes };
-    },
+      enqueue(() => db.getAllSync(sql, params as never[]) as T[]),
+    run: async (sql: string, params: readonly unknown[] = []) =>
+      enqueue(() => {
+        const info = db.runSync(sql, params as never[]);
+        return { changes: info.changes };
+      }),
     transaction: async <T>(
       fn: (tx: SqliteExecutor) => Promise<T>,
       mode: "immediate" | "deferred",
-    ): Promise<T> => {
-      const run = chain.then(async () => {
+    ): Promise<T> =>
+      enqueue(async () => {
         db.execSync(mode === "immediate" ? "BEGIN IMMEDIATE" : "BEGIN");
+        // 事务内部用直连 executor：不能再入队，否则自己等自己（死锁）
+        const tx: SqliteExecutor = {
+          query: async <R extends Record<string, unknown>>(sql: string, params: readonly unknown[] = []) =>
+            db.getAllSync(sql, params as never[]) as R[],
+          run: async (sql: string, params: readonly unknown[] = []) => {
+            const info = db.runSync(sql, params as never[]);
+            return { changes: info.changes };
+          },
+          transaction: async <R>(inner: (nested: SqliteExecutor) => Promise<R>) => inner(tx),
+        };
         try {
-          const result = await fn(executor);
+          const result = await fn(tx);
           db.execSync("COMMIT");
           return result;
         } catch (err) {
-          // ROLLBACK 也可能失败（事务已被自动回滚），不能让它掩盖真正的错误
           try {
             db.execSync("ROLLBACK");
           } catch {
-            /* 忽略 */
+            /* 忽略：SQLite 可能已自动回滚 */
           }
           throw err;
         }
-      });
-      // 队列继续往下走，失败不阻塞后续事务
-      chain = run.then(
-        () => undefined,
-        () => undefined,
-      );
-      return run;
-    },
+      }),
   };
   return executor;
 }
