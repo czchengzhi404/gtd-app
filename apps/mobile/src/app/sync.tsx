@@ -80,6 +80,7 @@ export default function SyncScreen() {
   const [testing, setTesting] = useState(false);
   const [peers, setPeers] = useState<PeerDeviceInfo[]>([]);
   const [status, setStatus] = useState("");
+  const [dirty, setDirty] = useState(false);
 
   const loadConfig = useCallback(async () => {
     const saved = await resolveSyncConfig();
@@ -100,21 +101,41 @@ export default function SyncScreen() {
     return raw !== undefined ? new Date(Number(raw)).toLocaleString() : t("more.lastSyncNever");
   }, [kv, t]);
 
-  const update = (patch: Partial<SyncConfig>) => setConfig((prev) => ({ ...prev, ...patch }));
-
-  const onSave = async () => {
+  /**
+   * persist：把给定配置落库。
+   *
+   * 为什么开关也要立即保存：页面上的开关原先只改本地 state，用户打开开关后
+   * 直接点「立即同步」，后端读到的仍是 enabled=false，于是报「同步未启用」——
+   * 开关显示已启用、提示说未启用，自相矛盾。
+   */
+  const persist = async (next: SyncConfig, silent = false): Promise<boolean> => {
     setBusy(true);
     try {
-      await saveSyncConfig(config);
-      showToast({ message: t("more.status.saved"), tone: "success" });
-      setStatus(t("more.status.saved"));
+      await saveSyncConfig(next);
+      setConfig(next);
+      setDirty(false);
+      if (!silent) {
+        showToast({ message: t("more.status.saved"), tone: "success" });
+        setStatus(t("more.status.saved"));
+      }
+      return true;
     } catch (err) {
       const message = t("more.status.saveFailed") + (err instanceof Error ? err.message : String(err));
       showToast({ message, tone: "danger" });
       setStatus(message);
+      return false;
     } finally {
       setBusy(false);
     }
+  };
+
+  const update = (patch: Partial<SyncConfig>) => {
+    setConfig((prev) => ({ ...prev, ...patch }));
+    setDirty(true);
+  };
+
+  const onSave = async () => {
+    await persist(config);
   };
 
   const onTest = async () => {
@@ -133,6 +154,11 @@ export default function SyncScreen() {
   };
 
   const onSyncNow = async () => {
+    // 表单有改动时先落库：否则同步服务读到的还是上一次保存的配置
+    if (dirty) {
+      const saved = await persist(config, true);
+      if (!saved) return;
+    }
     setBusy(true);
     setStatus(t("more.status.syncing"));
     try {
@@ -283,7 +309,11 @@ export default function SyncScreen() {
           <Pressable
             accessibilityRole="switch"
             accessibilityState={{ checked: config.enabled }}
-            onPress={() => update({ enabled: !config.enabled })}
+            onPress={() => {
+              const next = { ...config, enabled: !config.enabled };
+              setConfig(next);
+              void persist(next, true);
+            }}
             style={({ pressed }) => [styles.switchRow, { opacity: pressed ? 0.7 : 1 }]}
           >
             <View style={[styles.switchTrack, { backgroundColor: config.enabled ? colors.primary : colors.surfaceMuted }]}>
