@@ -1,5 +1,6 @@
-﻿import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -67,7 +68,16 @@ export default function RecentScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas, paddingTop: insets.top }}>
-      <PageHeader title={t("app.more.recent")} subtitle={t("app.more.recentHint")} />
+      {/* Stack header 已隐藏（见 _layout.tsx）：自绘标题要自己顶开状态栏 */}
+      <View style={{ paddingTop: insets.top }}>
+        <PageHeader
+          title={t("app.more.recent")}
+          subtitle={t("app.more.recentHint")}
+          onBack={() => router.back()}
+          backLabel={t("app.common.back")}
+        />
+      </View>
+
       {entries.length === 0 ? (
         <EmptyState
           title={t("undo.history.empty")}

@@ -100,7 +100,14 @@ export default function RootLayout() {
   );
 }
 
-/** Stack 路由标题使用 useT 以随语言/字体切换 */
+/**
+ * Stack 路由标题使用 useT 以随语言/字体切换。
+ *
+ * 哪些页面隐藏自身 header：凡是页面内已经用 `PageHeader` 自绘标题的（带副标题/操作区），
+ * 都设 `headerShown: false`，否则会出现两层标题栏 —— 上面是 Stack 的标题 + 返回箭头，
+ * 紧跟着又是 PageHeader 的同一标题 + 第二个返回箭头。tabs 里的收集箱/今天早就这么做了
+ * （见 (tabs)/_layout.tsx），这里补齐 Stack 侧的同类页面。
+ */
 function StackScreens() {
   const t = useT();
   return (
@@ -118,14 +125,14 @@ function StackScreens() {
       <Stack.Screen name="search" options={{ title: t("app.route.search") }} />
       <Stack.Screen name="insights" options={{ title: t("app.route.insights") }} />
       <Stack.Screen name="matrix" options={{ title: t("app.route.matrix") }} />
-      <Stack.Screen name="import" options={{ title: t("app.route.importPage") }} />
-      <Stack.Screen name="templates" options={{ title: t("template.routeTitle") }} />
-      <Stack.Screen name="recent" options={{ title: t("app.more.recent") }} />
-      <Stack.Screen name="settings" options={{ title: t("app.more.settings") }} />
-      <Stack.Screen name="data" options={{ title: t("more.group.data") }} />
-      <Stack.Screen name="materials" options={{ title: t("materials.title") }} />
-      <Stack.Screen name="writing" options={{ title: t("writing.title") }} />
-      <Stack.Screen name="history" options={{ title: t("history.title") }} />
+      <Stack.Screen name="history" options={{ title: t("history.title"), headerShown: false }} />
+      <Stack.Screen name="materials" options={{ title: t("materials.title"), headerShown: false }} />
+      <Stack.Screen name="writing" options={{ title: t("writing.title"), headerShown: false }} />
+      <Stack.Screen name="recent" options={{ title: t("app.more.recent"), headerShown: false }} />
+      <Stack.Screen name="import" options={{ title: t("app.route.importPage"), headerShown: false }} />
+      <Stack.Screen name="templates" options={{ title: t("template.routeTitle"), headerShown: false }} />
+      <Stack.Screen name="settings" options={{ title: t("app.more.settings"), headerShown: false }} />
+      <Stack.Screen name="data" options={{ title: t("more.group.data"), headerShown: false }} />
       <Stack.Screen name="sync" options={{ title: t("sync.pageTitle") }} />
     </Stack>
   );

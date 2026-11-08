@@ -108,20 +108,23 @@ export default function TemplatesScreen() {
 
   return (
     <Screen>
-      <PageHeader
-        title={t("template.title")}
-        subtitle={t("template.subtitle", { n: list.length })}
-        onBack={() => router.back()}
-        backLabel={t("template.title")}
-        actions={
-          <IconButton
-            icon="add"
-            variant="filled"
-            onPress={() => setFormOpen(true)}
-            accessibilityLabel={t("template.create")}
-          />
-        }
-      />
+      {/* Stack header 已隐藏（见 _layout.tsx）：自绘标题要自己顶开状态栏 */}
+      <View style={{ paddingTop: insets.top }}>
+        <PageHeader
+          title={t("template.title")}
+          subtitle={t("template.subtitle", { n: list.length })}
+          onBack={() => router.back()}
+          backLabel={t("template.title")}
+          actions={
+            <IconButton
+              icon="add"
+              variant="filled"
+              onPress={() => setFormOpen(true)}
+              accessibilityLabel={t("template.create")}
+            />
+          }
+        />
+      </View>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xxxl }]}
       >

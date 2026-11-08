@@ -49,7 +49,16 @@ export default function MaterialsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas, paddingTop: insets.top }}>
-      <PageHeader title={t("materials.title")} subtitle={t("materials.subtitle")} />
+      {/* Stack header 已隐藏（见 _layout.tsx）：自绘标题要自己顶开状态栏 */}
+      <View style={{ paddingTop: insets.top }}>
+        <PageHeader
+          title={t("materials.title")}
+          subtitle={t("materials.subtitle")}
+          onBack={() => router.back()}
+          backLabel={t("app.common.back")}
+        />
+      </View>
+
       <View style={{ flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm }}>
         <StatTile label={t("materials.count")} value={`${items.length}`} />
         <StatTile label={t("materials.withBody")} value={`${withBody}`} />

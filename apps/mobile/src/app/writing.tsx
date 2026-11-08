@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
+import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -57,7 +58,16 @@ export default function WritingScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas, paddingTop: insets.top }}>
-      <PageHeader title={t("writing.title")} subtitle={t("writing.subtitle")} />
+      {/* Stack header 已隐藏（见 _layout.tsx）：自绘标题要自己顶开状态栏 */}
+      <View style={{ paddingTop: insets.top }}>
+        <PageHeader
+          title={t("writing.title")}
+          subtitle={t("writing.subtitle")}
+          onBack={() => router.back()}
+          backLabel={t("app.common.back")}
+        />
+      </View>
+
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.tiles}>
           <StatTile label={t("writing.today")} value={`${todayDelta}`} delta={t("writing.unit")} />

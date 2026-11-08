@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { router } from "expo-router";
 import { ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -96,7 +96,15 @@ export default function ImportScreen() {
 
   return (
     <Screen>
-      <PageHeader title={t("app.importPage.title")} subtitle={t("app.importPage.subtitle")} onBack={() => router.back()} backLabel={t("app.route.importPage")} />
+      {/* Stack header 已隐藏（见 _layout.tsx）：自绘标题要自己顶开状态栏 */}
+      <View style={{ paddingTop: insets.top }}>
+        <PageHeader
+          title={t("app.importPage.title")}
+          subtitle={t("app.importPage.subtitle")}
+          onBack={() => router.back()}
+          backLabel={t("app.route.importPage")}
+        />
+      </View>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xxxl }]}
         keyboardShouldPersistTaps="handled"

@@ -180,11 +180,14 @@ export default function DataScreen() {
 
   return (
     <Screen>
-      <PageHeader
-        title={t("more.group.data")}
-        onBack={() => router.back()}
-        backLabel={t("app.common.back")}
-      />
+      {/* Stack header 已隐藏（见 _layout.tsx）：自绘标题要自己顶开状态栏 */}
+      <View style={{ paddingTop: insets.top }}>
+        <PageHeader
+          title={t("more.group.data")}
+          onBack={() => router.back()}
+          backLabel={t("app.common.back")}
+        />
+      </View>
       <ScrollView
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xxxl }]}
       >
