@@ -1,4 +1,4 @@
-﻿# 手机端功能清单（实测版）
+# 手机端功能清单（实测版）
 
 > 测试环境：Android 17（API 37）x86_64 模拟器，Pixel 尺寸 1080×2400，应用 v2.5.3（versionCode 25）
 > 测试方式：adb + uiautomator 自动断言（`scripts/android-*.mjs`），不是肉眼看截图
@@ -84,6 +84,7 @@
 | 导出 Markdown + 范围开关 | ✅ | 「Open only / Include done」两档可见（本次新增） |
 | 导出 ICS | 🟡 | 按钮可见 |
 | 导入（Markdown/Todoist/TickTick） | ✅ | 页面 + 格式切换 + 示例文本全部渲染 |
+| 导入 JSON（合并） | ✅ | v2.7.4 修复：之前走 Electron 的 `dialog.open()`，移动端点下去必失败；现在改为 `expo-document-picker` 选文件 → 读进内存 → 分批 `import.merge` |
 | 备份（本地） | ✅ | v2.5.8 实测：立即备份（Backups: 1→2，轮转正常）→ 恢复 → 重启后数据完好。实现用 `VACUUM INTO` 生成快照 |
 | 回收站 | ✅ | 空态「Trash is empty」 |
 | 已完成列表 | ✅ | 空态「No completed tasks yet」 |
