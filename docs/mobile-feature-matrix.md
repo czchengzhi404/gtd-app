@@ -62,8 +62,8 @@
 | 项目总字数 | 🟡 | 项目详情头部，未创建带正文的项目验证 |
 | 素材库 | ✅ | 设为 Someday 后出现在素材库：Items 1 / With body 1 / Words 3 |
 | 写作统计（每日曲线） | ✅ | 页面打开，显示 Today/Last 14 days/Total/Streak 四张卡 |
-| 正文版本历史 | 🟡 | 入口在详情页底部，本次未滚到（任务已被移走） |
-| 导出单篇正文 | 🟡 | 按钮存在，导出走系统分享，未完成落盘验证 |
+| 正文版本历史 | 🟡 | 入口在详情页底部（`Version history`，v2.7.4 已确认可见），未走完「改正文→回看旧版本→恢复」 |
+| 导出单篇正文 | 🟡 | 走的是与已验证三种导出完全相同的 `saveTextFile`（SAF 保存）通路；但自动化点击在键盘弹出后定位不到 `Save`，中文文件名的落盘未实测 |
 
 ## 五、回顾与洞察
 
@@ -80,11 +80,11 @@
 
 | 功能 | 状态 | 说明 |
 |---|---|---|
-| 导出 JSON | 🟡 | 按钮可见，走系统文件选择器未完成 |
-| 导出 Markdown + 范围开关 | ✅ | 「Open only / Include done」两档可见（本次新增） |
-| 导出 ICS | 🟡 | 按钮可见 |
+| 导出 JSON | ✅ | v2.7.4 实测：SAF 选 `Documents` → `Saved: gtd-2026-11-08.json`，落盘 4333 字节 |
+| 导出 Markdown + 范围开关 | ✅ | v2.7.4 实测：`gtd-2026-11-08.md` 落盘 135 字节 |
+| 导出 ICS | ✅ | v2.7.4 实测：`gtd-2026-11-08.ics` 落盘 275 字节（可直接导入系统日历） |
 | 导入（Markdown/Todoist/TickTick） | ✅ | 页面 + 格式切换 + 示例文本全部渲染 |
-| 导入 JSON（合并） | ✅ | v2.7.4 修复：之前走 Electron 的 `dialog.open()`，移动端点下去必失败；现在改为 `expo-document-picker` 选文件 → 读进内存 → 分批 `import.merge` |
+| 导入 JSON（合并） | ✅ | v2.7.4 修复：之前走 Electron 的 `dialog.open()`，移动端点下去必失败；现在改为 `expo-document-picker` 选文件 → 读进内存 → 分批 `import.merge`。实测选中刚导出的文件后提示 `Merged 8 records` |
 | 备份（本地） | ✅ | v2.5.8 实测：立即备份（Backups: 1→2，轮转正常）→ 恢复 → 重启后数据完好。实现用 `VACUUM INTO` 生成快照 |
 | 回收站 | ✅ | 空态「Trash is empty」 |
 | 已完成列表 | ✅ | 空态「No completed tasks yet」 |

@@ -69,7 +69,9 @@ for (const { status, file } of changes) {
   }
   const abs = path.join(root, file);
   if (!fs.existsSync(abs)) {
-    console.log("  skip (missing)", file);
+    // 显式列表里点名了但文件不在磁盘上 —— 当成删除，而不是默默跳过。
+    entries.push({ path: file, mode: "100644", type: "blob", sha: null });
+    console.log("  delete", file);
     continue;
   }
   const content = fs.readFileSync(abs).toString("base64");

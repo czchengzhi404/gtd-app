@@ -1,4 +1,11 @@
-# 在 DSH 会话里跑桌面端 smoke
+# 开发环境 runbook（DSH 会话）
+
+这里记的不是产品逻辑，而是「在这个环境里跑验证时会踩的坑」。
+分两块：桌面端 smoke、Android 模拟器。
+
+---
+
+# 一、桌面端 smoke
 
 桌面端 `bun --cwd apps/desktop smoke` 在这个环境里会连着踩两个坑，都不是代码问题。
 
@@ -67,3 +74,48 @@ bun x tsc -p apps/desktop/tsconfig.json --noEmit   # 类型
 bun --cwd apps/mobile export:web                    # 渲染层打包（more.tsx 等也要过这一关）
 bun --cwd apps/desktop build                        # esbuild 主进程 + preload + 同步 renderer
 ```
+
+---
+
+# 二、Android 模拟器上的三个环境噪声
+
+跑 `scripts/verify-*.mjs` 时会反复遇到，不是产品问题，但会让断言莫名其妙地失败。
+
+## 1. 另一个 app 抢前台
+
+模拟器里装了 `com.dreamtrace.app`（梦迹），会周期性把前台抢走。表现是断言里
+`topResumedActivity` 指向它，随后所有 `dumpUi()` 拿到的都是它家的界面。
+
+处理：关键操作前先确认前台，必要时 force-stop 它再拉起自己。
+
+```js
+async function ensureApp() {
+  const top = topActivity();
+  if (/app\.gtd\.local/i.test(top)) return true;
+  adb(["shell", "am force-stop com.dreamtrace.app"]);
+  adb(["shell", "am start -n app.gtd.local/.MainActivity"]);
+  await sleep(2600);
+  return /app\.gtd\.local/i.test(topActivity());
+}
+```
+
+## 2. 包状态会「坏掉」，需要重装
+
+跑一段时间后会突然出现：
+
+```
+Error: Activity class {app.gtd.local/app.gtd.local.MainActivity} does not exist.
+```
+
+但 `pm list packages` 里还能看到 `package:app.gtd.local`。重装即可恢复：
+
+```powershell
+adb install -r "$env:TEMP\gtd-274-x86_64.apk"
+```
+
+## 3. 深链别拿 `/` 当路由
+
+`go("/")` 会拼出 `gtd:///`，系统解析不了（`unable to resolve Intent`）。
+根路由用显式组件启动：`am start -n app.gtd.local/.MainActivity`。
+收件箱就是根路由（`(tabs)/index.tsx`），没有 `/inbox`。
+
