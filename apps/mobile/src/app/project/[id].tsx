@@ -83,6 +83,13 @@ export default function ProjectDetailScreen() {
         }
         onPressTask={(task) => router.push(`/task/${task.id}`)}
         areas={areas}
+        onSetKind={(kind) =>
+          void runCommand("project.upsert", {
+            id: project.id,
+            name: project.name,
+            kind,
+          }).catch(() => undefined)
+        }
         onSetArea={(areaId) =>
           void runCommand("project.upsert", {
             id: project.id,

@@ -1,7 +1,7 @@
 import { useMemo } from "react";
-import { ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { Area, Project, Section, Task } from "@gtd/core";
+import type { Area, Project, ProjectKind, Section, Task } from "@gtd/core";
 import { countWords } from "@gtd/core";
 
 import { SectionHeader } from "./Screen";
@@ -26,6 +26,8 @@ export interface ProjectDetailContentProps {
   /** 区域列表（传入方可修改归属） */
   areas?: Area[];
   onSetArea?: (areaId: string | null) => void;
+  /** 切换项目类型（顺序 ↔ 并行）；不传则类型胶囊只读 */
+  onSetKind?: (kind: ProjectKind) => void;
 }
 
 /** 项目详情：进度 + 所属区域 + 按 section 分组的任务 + 下一步行动高亮 */
@@ -39,6 +41,7 @@ export function ProjectDetailContent({
   onPressTask,
   areas,
   onSetArea,
+  onSetKind,
 }: ProjectDetailContentProps) {
   const colors = useTheme();
   const t = useT();
@@ -69,11 +72,22 @@ export function ProjectDetailContent({
       <View style={styles.column}>
         <Card style={styles.hero}>
           <View style={styles.heroTop}>
-            <View style={[styles.kindPill, { backgroundColor: colors.surfaceMuted }]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("projects.switchKind")}
+              disabled={onSetKind === undefined}
+              onPress={() =>
+                onSetKind?.(project.kind === "sequential" ? "parallel" : "sequential")
+              }
+              style={({ pressed }) => [
+                styles.kindPill,
+                { backgroundColor: colors.surfaceMuted, opacity: pressed ? 0.6 : 1 },
+              ]}
+            >
               <AppText variant="caption" tone="tertiary" lines={1}>
                 {t(project.kind === "sequential" ? "projects.sequential" : "projects.parallel")}
               </AppText>
-            </View>
+            </Pressable>
             <AppText variant="caption" tone="tertiary" lines={1}>
               {t("projects.openCount", { n: open.length })}
             </AppText>
