@@ -1544,6 +1544,9 @@ const en: Dict = {
 
 const DICTS: Record<Lang, Dict> = { zh, en };
 
+/** 词典本体（只读）。给一致性测试用：中英键集、空值、占位符必须对齐。 */
+export const MESSAGES: Readonly<Record<Lang, Readonly<Dict>>> = DICTS;
+
 interface LangState {
   lang: Lang;
 }
