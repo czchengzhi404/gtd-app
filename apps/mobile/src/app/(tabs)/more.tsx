@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import Constants from "expo-constants";
 
 import {
   AppText,
@@ -21,6 +22,7 @@ import {
 import { getWaitingTasks, getSomedayTasks } from "@gtd/core";
 import type { SyncConfig } from "@gtd/core";
 import { resolveSyncConfig } from "@/platform/desktop-actions";
+import { readPendingUpdate } from "@/platform/update-check";
 
 /**
  * 更多：只放「低频总入口」，不再是设置大杂烩。
@@ -61,6 +63,9 @@ export default function MoreScreen() {
 
   if (!loaded) return null;
 
+  // 启动时自动检测的结果；null 表示没有新版（或还没查过）
+  const pendingUpdate = readPendingUpdate(kv, Constants.expoConfig?.version ?? "0.0.0");
+
   const lastSync =
     kv["sync.last"] !== undefined
       ? new Date(Number(kv["sync.last"])).toLocaleString()
@@ -81,6 +86,29 @@ export default function MoreScreen() {
   return (
     <ScrollView contentContainerStyle={styles.content} style={{ backgroundColor: colors.canvas }}>
       <View style={styles.column}>
+        {/* 有新版本横幅：启动时静默查过一次 GitHub，结果在 kv 里 */}
+        {pendingUpdate !== null ? (
+          <Card variant="outline" padding="normal" style={styles.updateCard}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("update.banner", { version: pendingUpdate.version })}
+              onPress={() => router.push("/about")}
+              style={({ pressed }) => [styles.syncHeader, { opacity: pressed ? 0.7 : 1 }]}
+            >
+              <Ionicons name="cloud-download-outline" size={18} color={colors.primary} />
+              <View style={styles.syncHeaderText}>
+                <AppText variant="bodyStrong" lines={1}>
+                  {t("update.banner", { version: pendingUpdate.version })}
+                </AppText>
+                <AppText variant="caption" tone="tertiary" lines={1}>
+                  {t("update.bannerHint")}
+                </AppText>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            </Pressable>
+          </Card>
+        ) : null}
+
         {/* 0 同步：独立页面入口，放在最顶部——它原先在第 5 组折叠块里，
             手机上要滚过四组才看得到，会被误认为「只有电脑端有」。 */}
         <SectionHeader
@@ -347,6 +375,10 @@ const styles = StyleSheet.create({
   card: {
     marginHorizontal: space.lg,
     gap: space.sm,
+  },
+  updateCard: {
+    marginHorizontal: space.lg,
+    marginTop: space.lg,
   },
   tailCard: {
     marginHorizontal: space.lg,

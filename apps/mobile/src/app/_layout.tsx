@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View } from "react-native";
+import Constants from "expo-constants";
 
 import {
   AppText,
@@ -21,6 +22,7 @@ import { initPlatform } from "@/platform/bootstrap";
 import { startSyncScheduler } from "@/platform/sync-scheduler";
 import { installFontScaleOverride } from "@/platform/font-scale";
 import { ensureBuiltinFont, isBuiltinFontSelected } from "@/platform/font-loader";
+import { autoCheckForUpdate } from "@/platform/update-check";
 import { CommandPaletteHost } from "@/platform/CommandPaletteHost";
 import { installGlobalErrorHandler, recordCrash } from "@/platform/crash-log";
 
@@ -51,6 +53,11 @@ export default function RootLayout() {
         }
         // 自动同步：启动/回前台/本地改动（20s 合并）触发；未配置时自动空转
         if (!cancelled) stopSync = startSyncScheduler();
+        // 启动时静默查一次 GitHub release（一天一次，失败不打扰），
+        // 有新版就写进 kv，由「更多」页横幅和关于页引导下载。
+        if (!cancelled) {
+          void autoCheckForUpdate(Constants.expoConfig?.version ?? "0.0.0").catch(() => undefined);
+        }
       } catch (err) {
         if (!cancelled) {
           const message = err instanceof Error ? err.message : String(err);
