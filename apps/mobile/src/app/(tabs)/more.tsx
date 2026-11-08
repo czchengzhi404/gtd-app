@@ -1,5 +1,5 @@
-﻿import { useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
+import { useEffect, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -10,7 +10,6 @@ import {
   Card,
   Divider,
   SectionHeader,
-  showToast,
   useAppStore,
   useTheme,
   useT,
@@ -19,53 +18,17 @@ import {
   space,
   type,
 } from "@gtd/ui";
-import {
-  getSyncConfig,
-  getSqliteExecutor,
-  getWaitingTasks,
-  getSomedayTasks,
-  runCommand,
-} from "@gtd/core";
-import type { PeerDeviceInfo, SyncConfig } from "@gtd/core";
-import {
-  decryptSecret,
-  listPeerDevices,
-  resolveSyncConfig,
-  pickSyncFolder,
-  runManualSync,
-  saveSyncConfig,
-  testSyncConnection,
-} from "@/platform/desktop-actions";
-import { isDesktop } from "@/platform/env";
-
-/** 同步预设：坚果云/WebDAV/自托管 HTTP/S3/本地文件夹 */
-interface SyncPreset {
-  key: string;
-  /** SyncConfig.kind */
-  kind: SyncConfig["kind"];
-  labelKey: string;
-  hintKey: string;
-  endpointTemplate?: string;
-  desktopOnly?: boolean;
-  showBucket?: boolean;
-  showRegion?: boolean;
-}
-
-const SYNC_PRESETS: SyncPreset[] = [
-  { key: "nutstore", kind: "webdav", labelKey: "preset.nutstore", hintKey: "preset.nutstoreHint", endpointTemplate: "https://dav.jianguoyun.com/dav/" },
-  { key: "webdav", kind: "webdav", labelKey: "preset.customWebdav", hintKey: "preset.customWebdavHint" },
-  { key: "selfHosted", kind: "http", labelKey: "app.more.preset.selfHosted", hintKey: "app.more.preset.selfHostedHint" },
-  { key: "s3", kind: "s3", labelKey: "preset.s3", hintKey: "preset.s3Hint", showBucket: true, showRegion: true },
-  { key: "folder", kind: "folder", labelKey: "preset.folder", hintKey: "preset.folderHint", desktopOnly: true },
-];
+import { getWaitingTasks, getSomedayTasks } from "@gtd/core";
+import type { SyncConfig } from "@gtd/core";
+import { resolveSyncConfig } from "@/platform/desktop-actions";
 
 /**
  * 更多：只放「低频总入口」，不再是设置大杂烩。
  *
- * 1 今日回顾 / 2 任务状态（既有预览，保留） / 3 洞察 / 4 清理 / 5 同步（折叠）
+ * 0 同步 / 1 今日回顾 / 2 任务状态（既有预览，保留） / 3 洞察 / 4 清理
  * / 6 数据 →「数据与记录」页 / 7 设置 →「设置」页。
  *
- * 拆分原则：本页每个分组最多一行入口（EntryRow），高频项（同步配置）保留为折叠块；
+ * 拆分原则：本页每个分组最多一行入口（EntryRow）。同步配置全部搬去 `/sync`，
  * 导出/导入/备份搬去 `/data`，主题/字体/语言/关于搬去 `/settings`。
  */
 export default function MoreScreen() {
@@ -87,55 +50,6 @@ export default function MoreScreen() {
     accessKeyId: "",
     secretAccessKey: "",
   });
-  const [busy, setBusy] = useState(false);
-  const [status, setStatus] = useState("");
-  const [selectedPreset, setSelectedPreset] = useState("nutstore");
-  const [testing, setTesting] = useState(false);
-  const [syncOpen, setSyncOpen] = useState(false);
-  const [peers, setPeers] = useState<PeerDeviceInfo[] | null>(null);
-
-  const syncLog = useMemo(() => {
-    const raw = kv["sync.log"];
-    if (raw === undefined) return null;
-    try {
-      const parsed = JSON.parse(raw) as {
-        applied?: number;
-        localWins?: number;
-        remoteWins?: number;
-        durationMs?: number;
-        at?: number;
-        mergedFields?: string[];
-        conflictFields?: string[];
-        conflicts?: { label: string }[];
-      };
-      return {
-        applied: parsed.applied ?? 0,
-        localWins: parsed.localWins ?? 0,
-        remoteWins: parsed.remoteWins ?? 0,
-        durationMs: parsed.durationMs ?? null,
-        mergedFields: parsed.mergedFields ?? [],
-        conflictFields: parsed.conflictFields ?? [],
-        conflicts: parsed.conflicts ?? [],
-      };
-    } catch {
-      return null;
-    }
-  }, [kv]);
-
-  useEffect(() => {
-    if (!syncOpen) return;
-    let cancelled = false;
-    void listPeerDevices()
-      .then((list) => {
-        if (!cancelled) setPeers(list);
-      })
-      .catch(() => {
-        if (!cancelled) setPeers([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [syncOpen]);
 
   useEffect(() => {
     void (async () => {
@@ -163,74 +77,6 @@ export default function MoreScreen() {
           days: Math.max(0, Math.floor((Date.now() - lastReviewAt) / 86_400_000)),
         });
   const syncStatus = config.enabled ? t("app.more.syncStatusOn") : t("app.more.syncStatusOff");
-
-  const update = (patch: Partial<SyncConfig>) => setConfig((prev) => ({ ...prev, ...patch }));
-
-  const flash = (message: string, tone: "success" | "danger" | "info" | "warning") => {
-    setStatus(message);
-    showToast({ message, tone });
-  };
-
-  const onSyncNow = async () => {
-    setBusy(true);
-    setStatus(t("more.status.syncing"));
-    try {
-      const outcome = await runManualSync((progress) => {
-        setStatus(
-          t("sync.progress", {
-            phase: t(`sync.phase.${progress.phase}`),
-            done: progress.done,
-            total: progress.total,
-          }),
-        );
-      });
-      setStatus(outcome.message);
-      showToast({ message: outcome.message, tone: outcome.ok ? "success" : "warning" });
-      if (outcome.ok) {
-        void listPeerDevices()
-          .then(setPeers)
-          .catch(() => undefined);
-      }
-    } catch (err) {
-      const message = t("more.status.syncFailed") + (err instanceof Error ? err.message : String(err));
-      flash(message, "danger");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onPickFolder = async () => {
-    const dir = await pickSyncFolder();
-    if (dir !== null) update({ endpoint: dir, kind: "folder" });
-  };
-
-  const onSave = async () => {
-    setBusy(true);
-    try {
-      await saveSyncConfig(config);
-      setStatus(t("more.status.saved"));
-      showToast({ message: t("more.status.saved"), tone: "success" });
-    } catch (err) {
-      const message = t("more.status.saveFailed") + (err instanceof Error ? err.message : String(err));
-      flash(message, "danger");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const onTestConnection = async () => {
-    setTesting(true);
-    try {
-      const outcome = await testSyncConnection(config);
-      setStatus(outcome.message);
-      showToast({ message: outcome.message, tone: "info" });
-    } catch (err) {
-      const message = t("sync.testFailed") + (err instanceof Error ? err.message : String(err));
-      flash(message, "danger");
-    } finally {
-      setTesting(false);
-    }
-  };
 
   return (
     <ScrollView contentContainerStyle={styles.content} style={{ backgroundColor: colors.canvas }}>
@@ -425,12 +271,6 @@ export default function MoreScreen() {
             onPress={() => router.push("/settings")}
           />
         </Card>
-
-        {status.length > 0 ? (
-          <AppText variant="label" tone="secondary" lines={3} style={styles.status}>
-            {status}
-          </AppText>
-        ) : null}
       </View>
     </ScrollView>
   );
@@ -494,83 +334,6 @@ function PreviewRow({ title, sub, onPress }: { title: string; sub?: string; onPr
   );
 }
 
-function SegPill({
-  label,
-  selected,
-  disabled,
-  onPress,
-}: {
-  label: string;
-  selected: boolean;
-  disabled?: boolean;
-  onPress: () => void;
-}) {
-  const colors = useTheme();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      accessibilityLabel={label}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.pill,
-        {
-          backgroundColor: selected ? colors.primary : colors.surfaceMuted,
-          opacity: disabled === true ? 0.4 : pressed ? 0.75 : 1,
-        },
-      ]}
-    >
-      <AppText
-        variant="label"
-        weight="600"
-        color={selected ? colors.onPrimary : colors.textSecondary}
-        lines={1}
-      >
-        {label}
-      </AppText>
-    </Pressable>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  secureTextEntry,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (text: string) => void;
-  placeholder?: string;
-  secureTextEntry?: boolean;
-}) {
-  const colors = useTheme();
-  return (
-    <View style={styles.field}>
-      <AppText variant="caption" tone="tertiary" lines={1}>
-        {label}
-      </AppText>
-      <TextInput
-        accessibilityLabel={label}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.textTertiary}
-        secureTextEntry={secureTextEntry}
-        autoCapitalize="none"
-        autoCorrect={false}
-        allowFontScaling={false}
-        maxFontSizeMultiplier={1}
-        style={[
-          styles.input,
-          { backgroundColor: colors.surfaceMuted, borderColor: colors.border, color: colors.text },
-        ]}
-      />
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   content: {
@@ -631,24 +394,6 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
   },
-  pillRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: space.sm,
-  },
-  pill: {
-    minHeight: hit.min,
-    paddingHorizontal: space.md,
-    borderRadius: radius.pill,
-    justifyContent: "center",
-  },
-  inlineRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: space.sm,
-  },
   syncHeader: {
     minHeight: hit.row,
     flexDirection: "row",
@@ -659,23 +404,5 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0,
     gap: space.xxs,
-  },
-  syncBody: {
-    gap: space.sm,
-    paddingTop: space.xs,
-  },
-  field: {
-    gap: space.xxs,
-  },
-  input: {
-    height: hit.min,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderRadius: radius.sm,
-    paddingHorizontal: space.md,
-    fontSize: type.body.fontSize,
-  },
-  status: {
-    paddingHorizontal: space.lg,
-    paddingTop: space.md,
   },
 });

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 桌面端动作：手动同步、同步配置、导入导出、本地与云端备份。
  * 运行在 Electron 渲染进程（浏览器环境）——文件操作走 gtd() 桥或 fetch。
  */
@@ -206,19 +206,52 @@ export async function exportAllToFile(): Promise<string | null> {
   return target;
 }
 
-export async function importFromFile(): Promise<string> {
-  const picked = await gtd().dialog.open();
-  if (picked === null) return t("more.status.canceled");
-  const raw = await gtd().fs.readFile(picked);
-  if (raw === null) throw new Error(t("sync.readFailed"));
-  const parsed = JSON.parse(raw) as { records?: unknown };
+/**
+ * 把一段 GTD 导出 JSON 合并进本地库。
+ *
+ * 分批 300 条走 `import.merge`——单条 immediate 事务在大文件上会把 WAL 撑爆，
+ * 分批既能让 UI 有喘息，也能在某一批失败时保留前面已成功的记录（不整体回滚）。
+ */
+async function mergeImportedJson(raw: string): Promise<string> {
+  let parsed: { records?: unknown };
+  try {
+    parsed = JSON.parse(raw) as { records?: unknown };
+  } catch {
+    throw new Error(t("more.status.importInvalid"));
+  }
   const records = Array.isArray(parsed.records) ? parsed.records : [];
+  if (records.length === 0) throw new Error(t("more.status.importInvalid"));
   const batches = chunkRecords(records, 300);
   for (const batch of batches) {
     await runCommand("import.merge", { records: batch }).catch(() => undefined);
   }
   await bootstrapStore();
   return t("sync.merged", { n: records.length });
+}
+
+export async function importFromFile(): Promise<string> {
+  if (isDesktop()) {
+    const picked = await gtd().dialog.open();
+    if (picked === null) return t("more.status.canceled");
+    const raw = await gtd().fs.readFile(picked);
+    if (raw === null) throw new Error(t("sync.readFailed"));
+    return mergeImportedJson(raw);
+  }
+
+  // 移动端：系统文件选择器（SAF / iOS Files）选一个 .json，读进内存再合并。
+  // 不落盘复制——导出文件是只读一次的数据，复制进沙盒只会留下一份孤儿副本。
+  const picker = await import("expo-document-picker");
+  const result = await picker.getDocumentAsync({
+    copyToCacheDirectory: true,
+    multiple: false,
+    type: ["application/json", "text/plain", "application/octet-stream"],
+  });
+  if (result.canceled) return t("more.status.canceled");
+  const asset = result.assets?.[0];
+  if (asset === undefined) return t("more.status.canceled");
+  const fs = await import("expo-file-system/legacy");
+  const raw = await fs.readAsStringAsync(asset.uri, { encoding: fs.EncodingType.UTF8 });
+  return mergeImportedJson(raw);
 }
 
 /* ---------------- 云端备份（WebDAV/S3 通道上传 JSON 快照） ---------------- */

@@ -1,4 +1,4 @@
-﻿import { createStore } from "zustand/vanilla";
+import { createStore } from "zustand/vanilla";
 import { useStore } from "zustand";
 
 /**
@@ -342,6 +342,7 @@ const zh: Dict = {
   "more.status.exportFailed": "导出失败：",
   "more.status.importing": "导入中…",
   "more.status.importFailed": "导入失败：",
+  "more.status.importInvalid": "这个文件里没有 GTD 记录（应选之前导出的 gtd-*.json）",
   // 同步引擎消息
   "sync.notEnabled": "同步未启用：先在下方配置并开启",
   "sync.report": "已应用 {applied} 条 · 推送 {pushed} 条 · 设备 {devices}",
@@ -1105,6 +1106,7 @@ const en: Dict = {
   "more.status.exportFailed": "Export failed: ",
   "more.status.importing": "Importing…",
   "more.status.importFailed": "Import failed: ",
+  "more.status.importInvalid": "That file has no GTD records (pick a gtd-*.json you exported earlier)",
   "sync.notEnabled": "Sync is not enabled — configure it below first",
   "sync.report": "Applied {applied} · pushed {pushed} · devices {devices}",
   "sync.readFailed": "Cannot read the selected file",
