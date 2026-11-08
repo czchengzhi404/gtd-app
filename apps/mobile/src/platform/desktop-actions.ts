@@ -18,12 +18,13 @@ import {
   describePeerDevices,
   base64FromString,
 } from "@gtd/core";
-import type { PeerDeviceInfo, SyncConfig, SyncProgress } from "@gtd/core";
+import type { FilesPort, PeerDeviceInfo, SyncConfig, SyncProgress } from "@gtd/core";
 import { t } from "@gtd/ui";
 import { gtd } from "./gtd-api";
 import { isDesktop } from "./env";
 import { openSecret, sealSecret } from "./secret-store";
 import { mobileBackupCount, mobileBackupNow, mobileRestoreLatest } from "./mobile-backup";
+import { pickSafDirectory, SafFilesPort } from "./saf-files-port";
 
 /** 敏感字段加密：桌面走 safeStorage，移动端进系统安全存储（kv 只留指针） */
 async function encryptSecret(plaintext: string, slot: "password" | "s3"): Promise<string> {
@@ -64,6 +65,16 @@ export async function resolveSyncConfig(): Promise<SyncConfig | null> {
   return { ...config, password, secretAccessKey };
 }
 
+/**
+ * 选 FilesPort：桌面端用注入的 Electron 端口；
+ * 移动端的 folder 同步用 SAF 端口（rootUri 来自 config.endpoint）。
+ */
+function filesPortFor(config: SyncConfig): FilesPort | undefined {
+  if (config.kind !== "folder") return undefined;
+  if (isDesktop()) return getFilesPort() ?? undefined;
+  return new SafFilesPort(config.endpoint);
+}
+
 export async function runManualSync(
   onProgress?: (progress: SyncProgress) => void,
 ): Promise<SyncOutcome> {
@@ -73,7 +84,7 @@ export async function runManualSync(
     return { ok: false, message: t("sync.notEnabled") };
   }
   const deviceId = await getOrCreateDeviceId(executor);
-  const provider = createProvider(config, getFilesPort() ?? undefined);
+  const provider = createProvider(config, filesPortFor(config));
   try {
     const report = await syncNow({
       provider,
@@ -116,7 +127,10 @@ export async function saveSyncConfig(config: SyncConfig): Promise<void> {
 }
 
 export async function pickSyncFolder(): Promise<string | null> {
-  if (!isDesktop()) return null;
+  if (!isDesktop()) {
+    // 移动端：SAF 目录选择器（返回 content:// 树 URI）
+    return pickSafDirectory();
+  }
   return gtd().dialog.open({ directory: true });
 }
 
@@ -165,7 +179,7 @@ export async function testSyncConnection(config: SyncConfig): Promise<SyncOutcom
     password: await openSecret(config.password, "password"),
     secretAccessKey: await openSecret(config.secretAccessKey, "s3"),
   };
-  const provider = createProvider(resolved, getFilesPort() ?? undefined);
+  const provider = createProvider(resolved, filesPortFor(resolved));
   const devices = await provider.listDevices();
   return { ok: true, message: `${devices.length + 1}` };
 }

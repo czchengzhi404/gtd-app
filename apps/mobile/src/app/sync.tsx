@@ -249,7 +249,7 @@ export default function SyncScreen() {
           <Button
             label={t("more.pickFolder")}
             icon="folder-open-outline"
-            disabled={busy || !isDesktop()}
+            disabled={busy}
             block
             onPress={() => void onPickFolder()}
           />
