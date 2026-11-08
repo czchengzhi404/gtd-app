@@ -58,7 +58,7 @@ const SYNC_PRESETS: SyncPreset[] = [
   { key: "webdav", kind: "webdav", labelKey: "preset.customWebdav", hintKey: "preset.customWebdavHint" },
   { key: "selfHosted", kind: "http", labelKey: "app.more.preset.selfHosted", hintKey: "app.more.preset.selfHostedHint" },
   { key: "s3", kind: "s3", labelKey: "preset.s3", hintKey: "preset.s3Hint", showBucket: true, showRegion: true },
-  { key: "folder", kind: "folder", labelKey: "preset.folder", hintKey: "preset.folderHint", desktopOnly: true },
+  { key: "folder", kind: "folder", labelKey: "preset.folder", hintKey: "preset.folderHint" },
 ];
 
 const EMPTY_CONFIG: SyncConfig = {
