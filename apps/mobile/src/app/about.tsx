@@ -18,7 +18,7 @@ import {
   useT,
   showToast,
 } from "@gtd/ui";
-import { checkForUpdate, openReleasesPage, readPendingUpdate } from "@/platform/update-check";
+import { checkForUpdate, openReleasesPage, persistUpdateCheck, readPendingUpdate, KV_UPDATE_CHECKED_AT } from "@/platform/update-check";
 import { GITHUB_URL, ISSUES_URL, openExternalUrl } from "@/platform/links";
 
 /**
@@ -36,6 +36,8 @@ export default function AboutScreen() {
 
   // 启动时自动检测的结果（launch 时写进 kv）；没有就是 null
   const pending = readPendingUpdate(kv, version);
+  const checkedAt = Number(kv[KV_UPDATE_CHECKED_AT] ?? 0);
+  const lastChecked = checkedAt > 0 ? new Date(checkedAt).toLocaleString() : null;
 
   const open = async (url: string) => {
     const ok = await openExternalUrl(url);
@@ -50,6 +52,7 @@ export default function AboutScreen() {
         showToast({ message: t("about.checkFailed", { message: result.message }), tone: "danger" });
         return;
       }
+      await persistUpdateCheck(result);
       if (result.hasUpdate) {
         setUpdateUrl(result.url);
         showToast({ message: t("about.updateAvailable", { version: result.latest ?? "" }), tone: "info" });
@@ -118,6 +121,9 @@ export default function AboutScreen() {
                 />
               ) : null}
             </View>
+            <AppText variant="caption" tone="tertiary" lines={1}>
+              {lastChecked !== null ? t("about.lastChecked", { time: lastChecked }) : t("about.neverChecked")}
+            </AppText>
           </Card>
           <Card variant="outline" padding="normal" style={styles.card}>
             <AppText variant="mono" lines={1}>

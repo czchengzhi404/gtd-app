@@ -80,6 +80,27 @@ export async function checkForUpdate(currentVersion: string): Promise<UpdateChec
 }
 
 /**
+ * 把一次成功的检测结果落进 kv。自动检测和手动「检查更新」都走这里，
+ * 保证关于页显示的「上次检查」对两条路径都成立。
+ */
+export async function persistUpdateCheck(result: UpdateCheckResult): Promise<void> {
+  if (!result.ok) return;
+  await runCommand("settings.set", { key: KV_UPDATE_CHECKED_AT, value: Date.now() }).catch(
+    () => undefined,
+  );
+  if (result.hasUpdate && result.latest !== null) {
+    await runCommand("settings.set", { key: KV_UPDATE_LATEST, value: result.latest }).catch(
+      () => undefined,
+    );
+    await runCommand("settings.set", { key: KV_UPDATE_URL, value: result.url }).catch(() => undefined);
+  } else {
+    // 已经是最新：把之前留下的「有新版」清掉，否则横幅会一直挂着
+    await runCommand("settings.set", { key: KV_UPDATE_LATEST, value: "" }).catch(() => undefined);
+    await runCommand("settings.set", { key: KV_UPDATE_URL, value: "" }).catch(() => undefined);
+  }
+}
+
+/**
  * 启动时的静默检测。
  *
  * 失败一律静默（离网、GitHub 抽风都不该打扰用户）；成功则把结果写进 kv，
@@ -95,20 +116,7 @@ export async function autoCheckForUpdate(currentVersion: string): Promise<Update
 
   const result = await checkForUpdate(currentVersion);
   if (!result.ok) return null;
-
-  await runCommand("settings.set", { key: KV_UPDATE_CHECKED_AT, value: Date.now() }).catch(
-    () => undefined,
-  );
-  if (result.hasUpdate && result.latest !== null) {
-    await runCommand("settings.set", { key: KV_UPDATE_LATEST, value: result.latest }).catch(
-      () => undefined,
-    );
-    await runCommand("settings.set", { key: KV_UPDATE_URL, value: result.url }).catch(() => undefined);
-  } else {
-    // 已经是最新：把之前留下的「有新版」清掉，否则横幅会一直挂着
-    await runCommand("settings.set", { key: KV_UPDATE_LATEST, value: "" }).catch(() => undefined);
-    await runCommand("settings.set", { key: KV_UPDATE_URL, value: "" }).catch(() => undefined);
-  }
+  await persistUpdateCheck(result);
   return result;
 }
 
