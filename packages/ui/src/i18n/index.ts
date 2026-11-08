@@ -1,4 +1,4 @@
-import { createStore } from "zustand/vanilla";
+﻿import { createStore } from "zustand/vanilla";
 import { useStore } from "zustand";
 
 /**
@@ -306,7 +306,7 @@ const zh: Dict = {
   "preset.nutstoreHint": "坚果云 → 安全选项 → 添加应用密码，用邮箱 + 应用密码登录",
   "preset.customWebdavHint": "任意支持 WebDAV 的服务（群晖 NAS / Nextcloud 等）",
   "preset.s3Hint": "阿里云 OSS / 腾讯云 COS / MinIO / AWS S3 等兼容存储",
-  "preset.folderHint": "使用本地文件夹同步（仅桌面端）",
+  "preset.folderHint": "使用本地文件夹同步（手机和桌面都支持）",
   "preset.choose": "选择同步方式",
   "sync.bucket": "存储桶名称",
   "sync.region": "地域（如 oss-cn-hangzhou）",
@@ -362,7 +362,7 @@ const zh: Dict = {
   "sync.errUnknown": "同步失败：{message}",
   "sync.peersTitle": "其他设备",
   "sync.pageTitle": "同步",
-  "sync.pageIntro": "同步不需要注册账号：用你自己的网盘（坚果云 / WebDAV / S3）当中转，多台设备读写同一份数据。手机和电脑都支持，只有「本地文件夹」限定桌面端。",
+  "sync.pageIntro": "同步不需要注册账号：用你自己的网盘（坚果云 / WebDAV / S3）或共享文件夹当中转，多台设备读写同一份数据。手机和电脑都支持。",
   "sync.step1": "① 选择同步方式",
   "sync.step2": "② 填写账号",
   "sync.step3": "③ 启用并保存",
@@ -1069,7 +1069,7 @@ const en: Dict = {
   "preset.nutstoreHint": "Nutstore → Security → Add app password. Sign in with email + app password.",
   "preset.customWebdavHint": "Any WebDAV service (Synology NAS, Nextcloud, etc.)",
   "preset.s3Hint": "Alibaba OSS / Tencent COS / MinIO / AWS S3 and other S3-compatible storage",
-  "preset.folderHint": "Sync via local folder (desktop only)",
+  "preset.folderHint": "Sync via a local folder (phone and desktop)",
   "preset.choose": "Choose sync method",
   "sync.bucket": "Bucket name",
   "sync.region": "Region (e.g. oss-cn-hangzhou)",
@@ -1124,7 +1124,7 @@ const en: Dict = {
   "sync.errUnknown": "Sync failed: {message}",
   "sync.peersTitle": "Other devices",
   "sync.pageTitle": "Sync",
-  "sync.pageIntro": "Sync needs no account: use your own cloud (Nutstore / WebDAV / S3) as the relay, and devices read/write the same data. Works on phone and desktop; only “local folder” is desktop-only.",
+  "sync.pageIntro": "Sync needs no account: use your own cloud (Nutstore / WebDAV / S3) or a shared folder as the relay, and devices read/write the same data. Works on phone and desktop.",
   "sync.step1": "① Choose a method",
   "sync.step2": "② Enter credentials",
   "sync.step3": "③ Enable and save",
