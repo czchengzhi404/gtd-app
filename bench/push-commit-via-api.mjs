@@ -25,11 +25,27 @@ if (!root || !repo || !branch || !message) {
 }
 
 function gh(args, input) {
-  return execFileSync("gh", ["api", ...args], {
-    encoding: "utf8",
-    input,
-    maxBuffer: 128 * 1024 * 1024,
-  }).trim();
+  // 这条链路上 api.github.com 会偶发 TLS 握手超时（今天实测多次），
+  // 单次失败就重试，别让一次抖动毁掉整次发布。
+  let lastError;
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    try {
+      return execFileSync("gh", ["api", ...args], {
+        encoding: "utf8",
+        input,
+        maxBuffer: 128 * 1024 * 1024,
+      }).trim();
+    } catch (error) {
+      lastError = error;
+      const detail = `${error.stderr ?? ""}${error.stdout ?? ""}${error.message ?? ""}`;
+      const transient = /timeout|timed out|502|503|504|ECONNRESET|EOF/i.test(detail);
+      if (!transient || attempt === 4) break;
+      console.log(`  gh api 第 ${attempt} 次失败（${detail.split("\n")[0].slice(0, 80)}），重试…`);
+      // 同步等待：脚本整体是同步流程，用 Atomics.wait 睡一会儿
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500 * attempt);
+    }
+  }
+  throw lastError;
 }
 
 const headSha = gh([`repos/${repo}/git/ref/heads/${branch}`, "--jq", ".object.sha"]);

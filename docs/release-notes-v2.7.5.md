@@ -38,8 +38,10 @@
 
 - `tsc -p apps/mobile` 通过
 - `bun test` 465 项 / 38 文件全绿
-- 大字体截图：`android-report/large-font/1.3-*.png`、`1.5-*.png`（6 页 × 2 档）
-- **修复后的截图验证在发布后进行**（本轮先发布再装包看）
+- 大字体截图：`android-report/large-font/1.3-*.png`、`1.5-*.png`（6 页 × 2 档，全部无截断）
+- 装 x86_64 包实测（versionCode 39）：`scripts/verify-275.mjs` **21/21 通过**
+  —— data / settings / templates / import / recent / materials / writing 七页均为单层标题、单个返回箭头，无重复标题
+  （截图 `android-report/v275/*.png`）
 
 ## 升级
 
