@@ -69,7 +69,19 @@ for (const { status, file } of changes) {
   }
   const abs = path.join(root, file);
   if (!fs.existsSync(abs)) {
-    // 显式列表里点名了但文件不在磁盘上 —— 当成删除，而不是默默跳过。
+    // 显式列表里点名了但磁盘上没有：只有当它确实在本地 HEAD 里时才当删除，
+    // 否则就是对远端不存在的路径做删除 —— Git Data API 会回 422 BadObjectState。
+    const inHead = (() => {
+      try {
+        return execFileSync("git", ["ls-tree", "HEAD", "--", file], { cwd: root, encoding: "utf8" }).trim().length > 0;
+      } catch {
+        return false;
+      }
+    })();
+    if (!inHead) {
+      console.log("  skip (never tracked)", file);
+      continue;
+    }
     entries.push({ path: file, mode: "100644", type: "blob", sha: null });
     console.log("  delete", file);
     continue;
