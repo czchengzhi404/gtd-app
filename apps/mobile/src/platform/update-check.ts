@@ -1,4 +1,12 @@
-import { getKvValue, getSqliteExecutor, runCommand } from "@gtd/core";
+import {
+  compareVersion,
+  getKvValue,
+  getSqliteExecutor,
+  readPendingUpdate as readPendingFromKv,
+  runCommand,
+  shouldAutoCheck,
+} from "@gtd/core";
+import type { PendingUpdate } from "@gtd/core";
 
 import { RELEASES_URL, REPO } from "./links";
 
@@ -8,6 +16,9 @@ import { RELEASES_URL, REPO } from "./links";
  * 桌面端由 electron-updater 静默下载安装；移动端侧载 APK 没有这个能力，
  * 能做的等价物是：查 GitHub 最新 release → 比版本 → 有新版就把结果记进 kv，
  * 由「更多」页的横幅和关于页引导用户去下载页。
+ *
+ * 判定逻辑（版本比较、要不要提示、节流）都在 `@gtd/core` 的 updates.ts，
+ * 这里是平台层：只负责请求 GitHub 和读写 kv。
  *
  * 不自动下载：侧载应用装 APK 需要用户确认，静默安装会触发系统安全策略。
  */
@@ -29,18 +40,6 @@ export interface UpdateCheckResult {
   hasUpdate: boolean;
   message: string;
   url: string;
-}
-
-/** 语义化版本比较：返回 >0 表示 a 比 b 新 */
-function compareVersion(a: string, b: string): number {
-  const pa = a.replace(/^v/, "").split(".").map((part) => Number(part) || 0);
-  const pb = b.replace(/^v/, "").split(".").map((part) => Number(part) || 0);
-  const len = Math.max(pa.length, pb.length);
-  for (let i = 0; i < len; i += 1) {
-    const diff = (pa[i] ?? 0) - (pb[i] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
 }
 
 export async function checkForUpdate(currentVersion: string): Promise<UpdateCheckResult> {
@@ -109,8 +108,7 @@ export async function persistUpdateCheck(result: UpdateCheckResult): Promise<voi
  */
 export async function autoCheckForUpdate(currentVersion: string): Promise<UpdateCheckResult | null> {
   const lastRaw = await getKvValue(getSqliteExecutor(), KV_UPDATE_CHECKED_AT).catch(() => null);
-  const last = Number(lastRaw ?? 0);
-  if (Number.isFinite(last) && last > 0 && Date.now() - last < AUTO_CHECK_INTERVAL_MS) {
+  if (!shouldAutoCheck(Number(lastRaw ?? 0), Date.now(), AUTO_CHECK_INTERVAL_MS)) {
     return null;
   }
 
@@ -120,17 +118,12 @@ export async function autoCheckForUpdate(currentVersion: string): Promise<Update
   return result;
 }
 
-/** 从 kv 读出「待更新」信息；没有就返回 null */
+/** 从 kv 读出「待更新」信息；判定在 core，这里只补默认下载页 */
 export function readPendingUpdate(
   kv: Record<string, string | undefined>,
   currentVersion: string,
-): { version: string; url: string } | null {
-  const version = kv[KV_UPDATE_LATEST] ?? "";
-  if (version.length === 0) return null;
-  // 防御：记录比当前版本旧（用户已经手动装了新版）时不提示
-  if (compareVersion(version, currentVersion) <= 0) return null;
-  const url = kv[KV_UPDATE_URL] ?? "";
-  return { version, url: url.length > 0 ? url : RELEASES_URL };
+): PendingUpdate | null {
+  return readPendingFromKv(kv, currentVersion, RELEASES_URL);
 }
 
 /** 打开下载页 */

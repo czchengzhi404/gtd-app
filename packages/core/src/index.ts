@@ -39,3 +39,4 @@ export * from "./sync/devices";
 export * from "./sync/crypto";
 export * from "./store/app-store";
 export * from "./store/selectors";
+export * from "./updates";
