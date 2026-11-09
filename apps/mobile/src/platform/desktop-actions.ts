@@ -211,8 +211,10 @@ export async function exportAllToFile(): Promise<string | null> {
  *
  * 分批 300 条走 `import.merge`——单条 immediate 事务在大文件上会把 WAL 撑爆，
  * 分批既能让 UI 有喘息，也能在某一批失败时保留前面已成功的记录（不整体回滚）。
+ *
+ * 导出给「从文件导入」和「别的应用分享进来」两条路复用，保证只有一条写路径。
  */
-async function mergeImportedJson(raw: string): Promise<string> {
+export async function mergeImportedJson(raw: string): Promise<string> {
   let parsed: { records?: unknown };
   try {
     parsed = JSON.parse(raw) as { records?: unknown };

@@ -11,6 +11,7 @@ import {
   ThemeProvider,
   ToastHost,
   UndoHost,
+  showToast,
   space,
   useAppStore,
   useTheme,
@@ -25,6 +26,12 @@ import { ensureBuiltinFont, isBuiltinFontSelected } from "@/platform/font-loader
 import { autoCheckForUpdate } from "@/platform/update-check";
 import { CommandPaletteHost } from "@/platform/CommandPaletteHost";
 import { installGlobalErrorHandler, recordCrash } from "@/platform/crash-log";
+import { mergeImportedJson } from "@/platform/desktop-actions";
+import {
+  readIncomingFile,
+  subscribeIncomingFile,
+  takeInitialFileUrl,
+} from "@/platform/incoming-file";
 
 installFontScaleOverride();
 // 先装全局错误捕获：任何后续初始化/渲染错误都至少能留下记录，而不是直接闪退
@@ -38,6 +45,7 @@ installGlobalErrorHandler();
 export default function RootLayout() {
   const [error, setError] = useState<string | null>(null);
   const loaded = useAppStore((s) => s.loaded);
+  const t = useT();
 
   useEffect(() => {
     let cancelled = false;
@@ -84,6 +92,43 @@ export default function RootLayout() {
     }
     router.replace("/onboarding");
   }, [loaded, error]);
+
+  /**
+   * 别的应用把 .json 递进来（微信/文件管理器里「用其他应用打开」）。
+   *
+   * 冷启动走 `takeInitialFileUrl()`（intent data 就是文件 URI），热启动走 url 事件。
+   * 导入完成后统一落到数据页：即使 expo-router 先把 content:// 当成未知路由渲染了一次，
+   * 也会被这里 replace 掉，不会把用户卡在「Unmatched Route」上。
+   */
+  useEffect(() => {
+    if (!loaded || error !== null) return;
+    let cancelled = false;
+
+    const handle = async (url: string) => {
+      try {
+        const raw = await readIncomingFile(url);
+        const message = await mergeImportedJson(raw);
+        if (cancelled) return;
+        showToast({ message, tone: "success" });
+      } catch (err) {
+        if (cancelled) return;
+        const detail = err instanceof Error ? err.message : String(err);
+        showToast({ message: `${t("more.status.importFailed")}${detail}`, tone: "danger" });
+      } finally {
+        if (!cancelled) router.replace("/data");
+      }
+    };
+
+    void takeInitialFileUrl().then((url) => {
+      if (url !== null) void handle(url);
+    });
+    const stop = subscribeIncomingFile((url) => void handle(url));
+
+    return () => {
+      cancelled = true;
+      stop();
+    };
+  }, [loaded, error, t]);
 
   return (
     <ErrorBoundary
