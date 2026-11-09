@@ -26,12 +26,7 @@ import { ensureBuiltinFont, isBuiltinFontSelected } from "@/platform/font-loader
 import { autoCheckForUpdate } from "@/platform/update-check";
 import { CommandPaletteHost } from "@/platform/CommandPaletteHost";
 import { installGlobalErrorHandler, recordCrash } from "@/platform/crash-log";
-import { mergeImportedJson } from "@/platform/desktop-actions";
-import {
-  readIncomingFile,
-  subscribeIncomingFile,
-  takeInitialFileUrl,
-} from "@/platform/incoming-file";
+import { subscribeIncomingFile } from "@/platform/incoming-file";
 
 installFontScaleOverride();
 // 先装全局错误捕获：任何后续初始化/渲染错误都至少能留下记录，而不是直接闪退
@@ -94,41 +89,19 @@ export default function RootLayout() {
   }, [loaded, error]);
 
   /**
-   * 别的应用把 .json 递进来（微信/文件管理器里「用其他应用打开」）。
+   * 热启动时别的应用把 .json 递过来（App 在后台，用户又点了一次「用其他应用打开」）。
    *
-   * 冷启动走 `takeInitialFileUrl()`（intent data 就是文件 URI），热启动走 url 事件。
-   * 导入完成后统一落到数据页：即使 expo-router 先把 content:// 当成未知路由渲染了一次，
-   * 也会被这里 replace 掉，不会把用户卡在「Unmatched Route」上。
+   * 冷启动那条走 `+native-intent`（见该文件）。热启动时 expo-router 的原生改写钩子
+   * 在非 Expo Go 环境下不生效，所以这里用 `Linking` 的 url 事件接住，
+   * 跳到同一个导入页——导入逻辑只有一份。
    */
   useEffect(() => {
     if (!loaded || error !== null) return;
-    let cancelled = false;
-
-    const handle = async (url: string) => {
-      try {
-        const raw = await readIncomingFile(url);
-        const message = await mergeImportedJson(raw);
-        if (cancelled) return;
-        showToast({ message, tone: "success" });
-      } catch (err) {
-        if (cancelled) return;
-        const detail = err instanceof Error ? err.message : String(err);
-        showToast({ message: `${t("more.status.importFailed")}${detail}`, tone: "danger" });
-      } finally {
-        if (!cancelled) router.replace("/data");
-      }
-    };
-
-    void takeInitialFileUrl().then((url) => {
-      if (url !== null) void handle(url);
+    const stop = subscribeIncomingFile((url) => {
+      router.push(`/import-incoming?raw=${encodeURIComponent(url)}`);
     });
-    const stop = subscribeIncomingFile((url) => void handle(url));
-
-    return () => {
-      cancelled = true;
-      stop();
-    };
-  }, [loaded, error, t]);
+    return stop;
+  }, [loaded, error]);
 
   return (
     <ErrorBoundary
@@ -186,6 +159,10 @@ function StackScreens() {
       <Stack.Screen name="settings" options={{ title: t("app.more.settings"), headerShown: false }} />
       <Stack.Screen name="data" options={{ title: t("more.group.data"), headerShown: false }} />
       <Stack.Screen name="sync" options={{ title: t("sync.pageTitle") }} />
+      <Stack.Screen
+        name="import-incoming"
+        options={{ title: t("app.route.importPage"), headerShown: false, gestureEnabled: false }}
+      />
     </Stack>
   );
 }
