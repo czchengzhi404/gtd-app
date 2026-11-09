@@ -41,6 +41,16 @@ export function takePendingImportUrl(): string | null {
   return url;
 }
 
+/**
+ * 是否有等待导入的文件（不清空）。
+ *
+ * 给引导页判定用：首次安装就收到分享文件时，如果放引导页过去，
+ * 它会把 `/import-incoming` 顶掉，用户看到的是引导页而不是导入结果。
+ */
+export function hasPendingImport(): boolean {
+  return pendingUrl !== null;
+}
+
 /** 热启动（App 已在后台）时收到文件 */
 export function subscribeIncomingFile(onFile: (url: string) => void): () => void {
   const sub = Linking.addEventListener("url", ({ url }) => {

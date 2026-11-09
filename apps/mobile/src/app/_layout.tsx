@@ -26,7 +26,7 @@ import { ensureBuiltinFont, isBuiltinFontSelected } from "@/platform/font-loader
 import { autoCheckForUpdate } from "@/platform/update-check";
 import { CommandPaletteHost } from "@/platform/CommandPaletteHost";
 import { installGlobalErrorHandler, recordCrash } from "@/platform/crash-log";
-import { subscribeIncomingFile, setPendingImportUrl } from "@/platform/incoming-file";
+import { subscribeIncomingFile, setPendingImportUrl, hasPendingImport } from "@/platform/incoming-file";
 
 installFontScaleOverride();
 // 先装全局错误捕获：任何后续初始化/渲染错误都至少能留下记录，而不是直接闪退
@@ -79,6 +79,8 @@ export default function RootLayout() {
   // 首次启动：只在「从没用过」（无任务）时展示引导；老用户升级不打扰，直接补标记
   useEffect(() => {
     if (!loaded || error !== null) return;
+    // 刚收到分享文件时先别引导：那会把 /import-incoming 顶掉，用户看不到导入结果
+    if (hasPendingImport()) return;
     const state = appStore.getState();
     if (state.kv["onboarding.done"] === "1") return;
     if (Object.keys(state.tasks).length > 0) {
