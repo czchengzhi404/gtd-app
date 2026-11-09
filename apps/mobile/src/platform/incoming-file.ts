@@ -2,31 +2,42 @@
  * 接住别的应用递进来的文件（ACTION_VIEW）。
  *
  * 场景：微信里收到 .json → 「用其他应用打开」→ 选 GTD List。
- * 系统把文件以 `content://` 形式放在 intent data 里，RN 通过
- * `Linking.getInitialURL()`（冷启动）或 `url` 事件（热启动）交给我们。
+ * 系统把文件以 `content://` 形式放在 intent data 里，我们通过两条路拿到：
+ * - 冷启动：`app/+native-intent.ts` 的 `redirectSystemPath` 拿到**完整原始 URL**
+ * - 热启动：`Linking` 的 `url` 事件
  *
- * 不复制进沙盒：这份文件只读一次，复制一份只会留下孤儿副本
- * （附件才需要复制，因为它的 content:// 授权是临时的，而这里读完即弃）。
+ * 为什么用模块变量传 URL，而不是塞进路由参数：
+ * 路由参数会经历百分号解码，`content://.../primary%3ADocuments%2Ffile.json`
+ * 到页面里就变成了 `primary:Documents/file.json` —— URI 结构被破坏，
+ * 系统直接报 `Invalid URI`。base64 也要额外实现解码器。
+ * 而 `+native-intent` 和导入页在同一个 JS 实例里，一个模块变量就够了，
+ * 且完全不经过任何编解码。
  */
 import { Linking } from "react-native";
 
-/** 冷启动时的那一次 URL；模块加载早期就抓到，避免被 router 消费后才读 */
-const initialUrlPromise: Promise<string | null> = Linking.getInitialURL().catch(() => null);
+/** 等待导入的文件 URL（由 +native-intent 或 url 事件写入，导入页消费一次即清空） */
+let pendingUrl: string | null = null;
 
 /** 已经处理过的 URL，防止冷启动 + 事件双触发导致重复导入 */
 const handled = new Set<string>();
 
-/** 看起来像一份可导入文件吗（content:// 或 file://） */
+/** 能直接读的文件 URL：别的应用通过 FileProvider 给的 content://，或旧式 file:// */
 export function isFileUrl(url: string): boolean {
   return url.startsWith("content://") || url.startsWith("file://");
 }
 
-/** 取冷启动带进来的文件 URL（只返回一次） */
-export async function takeInitialFileUrl(): Promise<string | null> {
-  const url = await initialUrlPromise;
-  if (url === null || !isFileUrl(url)) return null;
-  if (handled.has(url)) return null;
+/** 记下待导入的文件（幂等：同一个 URL 只记一次） */
+export function setPendingImportUrl(url: string): boolean {
+  if (!isFileUrl(url) || handled.has(url)) return false;
   handled.add(url);
+  pendingUrl = url;
+  return true;
+}
+
+/** 取走待导入的 URL（只返回一次） */
+export function takePendingImportUrl(): string | null {
+  const url = pendingUrl;
+  pendingUrl = null;
   return url;
 }
 

@@ -26,7 +26,7 @@ import { ensureBuiltinFont, isBuiltinFontSelected } from "@/platform/font-loader
 import { autoCheckForUpdate } from "@/platform/update-check";
 import { CommandPaletteHost } from "@/platform/CommandPaletteHost";
 import { installGlobalErrorHandler, recordCrash } from "@/platform/crash-log";
-import { subscribeIncomingFile } from "@/platform/incoming-file";
+import { subscribeIncomingFile, setPendingImportUrl } from "@/platform/incoming-file";
 
 installFontScaleOverride();
 // 先装全局错误捕获：任何后续初始化/渲染错误都至少能留下记录，而不是直接闪退
@@ -98,7 +98,8 @@ export default function RootLayout() {
   useEffect(() => {
     if (!loaded || error !== null) return;
     const stop = subscribeIncomingFile((url) => {
-      router.push(`/import-incoming?raw=${encodeURIComponent(url)}`);
+      setPendingImportUrl(url);
+      router.push("/import-incoming");
     });
     return stop;
   }, [loaded, error]);

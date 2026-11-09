@@ -1,5 +1,11 @@
 # v2.7.9 · 修好「用其他应用打开」导入 JSON
 
+> ⚠️ **这一版仍然没修完**：Unmatched Route 确实没了，导入页也跑起来了，
+> 但原始 URL 是塞在路由参数里传的，而路由参数会被**百分号解码**——
+> `primary%3ADocuments%2Ffile.json` 到页面里变成 `primary:Documents/file.json`，
+> 系统报 `Invalid URI`。传参方式在 **v2.7.10** 改成模块变量，请装 v2.7.10 或更新版本。
+> 下面保留原始记录，用来对照「改对了什么、还差什么」。
+
 ## v2.7.8 漏了什么
 
 v2.7.8 注册了 `VIEW + application/json` 的 intent-filter，编译出来的 manifest 里也确实有：
