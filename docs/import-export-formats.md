@@ -324,6 +324,78 @@
 | Excel / 脚本处理 | **JSON** | 结构稳定、字段有类型 |
 | 从 Todoist 迁出 | 导出 Todoist CSV → 本应用导入 | 保留项目、标签、优先级、到期日 |
 | 从滴答清单迁出 | 导出 TickTick CSV → 本应用导入 | 同上，项目取 List/Folder |
+| 从任意在线清单 / 自写脚本 | **JSON**（自己生成备份信封） | 见 §13.1 |
+
+### 13.1 手写一份可导入的 JSON
+
+第三方清单服务（在线清单、Notion 导出、自己写的脚本）没有现成导入通道时，
+直接生成备份信封就行 —— App 的「从 JSON 导入（合并）」只认 `records`，
+不关心它是谁生成的。
+
+**最小可用信封**：
+
+```json
+{
+  "app": "gtd",
+  "version": 1,
+  "exportedAt": 1793514149614,
+  "records": [
+    { "type": "task", "record": { "id": "my-1", "title": "买牛奶" } }
+  ]
+}
+```
+
+`app` / `version` / `exportedAt` 只是标识，导入端**只读 `records`**。
+
+**每条 `record` 只有 `id` 是硬性要求**（非空字符串），其余字段缺失时由
+`coerceTaggedRecords` 按下面的默认值补齐，不会因为少字段被丢：
+
+| 字段 | 缺省 |
+|---|---|
+| `title` / `notes` | `""` |
+| `status` | `"inbox"`（非法值也回落到这个） |
+| `priority` | `0` |
+| `projectId` / `sectionId` / `waitingFor` / 各种时间 | `null` |
+| `contextIds` / `tags` / `checklist` | `[]` |
+| `starred` | `false` |
+| `recurrence` | `null` |
+| `createdAt` / `updatedAt` | 导入时刻 |
+| `revision` | `1` |
+| `deletedAt` | `null` |
+
+**两个容易踩的点**：
+
+1. **`orderKey` 是字典序比较的字符串**，不是数字。想保住清单原顺序，
+   用零填充下标（`"0000000001"`、`"0000000002"`…）；不填则全部为空字符串，
+   并列时退化成按创建时间排。
+2. **`id` 决定重复导入的行为**。`import.merge` 按 `id` + `revision` 合并：
+   同 `id` 同 `revision` 会保留已有记录，所以**用稳定的派生 id**
+   （如 `ol-<源 id>`）可以让重复导入幂等，而不用先清库。
+
+要建项目并把任务挂上去，就再多一条 `project` 记录，任务的 `projectId` 指向它：
+
+```json
+{ "type": "project",
+  "record": { "id": "p-1", "name": "军师欠下的999件事", "kind": "parallel", "status": "active" } }
+```
+
+已完成项写 `"status": "done"` 并给个 `completedAt`（毫秒时间戳）。
+
+**现成工具**（`scripts/`）：
+
+```bash
+# onlinelistmaker 导出 → 备份信封
+node scripts/convert-onlinelist.mjs imports/junshi-999.json imports/gtd-junshi-999.json \
+  --status next --tag 欠账
+
+# 导入前先校验：走的是和 App 完全相同的 schema + coercer 两道关
+bun run scripts/validate-import.mjs imports/gtd-junshi-999.json
+```
+
+`convert-onlinelist.mjs` 的选项：`--status next|someday|inbox`（未完成项去向）、
+`--project <名称>`、`--no-project`（不建项目，留在收件箱）、`--tag <标签>`（可重复）。
+
+把生成的 JSON 放到手机任意目录，App 里走「数据与记录 → 从 JSON 导入（合并）」选它即可。
 
 ---
 
