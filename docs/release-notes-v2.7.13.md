@@ -44,7 +44,11 @@ emptySuggestions={filterActive ? [] : suggestions}
 - `tsc`（ui / mobile）通过
 - `bun test` **489 项 / 40 文件全绿**
 - `scripts/verify-syntax-filter.mjs` 12/13（唯一未过的是我写错的断言，见下）
-- 空态文案改动的设备复验见发布后补充
+- **空态修复设备复验（`scripts/verify-inbox-empty-state.mjs`，7/7 全过）**：
+  - 筛选 `Overdue only` 后标题仍是 `3 to process`、漏斗角标 `1`
+  - 空态显示 **`No tasks match`** /「收件箱里还有任务，只是没匹配上当前筛选」
+  - 不再出现 `Inbox is empty`
+  - 清掉筛选后 3 条任务重新出现
 
 ## 自动化脚本又踩的三个坑（已写进 runbook）
 
