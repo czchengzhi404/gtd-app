@@ -119,3 +119,47 @@ adb install -r "$env:TEMP\gtd-274-x86_64.apk"
 根路由用显式组件启动：`am start -n app.gtd.local/.MainActivity`。
 收件箱就是根路由（`(tabs)/index.tsx`），没有 `/inbox`。
 
+## 4. 收软键盘：用 ESC，别用返回键
+
+这一条害我卡了整整两轮验证（「导出单篇正文」和「正文版本历史」都挂在它上面）。
+
+```powershell
+adb shell input keyevent 111   # KEYCODE_ESCAPE —— 只关 IME
+adb shell input keyevent 4     # KEYCODE_BACK —— 在 Stack 页面里等于「返回上一页」
+```
+
+`keyevent 4` 会把导入页/详情页整个退掉，然后后续所有断言都在错误的页面上跑，
+报出来的失败完全不指向真实原因。
+
+也不要点「空白处」收键盘：点常落在键盘上，之后的 `input swipe` 会被键盘当成
+**滑行输入（glide typing）**，往当前焦点输入框里打字母——实测往 URL 里打出了 `" by g"`。
+
+## 5. 详情页/表单的长页面：先滚到可见再点
+
+`uiautomator dump` 只包含当前视口内的节点。按钮在折叠线以下时 `tapExact("Save")`
+直接返回 `false`，看起来像「按钮不存在」，实际只是没滚到。
+
+更坑的是**滚动过猛会越过目标**：从页面底部继续下滑，会跳过中间的 ACTIONS 行，
+让「导出正文」看起来像没渲染。稳妥做法是先回顶部再向下找：
+
+```js
+async function scrollToTop(times = 6) {
+  for (let i = 0; i < times; i += 1) {
+    adb(["shell", "input swipe 540 800 540 2000 250"]);
+    await sleep(350);
+  }
+}
+```
+
+## 6. 断言文案要以 i18n 的英文值为准
+
+按中文猜英文会白白失败。踩过一次：以为「导出正文」的英文是 `Export note`，
+实际 `detail.notesExport` 的英文是 **`Export body`** —— 按钮一直存在，只是断言找错词。
+
+查法：
+
+```powershell
+Select-String -Path packages/ui/src/i18n/index.ts -Pattern '"detail\.notesExport"'
+```
+
+
