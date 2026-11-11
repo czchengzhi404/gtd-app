@@ -89,7 +89,8 @@ await sleep(2500);
 shot("3-section-created");
 
 const afterCreate = texts();
-record("项目详情出现分区标题", afterCreate.some((t) => t === SECTION), afterCreate.slice(0, 14).join(" | "));
+// SectionHeader 会把标题渲染成大写（SHOP），所以比较要不区分大小写
+record("项目详情出现分区标题（空分区也显示）", afterCreate.some((t) => t.toUpperCase() === SECTION.toUpperCase()), afterCreate.slice(0, 14).join(" | "));
 
 /* ---------- 2. 把任务指派到分区 ---------- */
 const taskRow = nodes().find((n) => /量书房尺寸/.test(n.text || ""));
@@ -114,8 +115,8 @@ shot("6-project-grouped");
 const grouped = texts();
 console.log("  项目页:", grouped.join(" | ").slice(0, 300));
 
-// 分区标题应在任务之前出现（说明任务归到了该分区下）
-const idxSection = grouped.findIndex((t) => t === SECTION);
+// 分区标题应在任务之前出现（说明任务归到了该分区下）；同样不区分大小写
+const idxSection = grouped.findIndex((t) => t.toUpperCase() === SECTION.toUpperCase());
 const idxTask = grouped.findIndex((t) => /量书房尺寸/.test(t));
 record(
   "任务归到分区下（分区标题在任务之前）",
