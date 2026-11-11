@@ -1,8 +1,8 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useLocalSearchParams, router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
-import { Chip, KanbanBoard, ProjectDetailContent, Screen, space, useAppStore, useT } from "@gtd/ui";
+import { Chip, KanbanBoard, ProjectDetailContent, Screen, showPrompt, space, useAppStore, useT } from "@gtd/ui";
 import { appStore, getProjectNextAction, runCommand, selectAreas } from "@gtd/core";
 import { completeTaskWithUndo, uncompleteTask } from "@/lib/task-ops";
 import type { KanbanColumn } from "@gtd/ui";
@@ -35,6 +35,23 @@ export default function ProjectDetailScreen() {
   const nextAction = getProjectNextAction(appStore.getState(), projectId);
 
   /**
+   * 新建分区。
+   *
+   * `section.create` 这个命令在 core 里一直存在（含 schema 和测试），但之前**没有任何 UI 调用它**——
+   * 也就是说用户根本建不了分区，而项目详情里「按 section 分组」的渲染逻辑等于一直空转。
+   */
+  const createSection = async () => {
+    const name = await showPrompt({
+      title: t("project.newSection"),
+      placeholder: t("project.sectionNamePlaceholder"),
+      confirmLabel: t("project.newSection"),
+      validate: (value) => (value.trim().length === 0 ? t("project.sectionNameEmpty") : null),
+    });
+    if (name === null) return;
+    await runCommand("section.create", { projectId, name: name.trim() }).catch(() => undefined);
+  };
+
+  /**
    * 看板列按状态切分（项目内任务通常是 next，但收集/等待/将来也许也会出现）。
    * 拖到另一列 = 执行 task.moveStatus，和列表里的「理清」是同一个命令。
    */
@@ -61,6 +78,9 @@ export default function ProjectDetailScreen() {
       <View style={styles.viewSwitch}>
         <Chip label={t("kanban.viewList")} selected={view === "list"} onPress={() => setView("list")} />
         <Chip label={t("kanban.viewBoard")} selected={view === "kanban"} onPress={() => setView("kanban")} />
+        {view === "list" ? (
+          <Chip label={t("project.newSection")} onPress={() => void createSection()} />
+        ) : null}
       </View>
       {view === "kanban" ? (
         <KanbanBoard

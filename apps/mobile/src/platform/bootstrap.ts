@@ -254,6 +254,8 @@ async function wireNative(): Promise<() => void> {
 export interface PlatformInitResult {
   mode: "electron-ipc" | "expo-sqlite";
   cleanup: () => void;
+  /** 本次启动是否刚刚种下种子数据（= 真·首次安装），首启引导用 */
+  justSeeded: boolean;
 }
 
 /** 统一入口：注入端口 → 迁移（原生）→ 种子（幂等）→ 事件/通知接线 */
@@ -273,9 +275,9 @@ export async function initPlatform(): Promise<PlatformInitResult> {
     setCommandPort({
       dispatch: async (op, payload) => api.command(op, payload) as Promise<CommandResult>,
     });
-    await seedIfNeeded();
+    const justSeeded = await seedIfNeeded();
     const cleanup = wireDesktop();
-    return { mode: "electron-ipc", cleanup };
+    return { mode: "electron-ipc", cleanup, justSeeded };
   }
   if (Platform.OS === "web") {
     throw new Error(t("platform.webUnsupported"));
@@ -284,9 +286,9 @@ export async function initPlatform(): Promise<PlatformInitResult> {
   setSqliteExecutor(executor);
   setCommandPort(createExpoCommandPort(executor));
   await migrate(executor);
-  await seedIfNeeded();
+  const justSeeded = await seedIfNeeded();
   const cleanup = await wireNative();
-  return { mode: "expo-sqlite", cleanup };
+  return { mode: "expo-sqlite", cleanup, justSeeded };
 }
 
 /** 存储自检（冒烟用）：确认命令端口可写、查询端口可读 */

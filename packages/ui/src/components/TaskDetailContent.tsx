@@ -44,6 +44,14 @@ export interface TaskDetailContentProps {
   task: Task;
   now: number;
   projectName?: string;
+  /**
+   * 所属项目下的分区列表。
+   * 与 onSetSection 一起传才会显示「分区」选择区——不传就当这个功能不存在，
+   * 避免在没有项目的任务上露出一个空壳。
+   */
+  sections?: { id: string; name: string }[];
+  /** 设置所属分区（null = 移出分区） */
+  onSetSection?: (id: string | null) => void;
   contextNames: string[];
   onMoveStatus: (status: TaskStatusInput) => void;
   onToggleStar: () => void;
@@ -84,6 +92,8 @@ export function TaskDetailContent({
   task,
   now,
   projectName,
+  sections,
+  onSetSection,
   contextNames,
   onMoveStatus,
   onToggleStar,
@@ -173,6 +183,27 @@ export function TaskDetailContent({
           ))}
         </View>
       </View>
+
+      {onSetSection !== undefined && (sections?.length ?? 0) > 0 ? (
+        <>
+          <SectionHeader title={t("task.sectionLabel")} />
+          <View style={styles.chipRow}>
+            <Chip
+              label={t("task.noSection")}
+              selected={task.sectionId === null}
+              onPress={() => onSetSection(null)}
+            />
+            {(sections ?? []).map((section) => (
+              <Chip
+                key={section.id}
+                label={section.name}
+                selected={task.sectionId === section.id}
+                onPress={() => onSetSection(section.id)}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
 
       {onSetTags !== undefined || task.tags.length > 0 ? (
         <>

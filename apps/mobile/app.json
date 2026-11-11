@@ -2,7 +2,7 @@
   "expo": {
     "name": "GTD 清单",
     "slug": "gtd-app",
-    "version": "2.7.13",
+    "version": "2.7.14",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "gtd",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "app.gtd.local",
-      "versionCode": 47,
+      "versionCode": 48,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",

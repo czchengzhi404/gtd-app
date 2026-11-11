@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Stack, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View } from "react-native";
@@ -41,6 +41,8 @@ export default function RootLayout() {
   const [error, setError] = useState<string | null>(null);
   const loaded = useAppStore((s) => s.loaded);
   const t = useT();
+  // 本次启动是否刚种下种子数据（真·首次安装）。用 ref：只影响首启判断，不需要触发重渲染。
+  const justSeededRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,6 +52,7 @@ export default function RootLayout() {
       try {
         const result = await initPlatform();
         cleanup = result.cleanup;
+        justSeededRef.current = result.justSeeded;
         await bootstrapStore();
         if (isBuiltinFontSelected()) {
           await ensureBuiltinFont();
@@ -76,14 +79,18 @@ export default function RootLayout() {
     };
   }, []);
 
-  // 首次启动：只在「从没用过」（无任务）时展示引导；老用户升级不打扰，直接补标记
+  // 首次启动：只在**真·首次安装**时展示引导。
+  //
+  // 判断依据是「这次启动有没有真的种下种子数据」，不是「有没有任务」——
+  // 种子本身就会写 4 条任务，用任务数判断会永远成立，引导页等于死代码（v2.7.13 前就是这样）。
+  // 老用户升级时 seeded 已存在 → justSeeded=false → 静默补标记，不打扰。
   useEffect(() => {
     if (!loaded || error !== null) return;
     // 刚收到分享文件时先别引导：那会把 /import-incoming 顶掉，用户看不到导入结果
     if (hasPendingImport()) return;
     const state = appStore.getState();
     if (state.kv["onboarding.done"] === "1") return;
-    if (Object.keys(state.tasks).length > 0) {
+    if (!justSeededRef.current) {
       void runCommand("settings.set", { key: "onboarding.done", value: 1 }).catch(() => undefined);
       return;
     }

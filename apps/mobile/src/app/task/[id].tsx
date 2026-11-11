@@ -64,6 +64,12 @@ export default function TaskDetailScreen() {
     .filter((n): n is string => n !== undefined);
   const projectName = projects.find((p) => p.id === task.projectId)?.name;
 
+  // 所属项目下的分区：只有任务挂了项目、且项目里建过分区时才显示选择区
+  const taskSections = Object.values(appStore.getState().sections)
+    .filter((s) => s.deletedAt === null && s.projectId === task.projectId)
+    .sort((a, b) => (a.orderKey < b.orderKey ? -1 : 1))
+    .map((s) => ({ id: s.id, name: s.name }));
+
   const confirmDelete = async () => {
     const ok = await showConfirm({
       title: t("detail.deleteConfirm"),
@@ -133,6 +139,10 @@ export default function TaskDetailScreen() {
           task={task}
           now={Date.now()}
           projectName={projectName}
+          sections={taskSections}
+          onSetSection={(sectionId) =>
+            void runCommand("task.update", { id: task.id, patch: { sectionId } }).catch(() => undefined)
+          }
           contextNames={contextNames}
           tagSuggestions={tagSuggestions}
           onMoveStatus={(status: TaskStatusInput) =>
