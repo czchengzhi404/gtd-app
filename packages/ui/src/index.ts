@@ -1,4 +1,5 @@
 export * from "./theme/tokens";
+export * from "./theme/project-accent";
 export * from "./theme/AppText";
 export * from "./theme/primitives";
 export * from "./nav-config";

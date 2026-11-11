@@ -1,5 +1,5 @@
 import { memo, type ReactNode } from "react";
-import { useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Animated, PanResponder, Pressable, StyleSheet, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -66,6 +66,25 @@ function TaskRowImpl({
   const colors = useTheme();
   const focus = useFocusStyle(radius.sm);
   const translateX = useRef(new Animated.Value(0)).current;
+
+  /**
+   * 勾选瞬间的「回弹」：复选框先缩到 0.86 再弹回 1。
+   *
+   * 列表的增删本来就有 220ms 收拢动画（见 TaskList 的 LayoutAnimation），
+   * 但那个动的是「行」，复选框自己是硬切——勾选是全天最高频的动作，
+   * 这一点点回弹能让「我确实勾掉了」有身体记忆，而不是屏幕默默少了一行。
+   */
+  const checkPop = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (!done) return;
+    checkPop.setValue(0.86);
+    Animated.spring(checkPop, {
+      toValue: 1,
+      friction: 4,
+      tension: 180,
+      useNativeDriver: true,
+    }).start();
+  }, [done, checkPop]);
 
   const swipeEnabled =
     (onSwipeLeft !== undefined || onSwipeRight !== undefined) && !selectionMode && !reorderMode;
@@ -172,17 +191,18 @@ function TaskRowImpl({
           hitSlop={4}
           style={({ pressed }) => [styles.checkHit, focus, { opacity: pressed ? 0.6 : 1 }]}
         >
-          <View
+          <Animated.View
             style={[
               styles.checkbox,
               {
                 borderColor: done ? colors.primary : colors.borderStrong,
                 backgroundColor: done ? colors.primary : "transparent",
+                transform: [{ scale: checkPop }],
               },
             ]}
           >
             {done ? <Ionicons name="checkmark" size={14} color={colors.onPrimary} /> : null}
-          </View>
+          </Animated.View>
         </Pressable>
       )}
 

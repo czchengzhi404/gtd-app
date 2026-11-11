@@ -389,6 +389,9 @@ export function TaskDetailContent({
             }
           />
           <View style={[styles.notesCard, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
+            {/* 笔记本左边线的暗示：写作页要的是「纸」，不是「表单」。
+                一条 1.5px 的竖线 + 更宽行距就够了，不需要铺纹理图片（那会让整个 App 变闷）。 */}
+            <View style={[styles.marginRule, { backgroundColor: colors.primaryMuted }]} />
             <TextInput
               multiline
               autoFocus
@@ -530,12 +533,23 @@ const styles = StyleSheet.create({
   notesCard: {
     marginHorizontal: space.lg,
     padding: space.md,
+    // 给左边线留位置：正文从线右侧开始，像写在横格本上
+    paddingLeft: space.xl,
+    position: "relative",
     borderRadius: radius.sm,
     borderWidth: StyleSheet.hairlineWidth,
   },
+  marginRule: {
+    position: "absolute",
+    left: 14,
+    top: 10,
+    bottom: 10,
+    width: 1.5,
+    borderRadius: 1,
+  },
   notes: {
     fontSize: 14,
-    lineHeight: 22,
+    lineHeight: 26,
   },
   notesHeaderTrailing: {
     flexDirection: "row",
@@ -554,7 +568,9 @@ const styles = StyleSheet.create({
     minHeight: 180,
     maxHeight: 520,
     fontSize: 16,
-    lineHeight: 26,
+    // 行距放宽到 30（约 1.9 倍）：长文写作时眼睛不容易串行
+    lineHeight: 30,
+    letterSpacing: 0.2,
     padding: 0,
   },
   notesToolbar: {

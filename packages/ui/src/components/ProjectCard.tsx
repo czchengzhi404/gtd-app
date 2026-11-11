@@ -6,6 +6,7 @@ import { t } from "../i18n";
 import { useTheme } from "../hooks/useTheme";
 import { AppText } from "../theme/AppText";
 import { Card } from "../theme/primitives";
+import { projectAccent } from "../theme/project-accent";
 import { RowActions, type ActionItem } from "./RowActions";
 import { radius, space } from "../theme/tokens";
 
@@ -41,6 +42,8 @@ export function ProjectCard({
         style={styles.card}
       >
         <View style={styles.titleRow}>
+          {/* 色点由项目 id 派生（不改数据模型），让列表里两个项目一眼能分开 */}
+          <View style={[styles.accentDot, { backgroundColor: projectAccent(project.id) }]} />
           <AppText variant="bodyStrong" lines={1} style={styles.name}>
             {project.name}
           </AppText>
@@ -103,6 +106,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: space.sm,
+  },
+  accentDot: {
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   name: {
     flex: 1,
