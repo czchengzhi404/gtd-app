@@ -151,7 +151,8 @@ export function ProjectDetailContent({
           <EmptyState icon="list-outline" title={t("project.empty")} hint={t("project.emptyHint")} />
         ) : (
           groups.map((group) => {
-            if (group.items.length === 0 && group.title !== null) return null;
+            // 空分区也要渲染标题：新建分区后如果直接跳过，界面上一点变化都没有，
+            // 用户会以为「新建」失败了，也就无从知道该往哪个分区里放任务。
             return (
               <View key={group.key}>
                 {group.title !== null ? <SectionHeader title={group.title} /> : null}
