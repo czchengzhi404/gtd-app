@@ -23,12 +23,14 @@ import {
 import {
   parseImportText,
   parseMarkdownTasks,
+  parseOnlinelistInit,
   parseTickTickCSV,
   parseTodoistCSV,
   runCommand,
   type ImportPlan,
   type ImportTaskDraft,
 } from "@gtd/core";
+import { fetchOnlinelist, OnlinelistFetchFailure } from "@/platform/onlinelist-fetch";
 
 /**
  * 导入页（Markdown 复选框清单 / Todoist CSV）。
@@ -45,6 +47,15 @@ type Format = "auto" | "markdown" | "todoist" | "ticktick";
 
 const PREVIEW_LIMIT = 5;
 
+/** 链接导入失败的 kind → i18n key */
+const LINK_ERROR_KEYS: Record<string, string> = {
+  invalidUrl: "app.importPage.linkInvalidUrl",
+  unsupportedHost: "app.importPage.linkUnsupportedHost",
+  timeout: "app.importPage.linkTimeout",
+  network: "app.importPage.linkNetwork",
+  badPayload: "app.importPage.linkBadPayload",
+};
+
 export default function ImportScreen() {
   const colors = useTheme();
   const t = useT();
@@ -54,7 +65,12 @@ export default function ImportScreen() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
 
-  const plan: ImportPlan | null = useMemo(() => {
+  // 链接导入：读到的计划单独存，避免和手动粘贴的文本互相干扰
+  const [linkUrl, setLinkUrl] = useState("");
+  const [linkBusy, setLinkBusy] = useState(false);
+  const [remotePlan, setRemotePlan] = useState<ImportPlan | null>(null);
+
+  const textPlan: ImportPlan | null = useMemo(() => {
     if (text.trim().length === 0) return null;
     const now = Date.now();
     if (format === "markdown") return parseMarkdownTasks(text, now);
@@ -63,7 +79,32 @@ export default function ImportScreen() {
     return parseImportText(text, now);
   }, [text, format]);
 
-  const importable = plan !== null && plan.tasks.length > 0 && !busy;
+  // 链接读到的优先：用户刚点过「读取清单」，就看那份
+  const plan = remotePlan ?? textPlan;
+
+  const importable = plan !== null && plan.tasks.length > 0 && !busy && !linkBusy;
+
+  const onFetchLink = async () => {
+    setLinkBusy(true);
+    try {
+      const result = await fetchOnlinelist(linkUrl);
+      const parsed = parseOnlinelistInit(result.payload, Date.now());
+      if (parsed.tasks.length === 0) {
+        showToast({ message: t("app.importPage.linkEmpty"), tone: "warning" });
+        setRemotePlan(null);
+        return;
+      }
+      setRemotePlan(parsed);
+      showToast({ message: t("app.importPage.linkOk", { n: parsed.tasks.length }), tone: "success" });
+    } catch (err) {
+      const kind = err instanceof OnlinelistFetchFailure ? err.kind : "network";
+      const key = LINK_ERROR_KEYS[kind] ?? "app.importPage.linkNetwork";
+      showToast({ message: t(key), tone: "danger" });
+      setRemotePlan(null);
+    } finally {
+      setLinkBusy(false);
+    }
+  };
 
   const runImport = async () => {
     if (plan === null || plan.tasks.length === 0) return;
@@ -109,6 +150,46 @@ export default function ImportScreen() {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space.xxxl }]}
         keyboardShouldPersistTaps="handled"
       >
+        {/* 链接导入：在线清单站点的数据靠 WebSocket 推，不在 HTML 里，所以单独一条通道 */}
+        <Card variant="outline" padding="normal">
+          <AppText variant="bodyStrong" lines={1}>
+            {t("app.importPage.linkTitle")}
+          </AppText>
+          <AppText variant="caption" tone="tertiary" lines={3}>
+            {t("app.importPage.linkHint")}
+          </AppText>
+          <View style={styles.gap} />
+          <TextInput
+            value={linkUrl}
+            onChangeText={(value) => {
+              setLinkUrl(value);
+              // 改了链接就丢掉上次读到的结果，避免「看着 A 的预览导 B」的错位
+              if (remotePlan !== null) setRemotePlan(null);
+            }}
+            placeholder={t("app.importPage.linkPlaceholder")}
+            placeholderTextColor={colors.textTertiary}
+            accessibilityLabel={t("app.importPage.linkPlaceholder")}
+            autoCapitalize="none"
+            autoCorrect={false}
+            style={[
+              styles.linkInput,
+              {
+                color: colors.text,
+                backgroundColor: colors.surfaceMuted,
+                borderColor: colors.border,
+              },
+            ]}
+          />
+          <View style={styles.gap} />
+          <Button
+            label={linkBusy ? t("app.importPage.linkFetching") : t("app.importPage.linkFetch")}
+            icon="link-outline"
+            size="sm"
+            disabled={linkBusy || linkUrl.trim().length === 0}
+            onPress={() => void onFetchLink()}
+          />
+        </Card>
+
         <Card variant="outline" padding="normal">
           <AppText variant="label" tone="secondary" lines={2}>
             {t("app.importPage.hint")}
@@ -129,7 +210,11 @@ export default function ImportScreen() {
           <TextInput
             multiline
             value={text}
-            onChangeText={setText}
+            onChangeText={(value) => {
+              setText(value);
+              // 手打内容覆盖掉链接结果，避免预览和正在编辑的文本不是一回事
+              if (remotePlan !== null) setRemotePlan(null);
+            }}
             placeholder={t("app.importPage.placeholder")}
             placeholderTextColor={colors.textTertiary}
             accessibilityLabel={t("app.importPage.a11yInput")}
@@ -153,7 +238,15 @@ export default function ImportScreen() {
             <Card variant="outline" padding="normal">
               <View style={styles.row}>
                 <Badge
-                  label={plan.format === "todoist" ? "Todoist CSV" : "Markdown"}
+                  label={
+                    plan.format === "onlinelist"
+                      ? t("app.importPage.linkBadge")
+                      : plan.format === "todoist"
+                        ? "Todoist CSV"
+                        : plan.format === "ticktick"
+                          ? "TickTick CSV"
+                          : "Markdown"
+                  }
                   tone="accent"
                 />
                 <View style={styles.stats}>
@@ -280,6 +373,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 21,
     textAlignVertical: "top",
+  },
+  linkInput: {
+    minHeight: 48,
+    borderRadius: radius.sm,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    fontSize: 14,
   },
   example: {
     marginTop: space.xs,

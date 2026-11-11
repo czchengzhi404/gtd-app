@@ -47,10 +47,14 @@ export default function ImportIncomingScreen() {
     })();
   }, []);
 
-  // 导入成功后停一下让用户看见结果，再回数据页
+  // 导入成功后停一下让用户看见结果，再回数据页。
+  //
+  // 为什么是 3 秒：实测「读文件 → 合并 25 条 → 跳转」全程不到 1 秒，
+  // 结果一闪而过，用户会怀疑到底导没导进去。3 秒足够看清条数，
+  // 又不至于让人等得不耐烦（这个页面不是终点，只是回执）。
   useEffect(() => {
     if (done === null) return;
-    const timer = setTimeout(() => router.replace("/data"), 1200);
+    const timer = setTimeout(() => router.replace("/data"), 3000);
     return () => clearTimeout(timer);
   }, [done]);
 

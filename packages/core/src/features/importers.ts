@@ -42,7 +42,7 @@ export interface ImportPlan {
   warnings: string[];
 }
 
-export type ImportFormat = "markdown" | "todoist" | "ticktick" | "generic";
+export type ImportFormat = "markdown" | "todoist" | "ticktick" | "generic" | "onlinelist";
 
 /** 通用 CSV 列映射：逻辑字段 → 表头名（大小写不敏感） */
 export interface CsvColumnMapping {
