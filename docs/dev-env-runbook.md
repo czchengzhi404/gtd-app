@@ -162,4 +162,20 @@ async function scrollToTop(times = 6) {
 Select-String -Path packages/ui/src/i18n/index.ts -Pattern '"detail\.notesExport"'
 ```
 
+## 7. 列表行里点「文字」可能点到的不是行本身
+
+项目详情/任务列表里，一行由「复选框 + 标题 + 右侧 ⋯」组成。用节点中心坐标去点，
+很容易落在复选框上——表现为任务被标成「已完成」（项目进度从 0% 跳到 100%），
+而不是打开详情。
+
+稳妥做法：先取到该行标题节点的 `cy`，再固定用 `x=800` 点右侧空白：
+
+```js
+const row = nodes().find((n) => /量书房尺寸/.test(n.text || ""));
+adb(["shell", `input tap 800 ${row.cy}`]);   // 不要用 row.cx
+```
+
+如果已经被勾掉了，点 `x=105`（复选框）取消完成再继续。
+
+
 
