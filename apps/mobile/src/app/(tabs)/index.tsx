@@ -256,9 +256,11 @@ export default function InboxScreen() {
         }
         onPressTask={(task) => router.push(`/task/${task.id}`)}
         emptyIllustration="inbox"
-        emptyTitle={t("inbox.emptyTitle")}
-        emptyHint={t("inbox.emptyHint")}
-        emptySuggestions={suggestions}
+        // 筛选生效时不能说「收集箱是空的」——任务还在，只是没匹配上。
+        // 之前筛选到 0 条会显示「Inbox is empty」，而标题还写着「3 to process」，自相矛盾。
+        emptyTitle={filterActive && inbox.length > 0 ? t("inbox.noMatchTitle") : t("inbox.emptyTitle")}
+        emptyHint={filterActive && inbox.length > 0 ? t("inbox.noMatchHint") : t("inbox.emptyHint")}
+        emptySuggestions={filterActive ? [] : suggestions}
         selectionMode={interactions.selectionMode}
         selectedIds={interactions.selectedIds}
         onToggleSelect={interactions.toggleSelect}
