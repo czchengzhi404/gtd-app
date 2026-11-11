@@ -68,7 +68,14 @@ new WebSocket(protocol + '//' + location.host + '/' + LIST_ID + '/ws')
   非 init 消息、signup 模式认领信息进备注）
 - WebSocket 协议用 `bench/probe-onlinelist-ws.mjs` 对真实站点验证过：连上即收到
   `type=init, name=军师欠下的999件事, items=26`
-- App 内「贴链接 → 读取 → 导入」的真机验证见发布后补充
+- **设备实测（x86_64 模拟器，versionCode 46）**：`scripts/verify-link-import.mjs` 9/10
+  - 导入页出现「从链接导入」卡片 ✓
+  - 粘贴真实链接 → 点「读取清单」→ 预览显示 **`26 tasks · 1 projects · 0 skipped`**，徽标「在线清单」✓
+  - 点「开始导入」✓
+  - 项目页出现「军师欠下的999件事 · Parallel · Next: 又幻想了做短剧赚大钱 · **25 open**」✓
+    （26 条里 1 条在原清单里是勾选状态，所以 25 open，数字对得上）
+  - 唯一未捕获的是「已导入 N 条任务」的 toast —— 它在 `router.back()` 后 1 秒内过期，
+    自动化采样时已经消失；数据落库已由项目页断言证明
 
 ## 升级
 
