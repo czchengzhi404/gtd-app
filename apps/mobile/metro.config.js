@@ -8,6 +8,12 @@ const workspaceRoot = path.resolve(__dirname, "../..");
 // 但 Metro 需要能解析它）；默认 assetExts 不含 wasm。
 config.resolver.assetExts.push("wasm");
 
+// 音效资源（expo-audio 读 app 内 .wav）。Metro 默认 assetExts 一般已含 wav，
+// 这里显式兜一下，避免以后有人精简默认列表时音效悄悄失效。
+if (!config.resolver.assetExts.includes("wav")) {
+  config.resolver.assetExts.push("wav");
+}
+
 // Bun hoisted linker 把 workspace 包以 Windows junction 链到根 node_modules；
 // Metro 的 resolver 在部分 Windows 环境读不到 junction 目标，直接把 @gtd/*
 // 指向真实源码目录（同时保留符号链接跟随作为兜底）。

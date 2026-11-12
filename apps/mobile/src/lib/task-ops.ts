@@ -3,6 +3,7 @@ import { runCommand } from "@gtd/core";
 import { showUndo, t } from "@gtd/ui";
 import { gtd } from "@/platform/gtd-api";
 import { isDesktop } from "@/platform/env";
+import { playSfx } from "@/platform/sound";
 
 /** 敏感字段加密（桌面端 safeStorage，OS 级加密） */
 export async function encryptSecret(plaintext: string): Promise<string> {
@@ -18,7 +19,10 @@ export async function decryptSecret(ciphertext: string): Promise<string> {
 /** 完成任务：可撤销（uncomplete） */
 export async function completeTaskWithUndo(task: Task): Promise<void> {
   await runCommand("task.complete", { id: task.id }).catch(() => undefined);
+  // 勾选是全天最高频的动作，也是唯一值得给声音的；未开启时 playSfx 直接返回
+  void playSfx("complete");
   showUndo(t("undo.completed", { title: task.title }), () => {
+    void playSfx("undo");
     void runCommand("task.uncomplete", { id: task.id }).catch(() => undefined);
   });
 }
@@ -33,6 +37,7 @@ export async function deleteTaskWithUndo(task: Task): Promise<void> {
   try {
     await runCommand("task.softDelete", { id: task.id });
     showUndo(t("undo.deleted", { title: task.title }), () => {
+      void playSfx("undo");
       void runCommand("task.restore", { id: task.id }).catch(() => undefined);
     });
   } catch {

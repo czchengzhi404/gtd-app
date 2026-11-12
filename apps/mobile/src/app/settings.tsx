@@ -24,6 +24,7 @@ import {
 } from "@gtd/ui";
 import { runCommand } from "@gtd/core";
 import { ensureBuiltinFont } from "@/platform/font-loader";
+import { previewSfx } from "@/platform/sound";
 
 type ThemeMode = "system" | "light" | "dark";
 type FontChoice = "wenkai" | "system";
@@ -46,6 +47,16 @@ export default function SettingsScreen() {
   const themeMode: ThemeMode =
     kv["theme.mode"] === "light" ? "light" : kv["theme.mode"] === "dark" ? "dark" : "system";
   const fontChoice: FontChoice = kv["font.family"] === "LXGWWenKai" ? "wenkai" : "system";
+  // 音效默认关：任务应用多在安静环境用，声音必须由用户主动开
+  const soundChoice: "on" | "off" = kv["sound.enabled"] === "1" ? "on" : "off";
+
+  const onSound = (next: "on" | "off") => {
+    void runCommand("settings.set", { key: "sound.enabled", value: next === "on" ? "1" : "0" }).catch(
+      () => undefined,
+    );
+    // 开启时立刻放一声，让用户当场听到「开了是什么效果」，不用等到下一次勾选
+    if (next === "on") void previewSfx("complete");
+  };
 
   const onTheme = (next: ThemeMode) => {
     void runCommand("settings.set", { key: "theme.mode", value: next }).catch(() => undefined);
@@ -111,6 +122,22 @@ export default function SettingsScreen() {
               onChange={onFont}
               accessibilityLabel={t("more.fontSection")}
             />
+          </Card>
+
+          <SectionHeader title={t("more.soundSection")} />
+          <Card variant="outline" padding="normal" style={styles.card}>
+            <SegmentedControl
+              items={[
+                { key: "off", label: t("more.sound.off") },
+                { key: "on", label: t("more.sound.on") },
+              ]}
+              value={soundChoice}
+              onChange={(next) => onSound(next as "on" | "off")}
+              accessibilityLabel={t("more.soundSection")}
+            />
+            <AppText variant="caption" tone="tertiary" lines={3}>
+              {t("more.soundHint")}
+            </AppText>
           </Card>
 
           <SectionHeader title={t("more.language")} />

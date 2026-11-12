@@ -35,6 +35,7 @@
         "@gtd/core": "workspace:*",
         "@gtd/ui": "workspace:*",
         "expo": "~57.0.31",
+        "expo-audio": "57.0.5",
         "expo-constants": "~57.0.22",
         "expo-document-picker": "~57.0.3",
         "expo-file-system": "~57.0.7",
@@ -805,6 +806,8 @@
     "expo-application": ["expo-application@57.0.3", "https://registry.npmmirror.com/expo-application/-/expo-application-57.0.3.tgz", { "peerDependencies": { "expo": "*" } }, "sha512-t/CxeLio0NjY9/cOak1tQp62/hAUjzJxmhR4rVUR7K5bb9YoEtfl1ZekTn+Iuh+dYOMYzF0l72ODMSmY3CR1NA=="],
 
     "expo-asset": ["expo-asset@57.0.20", "https://registry.npmmirror.com/expo-asset/-/expo-asset-57.0.20.tgz", { "dependencies": { "@expo/image-utils": "^0.11.6", "expo-constants": "~57.0.22" }, "peerDependencies": { "expo": "*", "react": "*", "react-native": "*" } }, "sha512-xm1p3Squ/dCzipISO1TE5+kDsIFEUc6DxEtRe2rRgPMDLPi6AumLlrNorFxetiP6zrvxK23xzVlNng/g7o/+aA=="],
+
+    "expo-audio": ["expo-audio@57.0.5", "https://registry.npmmirror.com/expo-audio/-/expo-audio-57.0.5.tgz", { "peerDependencies": { "expo": "*", "expo-asset": "*", "react": "*", "react-native": "*" } }, "sha512-39fX5JC5zDvELB4/eDJPj2XAYRN0W9+K2DfDWm5N3aC5WZ7HRrhupWtT6hbH09NlfYpsRSqYOwEZnocFM42ynQ=="],
 
     "expo-constants": ["expo-constants@57.0.22", "https://registry.npmmirror.com/expo-constants/-/expo-constants-57.0.22.tgz", { "dependencies": { "@expo/env": "~2.4.3" }, "peerDependencies": { "expo": "*", "react-native": "*" } }, "sha512-+mBjnzMWMKIrQa7BP7LTDRC0W7cI+q12/sZns4HzVQJGzgGoAdRJSTEKiObxIw/3EswKXlESkRob8upiL95Q4A=="],
 

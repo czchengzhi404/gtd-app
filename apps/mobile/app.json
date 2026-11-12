@@ -2,7 +2,7 @@
   "expo": {
     "name": "GTD 清单",
     "slug": "gtd-app",
-    "version": "2.7.16",
+    "version": "2.7.17",
     "orientation": "default",
     "icon": "./assets/images/icon.png",
     "scheme": "gtd",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "app.gtd.local",
-      "versionCode": 50,
+      "versionCode": 51,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -34,7 +34,7 @@
         {
           "backgroundColor": "#F7F5F1",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 96
+          "imageWidth": 160
         }
       ],
       "expo-secure-store",
