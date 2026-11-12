@@ -57,7 +57,14 @@ v2.7.16 把底色改成画布色后，图标占了屏宽约 12%，偏小。`imag
 
 - `tsc`（ui / mobile）通过
 - `bun test` **489 项 / 40 文件全绿**
-- 真机是否真的出声、启动屏尺寸，见发布后补充
+- **设备实测 `scripts/verify-sound.mjs` 7/7**：
+  - 设置页有 `SOUND` 分区，`Off / On`，默认关闭
+  - 点「On」→ 音频栈日志 0 → 9 条
+  - 勾选一个任务 → 音频栈日志 0 → 4 条
+  - 关键一行：`AudioTrack: stop(17): called with 2425 frames delivered`
+    —— 2425 帧 ÷ 22050Hz = **110ms**，正好是 `complete.wav` 的长度，
+    证明播的就是我们合成的那条音，不是别的系统提示音
+- APK 体积 59.4MB → **62.9MB**（expo-audio 原生库约 +3.5MB），这是这次唯一的代价
 
 ## 升级
 
