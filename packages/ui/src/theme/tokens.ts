@@ -125,18 +125,18 @@ export const zIndex = {
 export const lightColors = {
   /** 页面底色（暖中性「纸」，让白色卡片浮起来） */
   canvas: "#F7F5F1",
-  /** 卡片/浮层底色（纯白） */
-  surface: "#FFFFFF",
+  /** 卡片/浮层底色（微暖白，比纯白更像纸） */
+  surface: "#FFFDF9",
   /** 次级表面（输入框、分段控件底） */
   surfaceMuted: "#F0EDE7",
   /** 浮层专用表面（弹层/菜单/抽屉；亮色下与卡片一致） */
-  surfaceOverlay: "#FFFFFF",
+  surfaceOverlay: "#FFFDF9",
   text: "#1A1A18",
   textSecondary: "#5A5750",
   textTertiary: "#6E6A62",
-  /** 主色 cobalt blue */
-  primary: "#1D4ED8",
-  primaryMuted: "#E7ECFB",
+  /** 主色：赭石（笔迹）。宝蓝降级为 info/链接色——蓝在暖白纸底上读作「屏幕色」，压不住纸感 */
+  primary: "#8C3D0B",
+  primaryMuted: "#F6E9DC",
   onPrimary: "#FFFFFF",
   /** 实心强调色上的文字（primary/danger/info 实心底） */
   textOnAccent: "#FFFFFF",
@@ -148,12 +148,13 @@ export const lightColors = {
   successMuted: "#E7F2EC",
   warning: "#96550A",
   warningMuted: "#FBF0DB",
-  info: "#0B6AA8",
-  infoMuted: "#E7F1F9",
+  /** 信息/链接色：原主色宝蓝降级于此 */
+  info: "#1D4ED8",
+  infoMuted: "#E7ECFB",
   /** 中性语义底（Badge/Tag 的 default 态） */
   neutralMuted: "#EDEAE3",
   /** 键盘焦点环（web :focus；≥3:1 非文本对比） */
-  focusRing: "#1D4ED8",
+  focusRing: "#8C3D0B",
   /** 模态遮罩（Sheet/Toast 宿主） */
   scrim: "rgba(20,19,16,0.45)",
   overlay: "rgba(26,26,24,0.38)",
@@ -167,10 +168,10 @@ export const darkColors = {
   text: "#F2F0EB",
   textSecondary: "#B3AFA6",
   textTertiary: "#8A857C",
-  primary: "#8FA8FF",
-  primaryMuted: "#1C2440",
-  onPrimary: "#0A1022",
-  textOnAccent: "#0A1022",
+  primary: "#E0A878",
+  primaryMuted: "#3A2818",
+  onPrimary: "#2A1A0C",
+  textOnAccent: "#2A1A0C",
   border: "#33363D",
   borderStrong: "#3E4148",
   danger: "#F97066",
@@ -182,7 +183,7 @@ export const darkColors = {
   info: "#7CC7F5",
   infoMuted: "#13283A",
   neutralMuted: "#262A31",
-  focusRing: "#8FA8FF",
+  focusRing: "#E0A878",
   scrim: "rgba(0,0,0,0.6)",
   overlay: "rgba(0,0,0,0.55)",
 } as const;

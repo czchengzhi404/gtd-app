@@ -8,6 +8,7 @@ import {
   Button,
   FilterBar,
   IconButton,
+  NowView,
   OptionSheet,
   PageHeader,
   PerspectiveBar,
@@ -23,7 +24,9 @@ import {
   getAllTags,
   getInboxTasks,
   parseQuickAdd,
+  pickNextAction,
   quickAdd,
+  runCommand,
   selectContexts,
 } from "@gtd/core";
 import type { DeferPreset, TaskStatusInput } from "@gtd/core";
@@ -69,6 +72,23 @@ export default function InboxScreen() {
   const [activePerspective, setActivePerspective] = useState<string | null>(null);
   const [moveSheetOpen, setMoveSheetOpen] = useState(false);
   const [deferSheetOpen, setDeferSheetOpen] = useState(false);
+
+  /**
+   * 首屏视角：默认「一张」（只看现在该做的那一件），可切回「全部」完整列表。
+   * 写进 kv（settings.set），与主题/语言设置同一条路径，跨启动保留。
+   */
+  const focusMode = useAppStore((s) => s.kv["inbox.focusMode"]) !== "all";
+  const setFocusMode = (mode: "one" | "all") => {
+    void runCommand("settings.set", { key: "inbox.focusMode", value: mode }).catch(() => undefined);
+  };
+
+  const viewToggle = (
+    <IconButton
+      icon={focusMode ? "list-outline" : "square-outline"}
+      onPress={() => setFocusMode(focusMode ? "all" : "one")}
+      accessibilityLabel={focusMode ? t("now.toggleAll") : t("now.toggleOne")}
+    />
+  );
 
   const { perspectives, saveCurrent, remove } = usePerspectives();
 
@@ -168,6 +188,13 @@ export default function InboxScreen() {
 
   const filterActive = query.trim() !== "" || contextId !== null || tag !== null || overdueOnly;
 
+  /**
+   * 「一张」视角只在没有筛选/搜索时可用：用户一旦主动筛选，说明他想看列表，
+   * 这时候还硬把内容收成一张卡就是帮倒忙。
+   */
+  const showNow = focusMode && !filterActive && !interactions.selectionMode && !interactions.reorderMode;
+  const nowResult = useMemo(() => pickNextAction(inbox, Date.now()), [inbox]);
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
       <View style={{ paddingTop: insets.top }}>
@@ -176,6 +203,7 @@ export default function InboxScreen() {
           subtitle={t("app.inbox.subtitle", { n: inbox.length })}
           actions={
             <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
+              {viewToggle}
               <IconButton
                 icon="swap-vertical"
                 filled={interactions.reorderMode}
@@ -200,6 +228,20 @@ export default function InboxScreen() {
         onSubmit={submit}
         submitting={submitting}
       />
+      {showNow ? (
+        <NowView
+          next={nowResult.next}
+          rest={nowResult.rest}
+          blockedCount={nowResult.blockedCount}
+          availableCount={nowResult.availableCount}
+          now={Date.now()}
+          onSeeAll={() => setFocusMode("all")}
+          onComplete={(task) => void completeTaskWithUndo(task)}
+          onOpen={(task) => router.push(`/task/${task.id}`)}
+          onOpenRest={(task) => router.push(`/task/${task.id}`)}
+        />
+      ) : (
+        <>
       <FilterBar
         compact
         query={query}
@@ -270,6 +312,8 @@ export default function InboxScreen() {
         onReorderTask={(task, toIndex) => void interactions.reorder(filtered, task, toIndex)}
         reorderMode={interactions.reorderMode}
       />
+        </>
+      )}
 
       {interactions.selectionMode ? (
         <BulkActionBar
