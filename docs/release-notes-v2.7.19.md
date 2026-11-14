@@ -1,4 +1,9 @@
-# v2.7.19 · 修好《纸与当下》首屏崩溃
+# v2.7.19 · 修好《纸与当下》首屏崩溃（未修完）
+
+> ⚠️ **这一版首屏仍然崩**：`Rendered more hooks than during the previous render`。
+> `blockedBy` 的问题确实修好了，但新增的 `useMemo` 被放在 `if (!loaded) return null` 之后，
+> 违反 Hooks 规则。**v2.7.20 已修复**，请装 v2.7.20 或更新版本。
+> 下面保留当次排查记录。
 
 ## 崩溃现场
 

@@ -92,6 +92,12 @@ export default function InboxScreen() {
 
   const { perspectives, saveCurrent, remove } = usePerspectives();
 
+  // Hooks 必须在任何 early return 之前无条件调用：
+  // 之前把 pickNextAction 的 useMemo 放在 `if (!loaded) return null` 之后，
+  // 首帧 loaded=false 少一个 hook、加载后多一个 → "Rendered more hooks than
+  // during the previous render"，整页落到错误屏。
+  const nowResult = useMemo(() => pickNextAction(inbox, Date.now()), [inbox]);
+
   const filtered = useMemo(
     () => applyListFilter(inbox, { query, contextId, tag, overdueOnly }, Date.now()),
     [inbox, query, contextId, tag, overdueOnly],
@@ -193,7 +199,6 @@ export default function InboxScreen() {
    * 这时候还硬把内容收成一张卡就是帮倒忙。
    */
   const showNow = focusMode && !filterActive && !interactions.selectionMode && !interactions.reorderMode;
-  const nowResult = useMemo(() => pickNextAction(inbox, Date.now()), [inbox]);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
