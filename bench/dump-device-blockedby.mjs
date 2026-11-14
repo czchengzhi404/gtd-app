@@ -18,13 +18,9 @@ adb(["shell", `am force-stop ${PKG}`]);
 await sleep(800);
 adb(["shell", `am start -n ${PKG}/.MainActivity`]);
 await sleep(5000);
-
-// 进 More → 数据与记录
-await tapContains(/^More$|更多/);
-await sleep(1800);
-console.log("More 页:", texts().slice(0, 10).join(" | "));
-await tapContains(/Data & records|数据与记录/);
-await sleep(2200);
+// 深链直达数据页，比在 More 里找入口可靠
+adb(["shell", `am start -f 0x20 -a android.intent.action.VIEW -d "gtd://data" ${PKG}`]);
+await sleep(2800);
 console.log("数据页:", texts().slice(0, 12).join(" | "));
 
 // 清理旧导出
