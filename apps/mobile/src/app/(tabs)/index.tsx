@@ -221,6 +221,7 @@ export default function InboxScreen() {
                 label={t("app.inbox.process")}
                 icon="layers-outline"
                 variant={showNow ? "ghost" : "primary"}
+                tone={showNow ? "default" : undefined}
                 accessibilityLabel={t("app.inbox.processA11y")}
                 onPress={() => router.push("/process")}
               />
