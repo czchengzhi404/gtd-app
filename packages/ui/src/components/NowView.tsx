@@ -8,7 +8,7 @@ import { AppText } from "../theme/AppText";
 import { Button } from "../theme/primitives";
 import { useTheme } from "../hooks/useTheme";
 import { useT } from "../i18n";
-import { radius, space, type } from "../theme/tokens";
+import { space, type } from "../theme/tokens";
 
 /**
  * 《纸与当下》首屏：只把「现在该做的那一件」放大，其余压成灰字队列。
@@ -83,7 +83,7 @@ export function NowView({
         <AppText variant="caption" tone="tertiary" lines={1}>
           {heading}
         </AppText>
-        <AppText variant="caption" color={colors.primary} lines={1}>
+        <AppText variant="caption" tone="tertiary" lines={1}>
           {t("now.remaining", { n: availableCount })}
         </AppText>
       </View>
@@ -110,14 +110,10 @@ export function NowView({
             accessibilityRole="button"
             accessibilityLabel={t("now.a11yOpen", { title: next.title })}
             onPress={() => onOpen(next)}
-            style={[
-              styles.heroCard,
-              {
-                backgroundColor: colors.surface,
-                borderColor: colors.borderStrong,
-              },
-            ]}
+            style={styles.heroCard}
           >
+            {/* 一道短赭石笔迹标记「现在」：纸面上唯一的墨 */}
+            <View style={[styles.inkMark, { backgroundColor: colors.primary }]} />
             <AppText variant="hero" lines={3} align="left" style={styles.heroTitle}>
               {next.title}
             </AppText>
@@ -218,7 +214,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 0,
     top: 4,
-    bottom: 8,
+    bottom: 0,
     width: 1.5,
     borderRadius: 1,
   },
@@ -230,30 +226,36 @@ const styles = StyleSheet.create({
   sectionLabelRest: {
     letterSpacing: 1.2,
     textTransform: "uppercase",
-    marginTop: space.xxl,
+    marginTop: space.xl,
     marginBottom: space.sm,
   },
+  /** 不再有白底与描边：任务直接写在纸面上 */
   heroCard: {
-    borderWidth: 1,
-    borderRadius: radius.md,
-    padding: space.xl,
-    minHeight: 240,
+    paddingVertical: space.lg,
+    paddingRight: space.xs,
+  },
+  /** 一道短赭石笔迹：纸面上唯一的墨，替代原来的整块白卡 */
+  inkMark: {
+    width: 38,
+    height: 3,
+    borderRadius: 2,
+    marginBottom: space.md,
   },
   heroTitle: {
-    fontSize: type.hero.fontSize + 4,
-    lineHeight: 42,
-    letterSpacing: -0.3,
+    fontSize: type.hero.fontSize + 10,
+    lineHeight: 48,
+    letterSpacing: -0.4,
     fontWeight: "700",
   },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: space.md,
-    marginTop: space.md,
+    marginTop: space.sm,
   },
   heroAction: {
-    alignItems: "flex-end",
-    marginTop: space.xl,
+    alignItems: "flex-start",
+    marginTop: space.lg,
   },
   restList: {
     gap: space.xs,

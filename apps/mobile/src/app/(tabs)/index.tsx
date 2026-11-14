@@ -204,8 +204,8 @@ export default function InboxScreen() {
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
       <View style={{ paddingTop: insets.top }}>
         <PageHeader
-          title={t("nav.inbox")}
-          subtitle={t("app.inbox.subtitle", { n: inbox.length })}
+          title={showNow ? t("now.pageTitle") : t("nav.inbox")}
+          subtitle={showNow ? undefined : t("app.inbox.subtitle", { n: inbox.length })}
           actions={
             <View style={{ flexDirection: "row", alignItems: "center", gap: space.xs }}>
               {viewToggle}
@@ -215,10 +215,12 @@ export default function InboxScreen() {
                 onPress={interactions.toggleReorderMode}
                 accessibilityLabel={t("task.dragHandle")}
               />
+              {/* 「一张」视角下 Process 降为文字入口：赭石实心按钮只允许有一个（Done）。
+                  独立评审指出双赭色主按钮把「笔迹只属于当下」稀释了。 */}
               <Button
                 label={t("app.inbox.process")}
                 icon="layers-outline"
-                variant="primary"
+                variant={showNow ? "ghost" : "primary"}
                 accessibilityLabel={t("app.inbox.processA11y")}
                 onPress={() => router.push("/process")}
               />
