@@ -142,4 +142,13 @@ describe("pickNextAction", () => {
     pickNextAction(input, NOW);
     expect(input.map((t) => t.id)).toEqual(["c", "a"]);
   });
+
+  test("旧记录缺 blockedBy 时不崩，当作无前置", () => {
+    // v2.7.18 首屏曾因此崩掉：老版本导出的任务对象没有这个字段
+    const legacy = { ...task({ id: "old", orderKey: "0001" }) } as Partial<Task>;
+    delete legacy.blockedBy;
+    const r = pickNextAction([legacy as Task], NOW);
+    expect(r.next?.id).toBe("old");
+    expect(r.blockedCount).toBe(0);
+  });
 });

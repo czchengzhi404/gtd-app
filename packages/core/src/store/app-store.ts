@@ -50,6 +50,24 @@ function indexById<T extends { id: string }>(items: T[]): Record<string, T> {
   return result;
 }
 
+/**
+ * 把一条 task 记录补齐成完整的 Task。
+ *
+ * 为什么需要：`applyRecords` 里的 `record as Task` 只是类型断言，不做运行时补齐。
+ * 老版本导出的 JSON、跨设备同步过来的旧记录，可能没有后加的字段
+ * （v2.7.18 的 blockedBy 就曾让首屏整页崩溃：`.some of undefined`）。
+ * 这里是所有记录进 store 的唯一入口，在这里补齐比在每个消费点兜底更根本。
+ */
+function normalizeTask(record: Task): Task {
+  return {
+    ...record,
+    blockedBy: Array.isArray(record.blockedBy) ? record.blockedBy : [],
+    contextIds: Array.isArray(record.contextIds) ? record.contextIds : [],
+    tags: Array.isArray(record.tags) ? record.tags : [],
+    checklist: Array.isArray(record.checklist) ? record.checklist : [],
+  };
+}
+
 export function applyRecords(records: TaggedRecord[]): void {
   if (records.length === 0) return;
   appStore.setState((state) => {
@@ -65,7 +83,7 @@ export function applyRecords(records: TaggedRecord[]): void {
           if (record.deletedAt !== null) {
             delete tasks[record.id];
           } else {
-            tasks[record.id] = record as Task;
+            tasks[record.id] = normalizeTask(record as Task);
           }
           break;
         case "project":

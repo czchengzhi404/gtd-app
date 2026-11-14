@@ -47,7 +47,10 @@ export function pickNextAction(tasks: readonly Task[], now: number): NextActionR
   const available: Task[] = [];
   let blockedCount = 0;
   for (const task of alive) {
-    const waiting = task.blockedBy.some((id) => !doneIds.has(id));
+    // 防御：旧版本导出的记录 / 未走 coerce 的对象可能没有 blockedBy。
+    // 这类任务当作「没有前置」处理，绝不能让整个首屏崩掉。
+    const prereqs = task.blockedBy ?? [];
+    const waiting = prereqs.some((id) => !doneIds.has(id));
     if (waiting) blockedCount += 1;
     else available.push(task);
   }

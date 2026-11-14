@@ -1,5 +1,10 @@
 # v2.7.18 · 《纸与当下》UI 重设计（第一版）
 
+> ⚠️ **这一版首屏会崩**：`Cannot read property 'some' of undefined`，整页落到错误屏。
+> 原因是 `applyRecords` 用类型断言直接把老版本导入的记录塞进 store，
+> 那些记录没有新增的 `blockedBy` 字段。**v2.7.19 已修复**，请装 v2.7.19 或更新版本。
+> 下面保留第一版的完整记录，用来对照设计意图与漏掉的那一环。
+
 参考 `distinctive-ai-design` 流程：探索三个方向 → 定 brief → 落到可截图的界面。
 方向 **C（纸质手账材质）+ A（首屏「现在该做的一件事」）**，完整 brief 见
 [docs/visual-brief-paper-and-now.md](docs/visual-brief-paper-and-now.md)。

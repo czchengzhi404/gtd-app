@@ -133,7 +133,7 @@ export function NowView({
                   {`P${next.priority}`}
                 </AppText>
               ) : null}
-              {next.blockedBy.length > 0 ? (
+              {(next.blockedBy ?? []).length > 0 ? (
                 <AppText variant="label" tone="tertiary" lines={1}>
                   {t("now.hadPrereq")}
                 </AppText>
