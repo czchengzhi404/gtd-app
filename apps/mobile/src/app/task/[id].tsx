@@ -5,6 +5,7 @@ import { View } from "react-native";
 import {
   Screen,
   TaskDetailContent,
+  OptionSheet,
   showConfirm,
   showPrompt,
   showToast,
@@ -16,6 +17,7 @@ import {
   getAllTags,
   getAttachmentsForTask,
   getSqliteExecutor,
+  prereqCandidates,
   recordDailyWords,
   runCommand,
   selectActiveProjects,
@@ -46,6 +48,7 @@ export default function TaskDetailScreen() {
   const tagSuggestions = useAppStore(getAllTags);
   const t = useT();
   const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
+  const [prereqSheetOpen, setPrereqSheetOpen] = useState(false);
 
   const reloadAttachments = async (targetId: string) => {
     const list = await getAttachmentsForTask(getSqliteExecutor(), targetId).catch(() => []);
@@ -69,6 +72,39 @@ export default function TaskDetailScreen() {
     .filter((s) => s.deletedAt === null && s.projectId === task.projectId)
     .sort((a, b) => (a.orderKey < b.orderKey ? -1 : 1))
     .map((s) => ({ id: s.id, name: s.name }));
+
+  /**
+   * 先后关系：本任务要等哪些事项做完。
+   * 候选由 prereqCandidates 过滤掉「自己」和「加了会成环的」——
+   * 成环会让两个任务永远互为未完成前置，静默地从首屏消失。
+   */
+  const allTasks = Object.values(appStore.getState().tasks);
+  const selectedIds = task.blockedBy ?? [];
+  const prereqs = selectedIds
+    .map((pid) => allTasks.find((candidate) => candidate.id === pid))
+    .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== undefined)
+    .map((candidate) => ({
+      id: candidate.id,
+      title: candidate.title,
+      done: candidate.status === "done",
+    }));
+  const candidates = prereqCandidates(allTasks, task.id).filter(
+    (candidate) => !selectedIds.includes(candidate.id),
+  );
+
+  const addPrereq = (prereqId: string) => {
+    setPrereqSheetOpen(false);
+    void runCommand("task.update", {
+      id: task.id,
+      patch: { blockedBy: [...selectedIds, prereqId] },
+    }).catch(() => undefined);
+  };
+  const removePrereq = (prereqId: string) => {
+    void runCommand("task.update", {
+      id: task.id,
+      patch: { blockedBy: selectedIds.filter((pid) => pid !== prereqId) },
+    }).catch(() => undefined);
+  };
 
   const confirmDelete = async () => {
     const ok = await showConfirm({
@@ -143,6 +179,9 @@ export default function TaskDetailScreen() {
           onSetSection={(sectionId) =>
             void runCommand("task.update", { id: task.id, patch: { sectionId } }).catch(() => undefined)
           }
+          prereqs={prereqs}
+          onAddPrereq={() => setPrereqSheetOpen(true)}
+          onRemovePrereq={removePrereq}
           contextNames={contextNames}
           tagSuggestions={tagSuggestions}
           onMoveStatus={(status: TaskStatusInput) =>
@@ -206,6 +245,21 @@ export default function TaskDetailScreen() {
           }
         />
       </View>
+
+      <OptionSheet
+        visible={prereqSheetOpen}
+        title={t("dep.add")}
+        options={
+          candidates.length > 0
+            ? candidates.map((candidate) => ({ key: candidate.id, label: candidate.title }))
+            : [{ key: "__none__", label: t("dep.noCandidates") }]
+        }
+        onSelect={(key) => {
+          if (key !== "__none__") addPrereq(key);
+          else setPrereqSheetOpen(false);
+        }}
+        onClose={() => setPrereqSheetOpen(false)}
+      />
     </Screen>
   );
 }

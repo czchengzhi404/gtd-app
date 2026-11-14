@@ -52,6 +52,13 @@ export interface TaskDetailContentProps {
   sections?: { id: string; name: string }[];
   /** 设置所属分区（null = 移出分区） */
   onSetSection?: (id: string | null) => void;
+  /**
+   * 先后关系：这些事项做完之前本事项还不能开始。
+   * 与 onAddPrereq / onRemovePrereq 一起传才会显示该区域。
+   */
+  prereqs?: { id: string; title: string; done: boolean }[];
+  onAddPrereq?: () => void;
+  onRemovePrereq?: (id: string) => void;
   contextNames: string[];
   onMoveStatus: (status: TaskStatusInput) => void;
   onToggleStar: () => void;
@@ -94,6 +101,9 @@ export function TaskDetailContent({
   projectName,
   sections,
   onSetSection,
+  prereqs,
+  onAddPrereq,
+  onRemovePrereq,
   contextNames,
   onMoveStatus,
   onToggleStar,
@@ -201,6 +211,39 @@ export function TaskDetailContent({
                 onPress={() => onSetSection(section.id)}
               />
             ))}
+          </View>
+        </>
+      ) : null}
+
+      {onAddPrereq !== undefined ? (
+        <>
+          <SectionHeader title={t("dep.section")} />
+          <View style={styles.sectionBlock}>
+            {prereqs !== undefined && prereqs.length > 0 ? (
+              <View style={styles.chipRow}>
+                {prereqs.map((item) => (
+                  <Chip
+                    key={item.id}
+                    // 已完成的前置加对勾前缀，一眼看出哪条已经不挡路了
+                    label={item.done ? `✓ ${item.title}` : item.title}
+                    onPress={() => onRemovePrereq?.(item.id)}
+                  />
+                ))}
+              </View>
+            ) : (
+              <AppText variant="caption" tone="tertiary" lines={2}>
+                {t("dep.noneHint")}
+              </AppText>
+            )}
+            <View style={styles.depSpacer} />
+            <Button
+              label={t("dep.add")}
+              icon="add"
+              variant="ghost"
+              tone="default"
+              size="sm"
+              onPress={onAddPrereq}
+            />
           </View>
         </>
       ) : null}
@@ -529,6 +572,9 @@ const styles = StyleSheet.create({
   },
   sectionBlock: {
     paddingHorizontal: space.lg,
+  },
+  depSpacer: {
+    height: space.sm,
   },
   notesCard: {
     marginHorizontal: space.lg,

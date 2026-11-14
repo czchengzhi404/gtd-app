@@ -23,6 +23,7 @@ export * from "./features/stats";
 export * from "./features/matrix";
 export * from "./features/exporters";
 export * from "./features/importers";
+export * from "./features/dependencies";
 export * from "./features/next-action";
 export * from "./features/onlinelist";
 export * from "./features/word-count";
