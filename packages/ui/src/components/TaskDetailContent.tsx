@@ -57,7 +57,12 @@ export interface TaskDetailContentProps {
    * 与 onAddPrereq / onRemovePrereq 一起传才会显示该区域。
    */
   prereqs?: { id: string; title: string; done: boolean }[];
-  onAddPrereq?: () => void;
+  /** 可添加的前置候选（内联展开，不用弹层） */
+  prereqOptions?: { id: string; title: string }[];
+  /** 切换候选列表展开/收起 */
+  onTogglePrereqPicker?: () => void;
+  prereqPickerOpen?: boolean;
+  onAddPrereq?: (id: string) => void;
   onRemovePrereq?: (id: string) => void;
   contextNames: string[];
   onMoveStatus: (status: TaskStatusInput) => void;
@@ -102,6 +107,9 @@ export function TaskDetailContent({
   sections,
   onSetSection,
   prereqs,
+  prereqOptions,
+  onTogglePrereqPicker,
+  prereqPickerOpen,
   onAddPrereq,
   onRemovePrereq,
   contextNames,
@@ -215,7 +223,7 @@ export function TaskDetailContent({
         </>
       ) : null}
 
-      {onAddPrereq !== undefined ? (
+      {onTogglePrereqPicker !== undefined ? (
         <>
           <SectionHeader title={t("dep.section")} />
           <View style={styles.sectionBlock}>
@@ -224,7 +232,6 @@ export function TaskDetailContent({
                 {prereqs.map((item) => (
                   <Chip
                     key={item.id}
-                    // 已完成的前置加对勾前缀，一眼看出哪条已经不挡路了
                     label={item.done ? `✓ ${item.title}` : item.title}
                     onPress={() => onRemovePrereq?.(item.id)}
                   />
@@ -237,13 +244,36 @@ export function TaskDetailContent({
             )}
             <View style={styles.depSpacer} />
             <Button
-              label={t("dep.add")}
-              icon="add"
+              label={prereqPickerOpen ? t("dep.cancel") : t("dep.add")}
+              icon={prereqPickerOpen ? "close" : "add"}
               variant="ghost"
               tone="default"
               size="sm"
-              onPress={onAddPrereq}
+              onPress={onTogglePrereqPicker}
             />
+            {prereqPickerOpen ? (
+              <View style={[styles.depOptions, { borderTopColor: colors.border }]}>
+                {(prereqOptions ?? []).length === 0 ? (
+                  <AppText variant="caption" tone="tertiary" lines={2}>
+                    {t("dep.noCandidates")}
+                  </AppText>
+                ) : (
+                  (prereqOptions ?? []).map((option) => (
+                    <Pressable
+                      key={option.id}
+                      accessibilityRole="button"
+                      accessibilityLabel={option.title}
+                      onPress={() => onAddPrereq?.(option.id)}
+                      style={styles.depOptionRow}
+                    >
+                      <AppText variant="body" lines={1}>
+                        {option.title}
+                      </AppText>
+                    </Pressable>
+                  ))
+                )}
+              </View>
+            ) : null}
           </View>
         </>
       ) : null}
@@ -575,6 +605,15 @@ const styles = StyleSheet.create({
   },
   depSpacer: {
     height: space.sm,
+  },
+  depOptions: {
+    marginTop: space.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  depOptionRow: {
+    minHeight: 44,
+    justifyContent: "center",
+    paddingHorizontal: space.xs,
   },
   notesCard: {
     marginHorizontal: space.lg,

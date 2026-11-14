@@ -5,7 +5,6 @@ import { View } from "react-native";
 import {
   Screen,
   TaskDetailContent,
-  OptionSheet,
   showConfirm,
   showPrompt,
   showToast,
@@ -48,7 +47,7 @@ export default function TaskDetailScreen() {
   const tagSuggestions = useAppStore(getAllTags);
   const t = useT();
   const [attachments, setAttachments] = useState<AttachmentMeta[]>([]);
-  const [prereqSheetOpen, setPrereqSheetOpen] = useState(false);
+  const [prereqPickerOpen, setPrereqPickerOpen] = useState(false);
 
   const reloadAttachments = async (targetId: string) => {
     const list = await getAttachmentsForTask(getSqliteExecutor(), targetId).catch(() => []);
@@ -93,11 +92,13 @@ export default function TaskDetailScreen() {
   );
 
   const addPrereq = (prereqId: string) => {
-    setPrereqSheetOpen(false);
+    setPrereqPickerOpen(false);
     void runCommand("task.update", {
       id: task.id,
       patch: { blockedBy: [...selectedIds, prereqId] },
-    }).catch(() => undefined);
+    })
+      .then(() => showToast({ message: t("dep.added"), tone: "success" }))
+      .catch(() => showToast({ message: t("dep.addFailed"), tone: "danger" }));
   };
   const removePrereq = (prereqId: string) => {
     void runCommand("task.update", {
@@ -180,7 +181,10 @@ export default function TaskDetailScreen() {
             void runCommand("task.update", { id: task.id, patch: { sectionId } }).catch(() => undefined)
           }
           prereqs={prereqs}
-          onAddPrereq={() => setPrereqSheetOpen(true)}
+          prereqOptions={candidates.map((candidate) => ({ id: candidate.id, title: candidate.title }))}
+          prereqPickerOpen={prereqPickerOpen}
+          onTogglePrereqPicker={() => setPrereqPickerOpen((open) => !open)}
+          onAddPrereq={addPrereq}
           onRemovePrereq={removePrereq}
           contextNames={contextNames}
           tagSuggestions={tagSuggestions}
@@ -245,21 +249,6 @@ export default function TaskDetailScreen() {
           }
         />
       </View>
-
-      <OptionSheet
-        visible={prereqSheetOpen}
-        title={t("dep.add")}
-        options={
-          candidates.length > 0
-            ? candidates.map((candidate) => ({ key: candidate.id, label: candidate.title }))
-            : [{ key: "__none__", label: t("dep.noCandidates") }]
-        }
-        onSelect={(key) => {
-          if (key !== "__none__") addPrereq(key);
-          else setPrereqSheetOpen(false);
-        }}
-        onClose={() => setPrereqSheetOpen(false)}
-      />
     </Screen>
   );
 }

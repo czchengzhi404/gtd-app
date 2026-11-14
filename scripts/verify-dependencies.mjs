@@ -108,26 +108,21 @@ if (row2 !== undefined) {
 shot("2-task-detail");
 
 record("滚到「前置」区", await scrollUntil(/WAITING ON|前置|Add prerequisite/i), texts().slice(-10).join(" | "));
-record("点到「添加前置」", await tapContains(/Add prerequisite|添加前置/i));
+// v2.7.25 起是内联展开，不再有 Modal 面板
+record("点到「添加前置」展开候选", await tapContains(/Add prerequisite|添加前置/i));
 await sleep(1400);
 shot("3-candidates");
 
 const candTexts = texts();
-console.log("  候选:", candTexts.slice(0, 12).join(" | "));
-console.log("  候选节点坐标:");
-for (const n of nodes()) {
-  if (/^(Alpha|Beta|Gamma|整理桌面|回复客户邮件|Add prerequisite|Cancel)$/.test((n.text || "").trim())) {
-    console.log(`    cx=${n.cx} cy=${n.cy} text=${JSON.stringify((n.text || "").trim())} desc=${JSON.stringify((n.desc || "").trim())}`);
-  }
-}
-// 候选面板里第一个可点的任务：用 tapLabel（同时查 text 与 accessibilityLabel）
+console.log("  候选:", candTexts.slice(0, 14).join(" | "));
+// 内联候选是普通文字行，直接按标签点（详情页本身没有 Alpha/Beta/Gamma）
 const candidateLabel = ["Alpha", "Beta", "Gamma", "整理桌面", "回复客户邮件"].find((label) =>
   nodes().some((n) => (n.text || "").trim() === label || (n.desc || "").trim() === label),
 );
-record("候选列表里有可选任务", candidateLabel !== undefined, candTexts.slice(0, 10).join(" | "));
+record("内联列表里有可选任务", candidateLabel !== undefined, candTexts.slice(0, 12).join(" | "));
 if (candidateLabel !== undefined) {
   console.log("  点选候选:", candidateLabel);
-  await tapSheetItem(candidateLabel);
+  await tapLabel(candidateLabel);
   await sleep(2500);
 }
 shot("4-prereq-added");
