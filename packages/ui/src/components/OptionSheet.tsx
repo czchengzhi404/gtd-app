@@ -46,6 +46,7 @@ export function OptionSheet({ visible, title, options, onSelect, onClose }: Opti
       <View style={styles.sheetPos} pointerEvents="box-none">
         <View
           accessibilityRole="menu"
+          pointerEvents="auto"
           style={[styles.sheet, { backgroundColor: colors.surface, borderColor: colors.border }]}
         >
           <View style={styles.grabberWrap}>
