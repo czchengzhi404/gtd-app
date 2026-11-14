@@ -54,14 +54,23 @@ async function scrollUntil(re, tries = 8) {
   return texts().some((t) => re.test(t));
 }
 
-adb(["shell", `am force-stop ${PKG}`]);
-await sleep(900);
+// 模拟器里其它 App 会周期性抢前台（见 docs/dev-env-runbook.md 第 1 节）。
+// 先 force-stop 常见的干扰者，再拉起自己，保证后续 dumpUi 拿到的是本 App 的界面。
+for (const other of ["com.dreamtrace.app", "com.workledger.app"]) {
+  adb(["shell", `am force-stop ${other}`]);
+}
 adb(["shell", `pm clear ${PKG}`]);
 await sleep(1200);
 adb(["shell", `pm grant ${PKG} android.permission.POST_NOTIFICATIONS`]);
 await sleep(400);
+adb(["shell", `am force-stop ${PKG}`]);
+await sleep(400);
 adb(["shell", `am start -n ${PKG}/.MainActivity`]);
-await sleep(6500);
+await sleep(9000);
+
+// pm clear 后 uiautomator 服务要几秒才稳定，预热一次（失败忽略）
+try { dumpUi(); } catch { /* 预热，忽略 */ }
+await sleep(1500);
 
 // 清库后是全新安装：走完 3 步引导
 for (let i = 0; i < 5; i += 1) {
@@ -123,7 +132,8 @@ record("内联列表里有可选任务", candidateLabel !== undefined, candTexts
 if (candidateLabel !== undefined) {
   console.log("  点选候选:", candidateLabel);
   await tapLabel(candidateLabel);
-  await sleep(2500);
+  // runCommand 走 enqueue 事务队列，给足时间落库 + applyRecords + 重渲染
+  await sleep(6000);
 }
 shot("4-prereq-added");
 const afterAdd = texts();

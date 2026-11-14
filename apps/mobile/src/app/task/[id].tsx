@@ -93,12 +93,21 @@ export default function TaskDetailScreen() {
 
   const addPrereq = (prereqId: string) => {
     setPrereqPickerOpen(false);
+    // 显式打日志：命令若挂起或失败，logcat 里至少要留下痕迹，
+    // 否则「点了没反应」在 release 包上完全无法排查。
+    console.warn(`[dep] add prereq task=${task.id} prereq=${prereqId}`);
     void runCommand("task.update", {
       id: task.id,
       patch: { blockedBy: [...selectedIds, prereqId] },
     })
-      .then(() => showToast({ message: t("dep.added"), tone: "success" }))
-      .catch(() => showToast({ message: t("dep.addFailed"), tone: "danger" }));
+      .then((result) => {
+        console.warn(`[dep] ok records=${result.records.length}`);
+        showToast({ message: t("dep.added"), tone: "success" });
+      })
+      .catch((err) => {
+        console.warn(`[dep] fail ${err instanceof Error ? err.message : String(err)}`);
+        showToast({ message: t("dep.addFailed"), tone: "danger" });
+      });
   };
   const removePrereq = (prereqId: string) => {
     void runCommand("task.update", {
