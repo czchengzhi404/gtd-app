@@ -178,17 +178,19 @@ export function NowView({
           </AppText>
         ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("now.seeAllA11y")}
-          onPress={onSeeAll}
-          style={styles.seeAll}
-        >
-          <AppText variant="label" color={colors.info} lines={1}>
-            {t("now.seeAll", { n: availableCount })}
-          </AppText>
-          <Ionicons name="arrow-forward" size={14} color={colors.info} />
-        </Pressable>
+        {availableCount > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("now.seeAllA11y")}
+            onPress={onSeeAll}
+            style={styles.seeAll}
+          >
+            <AppText variant="label" color={colors.info} lines={1}>
+              {t("now.seeAll", { n: availableCount })}
+            </AppText>
+            <Ionicons name="arrow-forward" size={14} color={colors.info} />
+          </Pressable>
+        ) : null}
       </View>
     </ScrollView>
   );

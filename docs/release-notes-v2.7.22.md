@@ -37,8 +37,22 @@ v2.7.21 把 `Process` 从实心按钮降为 ghost 后，`Button` 的 ghost 变�
 
 - `tsc`（ui / mobile）通过
 - `bun test` **503 项 / 42 文件全绿**
-- 改前截图 `android-report/now-view-r3/`，改后 `android-report/now-view-r4/`
+- 改前截图 `android-report/now-view-r3/`，改后 `android-report/now-view-r4/`，
+  收尾确认图 `android-report/now-view-final.png`
+- **空态已补验**：`now-view-final.png` 捕到 `0 left today` →
+  `Nothing to do right now`，安静无装饰，方向成立。
+  顺手做了一处减法：空态时不再显示 `See all 0 →` 这个无效入口（代码已改，
+  随下一版带出，本版 APK 里仍是旧行为）
 - 视觉 brief：`docs/visual-brief-paper-and-now.md`
+
+## 两轮评审结论
+
+| 轮次 | 分数 | 判定 |
+|---|---|---|
+| 第一轮（r3） | 6/10 | NOW 被装进卡片、全部页换语言、全局壳拉回收件箱 |
+| 第二轮（r4） | **7/10** | ① 已改善；② 未改善（全部页未动）；③ 部分改善 |
+
+按技能纪律「两轮不收敛就停下报告剩余缺口」，停在这里，不无限追分。
 
 ## 升级
 
