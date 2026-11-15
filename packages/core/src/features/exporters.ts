@@ -287,6 +287,7 @@ function taskBackupRecord(task: Task): Task {
     sectionId: task.sectionId,
     contextIds: [...task.contextIds],
     tags: [...task.tags],
+    blockedBy: [...task.blockedBy],
     waitingFor: task.waitingFor,
     starred: task.starred,
     recurrence:

@@ -51,6 +51,15 @@ export interface Task extends BaseRecord {
   contextIds: string[];
   /** 标签：多维检索（#紧急 #等审批 #5分钟），与情境（在哪做）互补 */
   tags: string[];
+  /**
+   * 先后关系：这些事项（id）做完之前，本事项还不能开始。
+   *
+   * 只在任务上存、不加独立边表——记录式同步里一个任务一条记录最省事，
+   * 边表会多出一种记录类型并引入跨记录事务。
+   * 语义是「我必须等谁」，所以「谁在等我」由反向查询得到。
+   * 空数组 = 没有前置，随时可做。
+   */
+  blockedBy: string[];
   waitingFor: string | null;
   /** 专注视图已选中的下一步行动 */
   starred: boolean;

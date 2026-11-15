@@ -12,7 +12,7 @@ interface Migration {
   statements: readonly string[];
 }
 
-const MIGRATIONS: readonly Migration[] = [
+export const MIGRATIONS: readonly Migration[] = [
   {
     version: 1,
     statements: [
@@ -198,6 +198,18 @@ const MIGRATIONS: readonly Migration[] = [
         created_at INTEGER NOT NULL
       )`,
       `CREATE INDEX IF NOT EXISTS idx_note_versions_task ON note_versions(task_id, created_at DESC)`,
+    ],
+  },
+  {
+    version: 8,
+    statements: [
+      // 先后关系（参考 NextTodo 的核心概念）：本事项要等哪些事项做完才能开始。
+      // 存成「本任务上的一组 id」而不是独立的边表，理由：
+      // - 这套数据是记录式同步（一个任务一条记录），边表会多出一种记录类型，
+      //   还要处理跨记录事务与合并顺序，成本远大于收益
+      // - 「谁挡着我」是本任务自己的属性，跟着任务走天然一致
+      // 存 JSON 数组，与 context_ids / tags / checklist 同一种存法。
+      `ALTER TABLE tasks ADD COLUMN blocked_by TEXT NOT NULL DEFAULT '[]'`,
     ],
   },
 ];

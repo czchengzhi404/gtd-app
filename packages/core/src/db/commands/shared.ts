@@ -83,10 +83,10 @@ export async function getTaskRow(tx: SqliteExecutor, id: string): Promise<Task |
 }
 
 export const SQL_INSERT_TASK =
-  "INSERT INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, tags, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+  "INSERT INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, tags, blocked_by, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
 export const SQL_UPDATE_TASK =
-  "UPDATE tasks SET title = ?, notes = ?, status = ?, priority = ?, defer_until = ?, due_at = ?, completed_at = ?, last_completed_at = ?, project_id = ?, section_id = ?, context_ids = ?, tags = ?, waiting_for = ?, starred = ?, recurrence = ?, checklist = ?, order_key = ?, updated_at = ?, revision = ?, deleted_at = ? WHERE id = ?";
+  "UPDATE tasks SET title = ?, notes = ?, status = ?, priority = ?, defer_until = ?, due_at = ?, completed_at = ?, last_completed_at = ?, project_id = ?, section_id = ?, context_ids = ?, tags = ?, blocked_by = ?, waiting_for = ?, starred = ?, recurrence = ?, checklist = ?, order_key = ?, updated_at = ?, revision = ?, deleted_at = ? WHERE id = ?";
 
 export function taskUpdateParams(task: Task): unknown[] {
   // 与 SQL_UPDATE_TASK 列序一一对应（不使用索引偏移，避免加列时错位）
@@ -103,6 +103,7 @@ export function taskUpdateParams(task: Task): unknown[] {
     task.sectionId,
     JSON.stringify(task.contextIds),
     JSON.stringify(task.tags),
+    JSON.stringify(task.blockedBy),
     task.waitingFor,
     task.starred ? 1 : 0,
     task.recurrence ? JSON.stringify(task.recurrence) : null,
@@ -163,7 +164,7 @@ export async function writeRawRecord(tx: SqliteExecutor, tagged: TaggedRecord): 
   switch (type) {
     case "task":
       await tx.run(
-        "INSERT OR REPLACE INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, tags, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT OR REPLACE INTO tasks (id, title, notes, status, priority, defer_until, due_at, completed_at, last_completed_at, project_id, section_id, context_ids, tags, blocked_by, waiting_for, starred, recurrence, checklist, order_key, created_at, updated_at, revision, deleted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         taskToParams(record as Parameters<typeof taskToParams>[0]),
       );
       return;

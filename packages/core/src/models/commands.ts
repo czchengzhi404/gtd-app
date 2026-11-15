@@ -56,6 +56,8 @@ export const taskCreatePayloadSchema = z.object({
   sectionId: idSchema.nullable().optional(),
   contextIds: z.array(idSchema).optional(),
   tags: z.array(z.string().min(1).max(60)).optional(),
+  /** 先后关系：这些事项做完之前本事项还不能开始（id 列表） */
+  blockedBy: z.array(idSchema).max(50).optional(),
   waitingFor: z.string().max(500).nullable().optional(),
   starred: z.boolean().optional(),
   recurrence: recurrenceSchema.nullable().optional(),
@@ -76,6 +78,8 @@ export const taskUpdatePayloadSchema = z.object({
     sectionId: idSchema.nullable().optional(),
     contextIds: z.array(idSchema).optional(),
     tags: z.array(z.string().min(1).max(60)).optional(),
+    /** 先后关系：这些事项做完之前本事项还不能开始（id 列表） */
+    blockedBy: z.array(idSchema).max(50).optional(),
     waitingFor: z.string().max(500).nullable().optional(),
     starred: z.boolean().optional(),
     checklist: checklistSchema.optional(),

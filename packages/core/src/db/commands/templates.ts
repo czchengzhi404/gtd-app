@@ -129,6 +129,8 @@ const instantiateTemplate: Handler<"template.instantiate"> = async (tx, payload,
     sectionId: null,
     contextIds: [...template.contextIds],
     tags: [...template.tags],
+    // 模板只带"做什么"，不带"等谁"——先后关系属于具体执行场景
+    blockedBy: [],
     waitingFor: null,
     starred: false,
     recurrence:

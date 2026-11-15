@@ -38,6 +38,7 @@ export const TASK_MERGE_FIELDS = [
   "sectionId",
   "contextIds",
   "tags",
+  "blockedBy",
   "waitingFor",
   "starred",
   "recurrence",

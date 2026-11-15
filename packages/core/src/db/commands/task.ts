@@ -45,6 +45,7 @@ const createTask: Handler<"task.create"> = async (tx, payload, ctx) => {
     recurrence: payload.recurrence ?? null,
     checklist: payload.checklist ?? [],
     tags: payload.tags ?? [],
+    blockedBy: payload.blockedBy ?? [],
     orderKey: padOrderKey(now),
     createdAt: now,
     updatedAt: now,
@@ -77,6 +78,7 @@ const updateTask: Handler<"task.update"> = async (tx, payload, ctx) => {
     starred: patch.starred ?? existing.starred,
     checklist: (patch.checklist as ChecklistItem[] | undefined) ?? existing.checklist,
     tags: patch.tags ?? existing.tags,
+    blockedBy: patch.blockedBy ?? existing.blockedBy,
     recurrence:
       patch.recurrence !== undefined
         ? (patch.recurrence as RecurrenceRule | null)

@@ -164,6 +164,7 @@ export function coerceTask(obj: Record<string, unknown>): Task | null {
     sectionId: asStringNull(obj.sectionId),
     contextIds: asStringArray(obj.contextIds),
     tags: asStringArray(obj.tags),
+    blockedBy: asStringArray(obj.blockedBy),
     waitingFor: asStringNull(obj.waitingFor),
     starred: asBool(obj.starred),
     recurrence,
