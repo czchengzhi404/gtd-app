@@ -43,7 +43,9 @@ v2.7.28 的 tag 指向的是**带诊断日志**的代码。日志无害，但让
 
 - `tsc`（core / ui / mobile）全通过
 - `bun test` **519 项 / 44 文件全绿**
-- 设备实测 `scripts/verify-dependencies.mjs` **6/6**（v2.7.28，本版仅移除日志）
+- 设备实测 `scripts/verify-dependencies.mjs` **6/6**（v2.7.28 首次通过，
+  本版移除日志后**重新回归仍是 6/6**，`7 left today → 6 left today` 确认
+  被挡住的任务从「现在」消失）
 
 ## 升级
 
