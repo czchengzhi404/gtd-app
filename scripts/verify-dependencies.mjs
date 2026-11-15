@@ -13,7 +13,24 @@ const PKG = "app.gtd.local";
 const OUT = "android-report/dependencies";
 fs.mkdirSync(OUT, { recursive: true });
 
-const nodes = () => parseNodes(dumpUi()).filter((n) => (n.text || n.desc || "").trim().length > 0);
+/** pm clear / 重装后 uiautomator 偶发 137/255，重试几次再放弃 */
+function dumpSafe(tries = 4) {
+  let lastErr;
+  for (let i = 0; i < tries; i += 1) {
+    try {
+      return dumpUi();
+    } catch (e) {
+      lastErr = e;
+      sleepSync(1200);
+    }
+  }
+  throw lastErr;
+}
+function sleepSync(ms) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) { /* 同步等待，避免引 async 到同步函数 */ }
+}
+const nodes = () => parseNodes(dumpSafe()).filter((n) => (n.text || n.desc || "").trim().length > 0);
 const texts = () => nodes().map((n) => (n.text || "").trim()).filter(Boolean);
 
 function shot(name) {
@@ -55,9 +72,21 @@ async function scrollUntil(re, tries = 8) {
 }
 
 // 模拟器里其它 App 会周期性抢前台（见 docs/dev-env-runbook.md 第 1 节）。
-// 先 force-stop 常见的干扰者，再拉起自己，保证后续 dumpUi 拿到的是本 App 的界面。
-for (const other of ["com.dreamtrace.app", "com.workledger.app"]) {
-  adb(["shell", `am force-stop ${other}`]);
+// 直接临时禁用它们，避免验证过程中被顶掉；结束时恢复。
+// 模拟器里其它 App 会周期性抢前台（见 docs/dev-env-runbook.md 第 1 节）。
+// 不用 pm disable（会把环境搞乱、甚至让系统冻住本 App），
+// 改为在关键步骤前检查前台，不是本 App 就重新拉起。
+function topActivity() {
+  try {
+    return adb(["shell", "dumpsys activity activities | grep -m1 topResumedActivity"], { encoding: "utf8" });
+  } catch (e) {
+    return (e.stdout ?? "").toString();
+  }
+}
+function ensureForeground() {
+  if (/app\.gtd\.local/i.test(topActivity())) return;
+  adb(["shell", `am start -n ${PKG}/.MainActivity`]);
+  sleepSync(2200);
 }
 adb(["shell", `pm clear ${PKG}`]);
 await sleep(1200);
@@ -67,6 +96,7 @@ adb(["shell", `am force-stop ${PKG}`]);
 await sleep(400);
 adb(["shell", `am start -n ${PKG}/.MainActivity`]);
 await sleep(9000);
+ensureForeground();
 
 // pm clear 后 uiautomator 服务要几秒才稳定，预热一次（失败忽略）
 try { dumpUi(); } catch { /* 预热，忽略 */ }
@@ -83,6 +113,7 @@ await sleep(2000);
 
 /* 造 3 个任务（清库后种子任务可能已被勾完/不存在） */
 for (const title of ["Alpha", "Beta", "Gamma"]) {
+  ensureForeground();
   const input = nodes().find((n) => /Quick note|快速/.test((n.desc || "") + (n.text || "")));
   if (input === undefined) break;
   adb(["shell", `input tap ${input.cx} ${input.cy}`]);
@@ -96,6 +127,7 @@ adb(["shell", "input keyevent 111"]); // 收键盘
 await sleep(1200);
 
 /* ---------- 1. 记下首屏「现在」是谁 ---------- */
+ensureForeground();
 shot("1-now-before");
 const before = texts();
 const beforeNow = before.find((t) => /Alpha|Beta|Gamma/.test(t));
@@ -103,6 +135,7 @@ console.log("  首屏现在:", beforeNow, "| 全文:", before.slice(0, 12).join(
 record("首屏有「现在」任务", beforeNow !== undefined, before.slice(0, 8).join(" | "));
 
 /* ---------- 2. 进这个任务的详情，加前置 ---------- */
+ensureForeground();
 const row = nodes().find((n) => /^Open task: /.test(n.desc || ""));
 if (row === undefined) {
   // 「一张」视角下没有列表行，改用 See all 切到全部
@@ -145,9 +178,19 @@ record(
 );
 
 /* ---------- 3. 回首屏，看被挡住的任务是否从「现在」消失 ---------- */
-// 不用 back()：详情页在某些状态下会把整个 App 退到桌面
+// 先按返回键回到列表/首页（干扰 App 已被禁用，back 不会跑到桌面）。
+// 不能只用 am start MainActivity：NowView 与详情在同一 Activity，
+// 重发 intent 只是把当前 task 带到前台，不会重建 UI。
+adb(["shell", "input keyevent 4"]);
+await sleep(1800);
+const mid = texts();
+if (!mid.some((t) => /^NOW$|left today|今天还剩/.test(t))) {
+  // 若退到了列表页，再点一次视角切换或直接回首页
+  adb(["shell", "input keyevent 4"]);
+  await sleep(1500);
+}
 adb(["shell", `am start -n ${PKG}/.MainActivity`]);
-await sleep(3000);
+await sleep(2600);
 shot("5-now-after");
 const nowAfter = texts();
 console.log("  加前置后首屏:", nowAfter.slice(0, 14).join(" | "));

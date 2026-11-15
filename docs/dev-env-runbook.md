@@ -5,6 +5,34 @@
 
 ---
 
+# 〇、发布前必做：源码树 ≠ 远端 main 的审计
+
+`E:\gtd清单` 是源码树（**不是 git 仓库**），发布走
+`$env:TEMP\gtd-publish` + `bench/push-commit-via-api.mjs`，
+后者接受一个**显式文件列表**。这意味着：
+
+> 本地改了但没列进任何一次推送清单的文件，永远不会进 GitHub。
+> CI 从 GitHub 构建，于是「本地测试全绿、APK 行为却是旧代码」。
+
+v2.7.18 起 `blockedBy` 的 10 个 core 文件就是这样漏了整整 10 个版本，
+排查时表现为「命令返回成功但 record 里字段是 undefined」。
+
+**每次发布前跑：**
+
+```powershell
+node bench/audit-full-parity.mjs
+```
+
+- 逐个比对源码树与远端 `main` 的文本文件内容
+- 预期差异只有 3 个版本号文件（`bump-version` 只在发布树跑）
+- 出现任何其它差异 → 停下来，把漏掉的文件加进推送清单
+- 定向核对关键文件用 `node bench/audit-remote-parity.mjs`
+
+补推后要**重新打 tag 让 CI 用完整代码构建**，只改远端文件不会
+自动重建已有 tag 的产物。
+
+---
+
 # 一、桌面端 smoke
 
 桌面端 `bun --cwd apps/desktop smoke` 在这个环境里会连着踩两个坑，都不是代码问题。
@@ -87,6 +115,23 @@ bun --cwd apps/desktop build                        # esbuild 主进程 + preloa
 `topResumedActivity` 指向它，随后所有 `dumpUi()` 拿到的都是它家的界面。
 
 处理：关键操作前先确认前台，必要时 force-stop 它再拉起自己。
+**不要用 `pm disable-user`**：它会把目标包置为 suspended，
+`pm enable` 并不会解除 suspend，之后启动只会得到
+`App isn't available / This is managed by Shell`。
+若已经踩了，用 `pm unsuspend <包名>` 恢复（再配合 `pm enable`）。
+
+急用的兜底：只对**确实存在**的干扰包做 `am force-stop`，
+并在每次 `dumpUi()` 前用 `ensureForeground()` 检查
+`topResumedActivity` 是否为 `app.gtd.local`，不是就重新
+`am start -n app.gtd.local/.MainActivity`。
+
+```js
+function ensureForeground() {
+  if (/app\.gtd\.local/i.test(topActivity())) return;
+  adb(["shell", "am start -n app.gtd.local/.MainActivity"]);
+  await sleep(2200);
+}
+```
 
 ```js
 async function ensureApp() {

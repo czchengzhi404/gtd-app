@@ -98,26 +98,12 @@ export default function TaskDetailScreen() {
 
   const addPrereq = (prereqId: string) => {
     setPrereqPickerOpen(false);
-    // 显式打日志：命令若挂起或失败，logcat 里至少要留下痕迹，
-    // 否则「点了没反应」在 release 包上完全无法排查。
-    console.warn(`[dep] add prereq task=${task.id} prereq=${prereqId}`);
     void runCommand("task.update", {
       id: task.id,
       patch: { blockedBy: [...selectedIds, prereqId] },
     })
-      .then((result) => {
-        // 定案日志：命令返回的 record 与 store 里最终的值都打出来
-        const returned = (result.records[0]?.record as { blockedBy?: string[] } | undefined)?.blockedBy;
-        const inStore = appStore.getState().tasks[task.id]?.blockedBy;
-        console.warn(
-          `[dep] ok records=${result.records.length} returned=${JSON.stringify(returned)} inStore=${JSON.stringify(inStore)} selectedIdsWas=${JSON.stringify(selectedIds)}`,
-        );
-        showToast({ message: t("dep.added"), tone: "success" });
-      })
-      .catch((err) => {
-        console.warn(`[dep] fail ${err instanceof Error ? err.message : String(err)}`);
-        showToast({ message: t("dep.addFailed"), tone: "danger" });
-      });
+      .then(() => showToast({ message: t("dep.added"), tone: "success" }))
+      .catch(() => showToast({ message: t("dep.addFailed"), tone: "danger" }));
   };
   const removePrereq = (prereqId: string) => {
     void runCommand("task.update", {

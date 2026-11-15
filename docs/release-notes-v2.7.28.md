@@ -65,12 +65,40 @@ v2.7.18 那次推的 11 个文件全是 UI / 首屏相关，数据层的 10 个�
 
 那些猜测版的发布说明都保留了当时的记录，没有事后改写。
 
+## 设备实测（v2.7.28，6/6 全通过）
+
+```
+[dep] add prereq task=01a1dcf8-… prereq=01a1dcf9-…
+[dep] ok records=1 returned=["01a1dcf9-…"]     ← 字段终于不再丢
+
+PASS  首屏有「现在」任务
+PASS  滚到「前置」区
+PASS  点「添加前置」展开内联候选
+PASS  内联列表里有可选任务
+PASS  前置 chip 出现在详情页（WAITING ON | Alpha）
+PASS  首屏出现「另有 N 件在等前置完成」
+```
+
+关键因果：给「预约体检」加上未完成前置 Alpha 后，首屏
+`7 left today` → **`6 left today`**，被挡住的任务从「现在」消失。
+这正是 NextTodo「设好先后，只看现在能做的事」的核心行为。
+
+日志在确认修复后已从 `addPrereq` 中移除，只保留成功/失败 toast。
+
+## 顺带修的验证脚本坑
+
+- 干扰 App（`com.workledger.app` 等）会抢前台 → 改用 `ensureForeground()`
+- **不要用 `pm disable-user`**：它会把包置为 suspended，
+  `pm enable` 解不开，之后启动只会得到 `App isn't available / managed by Shell`。
+  已踩过，用 `pm unsuspend` 恢复，并写进 `docs/dev-env-runbook.md`
+- `uiautomator dump` 在 `pm clear` 后偶发 137/255 → 加 `dumpSafe()` 重试
+
 ## 验证
 
 - `tsc`（core / ui / mobile）全通过
 - `bun test` **519 项 / 44 文件全绿**
 - 远端 14/14 关键文件一致、全量 207 文件审计完成
-- 设备实测（点候选 → chip 出现 → 首屏显示等前置）：本版补充
+- 设备实测 `scripts/verify-dependencies.mjs` **6/6**
 
 ## 升级
 
