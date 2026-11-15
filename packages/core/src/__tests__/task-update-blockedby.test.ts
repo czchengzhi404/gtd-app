@@ -9,6 +9,7 @@ import { migrate } from "../db/migrations";
 import { executeCommand } from "../db/commands";
 import { loadBootstrapData } from "../db/queries";
 import { setSqliteExecutor, setCommandPort } from "../platform/ports";
+import { appStore, applyRecords, runCommand } from "../store/app-store";
 import type { SqliteExecutor, SqliteRow } from "../platform/executor";
 
 function makeExecutor(db: Database): SqliteExecutor {
@@ -59,6 +60,35 @@ describe("task.update · blockedBy 往返", () => {
     const data = await loadBootstrapData(executor);
     const storedB = data.tasks.find((t) => t.id === bId);
     expect(storedB?.blockedBy).toEqual([aId]);
+    db.close();
+  });
+
+  test("走 runCommand → applyRecords 后，store 里的 blockedBy 也更新", async () => {
+    // 这是设备实测卡住的那一环：日志显示 runCommand 成功、records=1，
+    // 但详情页读不到更新后的 blockedBy。用内存库把 store 这一层也验掉。
+    const db = new Database(":memory:");
+    const executor = makeExecutor(db);
+    await migrate(executor);
+    setSqliteExecutor(executor);
+    setCommandPort({
+      dispatch: async (op, payload) => executeCommand(executor, op, payload, { now: () => 1_700_000_000_000 }),
+    });
+    appStore.setState({ tasks: {} });
+
+    const a = await runCommand("task.create", { title: "A" });
+    const b = await runCommand("task.create", { title: "B" });
+    applyRecords(a.records);
+    applyRecords(b.records);
+    const aId = (a.records[0]?.record as { id: string }).id;
+    const bId = (b.records[0]?.record as { id: string }).id;
+
+    const result = await runCommand("task.update", { id: bId, patch: { blockedBy: [aId] } });
+    expect(result.records).toHaveLength(1);
+    expect(
+      (result.records[0]?.record as { blockedBy?: string[] }).blockedBy,
+    ).toEqual([aId]);
+    // runCommand 内部已调用 applyRecords，store 里应能直接看到
+    expect(appStore.getState().tasks[bId]?.blockedBy).toEqual([aId]);
     db.close();
   });
 });

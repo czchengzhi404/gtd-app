@@ -42,6 +42,9 @@ export default function TaskDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const taskId = typeof id === "string" ? id : "";
   const task = useAppStore((s) => selectTaskById(s, taskId));
+  // 显式订阅整个 tasks 表：前置关系需要从「其它任务」查标题，
+  // 用 appStore.getState() 的命令式快照不会随 store 变化重算（实测踩过）。
+  const tasksById = useAppStore((s) => s.tasks);
   const contexts = useAppStore(selectContexts);
   const projects = useAppStore(selectActiveProjects);
   const tagSuggestions = useAppStore(getAllTags);
@@ -77,8 +80,10 @@ export default function TaskDetailScreen() {
    * 候选由 prereqCandidates 过滤掉「自己」和「加了会成环的」——
    * 成环会让两个任务永远互为未完成前置，静默地从首屏消失。
    */
-  const allTasks = Object.values(appStore.getState().tasks);
-  const selectedIds = task.blockedBy ?? [];
+  const allTasks = Object.values(tasksById);
+  // 直接从响应式 tasks 里按 id 取最新的 blockedBy，
+  // 不依赖 `task` 对象的身份（useShallow 对 Task 对象的比较行为容易踩坑）
+  const selectedIds = tasksById[task.id]?.blockedBy ?? task.blockedBy ?? [];
   const prereqs = selectedIds
     .map((pid) => allTasks.find((candidate) => candidate.id === pid))
     .filter((candidate): candidate is NonNullable<typeof candidate> => candidate !== undefined)
@@ -101,7 +106,12 @@ export default function TaskDetailScreen() {
       patch: { blockedBy: [...selectedIds, prereqId] },
     })
       .then((result) => {
-        console.warn(`[dep] ok records=${result.records.length}`);
+        // 定案日志：命令返回的 record 与 store 里最终的值都打出来
+        const returned = (result.records[0]?.record as { blockedBy?: string[] } | undefined)?.blockedBy;
+        const inStore = appStore.getState().tasks[task.id]?.blockedBy;
+        console.warn(
+          `[dep] ok records=${result.records.length} returned=${JSON.stringify(returned)} inStore=${JSON.stringify(inStore)} selectedIdsWas=${JSON.stringify(selectedIds)}`,
+        );
         showToast({ message: t("dep.added"), tone: "success" });
       })
       .catch((err) => {
