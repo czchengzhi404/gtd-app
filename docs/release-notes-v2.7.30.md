@@ -78,10 +78,36 @@
 
 - 真机 arm64 未复核（仍是模拟器结论）
 - 通知（矩阵唯一 🟡）
-- `OptionSheet` 的批量移动/推迟**仍未端到端验过**：模拟器
-  `input swipe` 长按被识别成点击，进不了多选模式。代码接线已确认正确
-  （`TaskList.tsx:146` → `TaskRow onLongPress`，`delayLongPress={250}`），
-  但缺一次真实触摸验证
+
+## 补验完成：OptionSheet 批量回调（v2.7.30 之后，无代码改动）
+
+此前三版都挂着「`OptionSheet` 的批量移动/推迟只验过入口能点开」。
+这一轮销掉了，`scripts/verify-bulk-move.mjs` **6/6**：
+
+```
+PASS  全部列表里有可长按的任务行 — 6 行
+PASS  长按进入多选模式 — 1 selected, Complete, Move to…, Defer to…, Delete
+PASS  找到「Move to」按钮
+PASS  OptionSheet 弹出 — Move to… | Next | Waiting | Someday | Inbox | Cancel
+PASS  面板里定位到 Waiting
+PASS  被移动的任务「BulkOne」已离开收件箱列表
+      6 to process → 5 to process
+```
+
+**关键突破**：长按不能再用 `input swipe x y x y 800`——在这个模拟器上它会被
+识别成**点击**，直接打开详情页，看起来就像「多选模式进不去」。
+改用 `input motionevent DOWN / sleep / UP` 精确按住 800ms 才稳定触发
+`delayLongPress={250}`。
+
+**结论：`OptionSheet` 的选择回调从来没有问题。** v2.7.24（改 `pointerEvents`）
+和 v2.7.25（改成内联展开）这两次针对它的修改，都是基于误判——真因是远端缺 schema。
+v2.7.25 的内联展开本身是合理的产品选择（不弹层、同一张纸上完成），所以保留。
+
+同时修掉一个测试自身的缺陷：批量操作后列表可能变空，
+`!rows.includes(target)` 会恒为真、产出**假阳性 PASS**。
+现在必须先断言 `rows.length > 0`。
+
+两条经验都已写进 `docs/dev-env-runbook.md`（4b / 4c 节）。
 
 ## 升级
 

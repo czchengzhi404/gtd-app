@@ -179,6 +179,29 @@ adb shell input keyevent 4     # KEYCODE_BACK —— 在 Stack 页面里等于�
 也不要点「空白处」收键盘：点常落在键盘上，之后的 `input swipe` 会被键盘当成
 **滑行输入（glide typing）**，往当前焦点输入框里打字母——实测往 URL 里打出了 `" by g"`。
 
+## 4b. 长按：`input swipe` 不行，要用 `input motionevent`
+
+`input swipe x y x y 800`（同点起止、800ms）在这个模拟器上会被识别成**点击**，
+不是长按。结果是长按任务行时直接打开了详情页，看起来像「多选模式进不去」。
+
+正确的做法是用 `motionevent` 精确按住再松手：
+
+```powershell
+adb shell input motionevent DOWN 800 1200
+adb shell sleep 0.80
+adb shell input motionevent UP 800 1200
+```
+
+配合组件里的 `delayLongPress={250}`（见 `TaskRow.tsx`），按住 800ms 稳定触发。
+
+`scripts/verify-bulk-move.mjs` 用这个方式验证了「长按 → 多选 → Move to… →
+选 Waiting → 任务离开收件箱」全链路（6/6）。
+
+## 4c. 断言里别写「列表为空也算通过」
+
+批量操作后列表可能变空，此时 `!rows.includes(target)` 恒为真，
+会产出**假阳性 PASS**。必须先断言 `rows.length > 0` 再判断目标是否消失。
+
 ## 5. 详情页/表单的长页面：先滚到可见再点
 
 `uiautomator dump` 只包含当前视口内的节点。按钮在折叠线以下时 `tapExact("Save")`
