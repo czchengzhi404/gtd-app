@@ -48,7 +48,7 @@
 | 完成任务 | ✅ | 勾选后任务从收集箱消失 |
 | 完成 + 撤销 | ✅ | 完成已验证；撤销条截图确认存在（uiautomator 抓不到浮层） |
 | 右滑延后 | ✅ | `input swipe` 模拟成功，任务移到明天 |
-| 多选批量 | ✅ | 长按 900ms 进入，显示「已选 1 项 + 完成/移动到/推迟到」 |
+| 多选批量 | ✅ | v2.7.30 补验 `scripts/verify-bulk-move.mjs` 6/6：长按 `motionevent` 按住 800ms 进入（组件 `delayLongPress={250}`），显示「1 selected + 完成/移动到/推迟到/删除」；选「Move to… → Waiting」后任务离开收件箱，`6 to process → 5 to process` |
 | 拖拽排序 | ✅ | v2.7.14 实测：点标题栏 `Drag to reorder` 进入重排，每行出现手柄；把「整理桌面」拖到下方后顺序变为 回复客户邮件 → 预约体检 → 整理桌面 |
 | 看板视图 | ✅ | v2.5.5 接到项目详情：列表/看板切换，五列按状态，拖拽即 moveStatus |
 
