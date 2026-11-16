@@ -197,7 +197,7 @@ export function TaskList({
       data={tasks}
       keyExtractor={(item) => item.id}
       renderItem={renderItem}
-      ItemSeparatorComponent={() => <Divider inset={space.lg} />}
+      ItemSeparatorComponent={carded ? () => <Divider inset={space.lg} /> : null}
       ListHeaderComponent={header ?? null}
       ListFooterComponent={footer ?? null}
       keyboardShouldPersistTaps="handled"

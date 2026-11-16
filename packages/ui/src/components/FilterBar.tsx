@@ -131,8 +131,8 @@ export function FilterBar({
         style={[
           styles.search,
           {
-            backgroundColor: colors.surface,
-            borderColor: focused ? colors.primary : colors.border,
+            // 纸面下一行字：只留底边线。聚焦时线色变主色（赭石），不再有填充与圆角
+            borderBottomColor: focused ? colors.primary : colors.border,
           },
         ]}
       >
@@ -299,13 +299,14 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   search: {
+    // 纸面上的一行字：只用一条底边线，不再套描边胶囊。
+    // 独立评审指出「第二只描边胶囊」把一张纸切成了几块白板。
     height: 44,
     flexDirection: "row",
     alignItems: "center",
     gap: space.sm,
-    paddingHorizontal: space.md,
-    borderRadius: radius.sm,
-    borderWidth: 1,
+    paddingHorizontal: space.xs,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   input: {
     flex: 1,
