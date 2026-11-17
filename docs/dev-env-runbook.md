@@ -202,6 +202,34 @@ adb shell input motionevent UP 800 1200
 批量操作后列表可能变空，此时 `!rows.includes(target)` 恒为真，
 会产出**假阳性 PASS**。必须先断言 `rows.length > 0` 再判断目标是否消失。
 
+## 4d. 有些输入框 uiautomator 根本不报告
+
+同步页的 **Server URL** 输入框就是：`dumpUi()` 里只有它的标签
+（`Server URL`，y≈1275），紧接着的 `Username` 标签在 y≈1567，
+中间 250px 什么都没有。但截图看那里**确实有输入框**，
+占位文字 `https://dav.example.com/gtd/` 清晰可见。
+
+于是「找不到输入框」并不代表它不存在。判定办法：
+
+```powershell
+# 截图后量像素：placeholder 是浅灰（亮度≈154），真值才是深色
+node bench/locate-url-text.py android-report/peer-devices/02-url-typed.png
+```
+
+实测标签 y≈1275，输入框文字 y≈1379..1398。脚本里用
+「标签中心 + 76px」定位它。同类问题（`Field` 组件渲染的 TextInput）
+在其它页面也可能出现，找不到输入框时先截图确认，别急着改代码。
+
+## 4e. `input text` 里的空格会丢
+
+```powershell
+adb shell input text "NotifyProbe today"   # ❌ 只进去 "NotifyProbe"
+adb shell input text "NotifyProbe%stoday"  # ✅ 空格写 %s
+```
+
+`today` 没进去 → quick-add 解析不出 `dueAt` → 到期通知永远不触发。
+这个坑会伪装成「通知功能坏了」。
+
 ## 5. 详情页/表单的长页面：先滚到可见再点
 
 `uiautomator dump` 只包含当前视口内的节点。按钮在折叠线以下时 `tapExact("Save")`
