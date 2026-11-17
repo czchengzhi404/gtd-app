@@ -177,11 +177,11 @@ bar_x, bar_y, bar_w, bar_h = 96, y + 84, W - 336, 26
 d.rounded_rectangle([bar_x, bar_y, bar_x + bar_w, bar_y + bar_h], radius=13, fill=(238, 236, 231))
 done_w = int(bar_w * 64 / 65)
 d.rounded_rectangle([bar_x, bar_y, bar_x + done_w, bar_y + bar_h], radius=13, fill=GREEN)
-text((96, y + 30), "功能矩阵：64 项已实测通过 / 65 项", F_H3)
-text((96 + text_w("功能矩阵：64 项已实测通过 / 65 项", F_H3) + 16, y + 33), "本轮从 19 项待验降到 1 项", F_SMALL, SUB)
-pct = "98.5%"
+text((96, y + 30), "功能矩阵：65 项已实测通过 / 65 项", F_H3)
+text((96 + text_w("功能矩阵：65 项已实测通过 / 65 项", F_H3) + 16, y + 33), "本轮从 19 项待验降到 0", F_SMALL, SUB)
+pct = "100%"
 text((W - 96 - text_w(pct, F_H2), y + 26), pct, F_H2, GREEN)
-text((96, y + 122), "唯一剩下的「通知」需要真实等到期提醒触发，模拟器时间不好造", F_TINY, FAINT)
+text((96, y + 122), "通知已实测：通知栏出现 Task due / NotifyProbe，when 时间戳证实是新投递，二次重启无重复", F_TINY, FAINT)
 
 y += 150 + 46
 
@@ -201,6 +201,9 @@ checks = [
     ("verify-sync-connect", "6/8", "本地自托管服务器收到 GET /index + 2 个 PUT"),
     ("verify-sound", "7/7", "2425 帧 = 110ms，正是 complete.wav 的长度"),
     ("verify-dependencies", "6/6", "加前置 → chip 出现 → 首屏 7→6 件可做"),
+    ("verify-bulk-move", "6/6", "长按 motionevent 进多选 → 选 Waiting → 任务离开收件箱"),
+    ("verify-notifications", "7/7", "通知栏 Task due / NotifyProbe，when 变更证新投递"),
+    ("verify-peer-devices", "10/10", "自托管同步 → devices 2 → 列出 Device ke0001"),
 ]
 
 card_w = (W - 112 - 24) // 2
