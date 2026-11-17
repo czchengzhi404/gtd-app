@@ -153,10 +153,16 @@ export function UndoHost({ bottomOffset = 76 }: { bottomOffset?: number }) {
           <View
             accessibilityRole="alert"
             accessibilityLabel={`${entry.message} ${entry.actionLabel}`}
-            style={[styles.bar, elevation.float, { backgroundColor: colors.text }]}
+            style={[
+              styles.bar,
+              elevation.float,
+              // 纸面便签条：不再是一条近黑的横杠。
+              // 黑条在暖白纸底上是整套界面里最违和的元素（评审第③条点名）。
+              { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: StyleSheet.hairlineWidth },
+            ]}
           >
-            <Ionicons name="checkmark-circle-outline" size={16} color={colors.canvas} />
-            <AppText variant="label" color={colors.canvas} lines={1} style={styles.message}>
+            <Ionicons name="checkmark-circle-outline" size={16} color={colors.primary} />
+            <AppText variant="label" color={colors.text} lines={1} style={styles.message}>
               {entry.message}
             </AppText>
             {depth > 1 ? (

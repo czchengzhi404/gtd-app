@@ -9,7 +9,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useFocusStyle } from "../hooks/useFocusStyle";
 import { useBreakpoint } from "../hooks/useBreakpoint";
 import { AppText } from "../theme/AppText";
-import { elevation, hit, radius, space } from "../theme/tokens";
+import { hit, radius, space } from "../theme/tokens";
 
 type IoniconName = ComponentProps<typeof Ionicons>["name"];
 
@@ -78,7 +78,9 @@ export function AppTabBar({ state, navigation, badges = {} }: AppTabBarProps) {
                   color={active ? colors.primary : colors.textTertiary}
                 />
                 {count > 0 ? (
-                  <View style={[styles.badge, { backgroundColor: colors.danger }]}>
+                  // 角标只表示「有 N 件」，不是错误状态：用赭石而非 danger 红。
+                  // 红色在这套配色里是「逾期/删除」的警报语汇，用在计数上过吵。
+                  <View style={[styles.badge, { backgroundColor: colors.primary }]}>
                     <AppText variant="caption" weight="700" color={colors.onPrimary} lines={1}>
                       {count > 99 ? "99+" : `${count}`}
                     </AppText>
@@ -140,7 +142,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     alignItems: "center",
     justifyContent: "center",
-    ...elevation.float,
+    // 不叠 elevation：纸面上一个小计数不该有浮起的投影
   },
   tabLabel: {
     fontSize: 11,
