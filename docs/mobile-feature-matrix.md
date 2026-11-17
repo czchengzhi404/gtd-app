@@ -100,7 +100,7 @@
 | 本地文件夹 | ⛔ | 桌面专属，移动端置灰 |
 | 明文 HTTP 支持 | ✅ | AndroidManifest 已含 `usesCleartextTraffic=true`（aapt 验证） |
 | 实际连接 | ✅ | v2.7.14 实测：本地起 `bench/local-sync-server.mjs` 当「自托管 HTTP」服务器（`http://10.0.2.2:8787`），App 配好后真实跑到 `GET /index`、`PUT devices/<id>/manifest.json`、`PUT devices/<id>/records.json` |
-| 设备列表 | ❌ | **移动端同步页没有设备列表区块**：页面到 `Save config` 就结束（`Devices` 只在桌面端有）。服务端已有设备数据（manifest/records 都已上传），但手机上看不到「有哪些设备在同步」 |
+| 设备列表 | ✅ | v2.7.31 更正：**此前记的 ❌ 是过时记录**。同步页早在 `sync.tsx:374` 就有 `sync.peersTitle`（OTHER DEVICES / 其他设备）区块，由 `listPeerDevices()` 从服务端 `GET /index` 拉取。实测 `scripts/verify-peer-devices2.mjs` 10/10：配置自托管 → `Sync now` 返回 `Applied 0 · pushed 9 · devices 2` → 设备区列出 `Device ke0001`（伪造的第二台设备，`1/1/1970` 是它 manifest 里没写活动时间导致）|
 | 自动同步 | ✅ | v2.7.14 实测：配置保存并开启后**重启 App**，无需任何手动操作，25 秒内服务端收到 `GET /index` + 两个 `PUT`，上传 9 条记录（4 任务 / 1 项目 / 1 分区 / 3 情境） |
 
 ## 八、系统与外观
@@ -112,7 +112,7 @@
 | 字体（系统/霞鹜文楷） | ✅ | 切换后界面正常渲染 |
 | 语言（中/英） | ✅ | 切中文后全站即时变中文 |
 | 大字体防御 | ✅ | v2.7.5 实测：系统字体缩放 1.3 / 1.5 下，收件箱/今天/项目/更多/数据/设置 6 页截图均无截断、无重叠（`android-report/large-font/`） |
-| 通知 | 🟡 | 权限弹窗已授予，未等实际触发 |
+| 通知 | ✅ | v2.7.31 补验 `scripts/verify-notifications.mjs` 7/7：建一个 `NotifyProbe today`（行内实测带 `Today` 标记）→ 重启 App 跨过 60s 扫描周期 → 系统通知栏出现 `Task due / NotifyProbe / GTD 清单`，`when` 时间戳由 `1794894916713` 变为 `1794895030884`（证实是新投递）→ 二次重启无新 `when`，kv 去重生效不重复打扰 |
 | 错误边界 | ✅ | 代码存在（v2.5.1 新增），本次无崩溃可验证 |
 
 ## 九、明确未实现 / 桌面专属
