@@ -230,6 +230,21 @@ adb shell input text "NotifyProbe%stoday"  # ✅ 空格写 %s
 `today` 没进去 → quick-add 解析不出 `dueAt` → 到期通知永远不触发。
 这个坑会伪装成「通知功能坏了」。
 
+## 4f. `pm clear` 会让同步数据累积同名任务
+
+`pm clear` 清库后，种子任务用**新 uuid** 重建。若此前已同步过，
+再同步时服务器上**旧 uuid** 的种子任务会被拉回来 —— 于是列表里出现
+同名不同 id 的「重复」任务。
+
+这不是产品缺陷（`records.json` 里唯一 id 数与任务数一致）。
+做同步相关验证**之前**先清掉服务端数据目录：
+
+```powershell
+Remove-Item -Recurse -Force android-report/local-sync
+```
+
+然后再起 `bench/local-sync-server.mjs`。
+
 ## 5. 详情页/表单的长页面：先滚到可见再点
 
 `uiautomator dump` 只包含当前视口内的节点。按钮在折叠线以下时 `tapExact("Save")`
