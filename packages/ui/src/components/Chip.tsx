@@ -15,6 +15,12 @@ export interface ChipProps {
    * null = 不加前缀；"#" = 标签。
    */
   prefix?: string | null;
+  /**
+   * 无障碍标签覆盖。
+   * 显示文本为了排版常常很短（如「全部」），但读屏需要完整语义
+   * （「切换到全部列表」）。不传则沿用显示文本，行为与之前一致。
+   */
+  a11yLabel?: string;
 }
 
 /**
@@ -22,7 +28,7 @@ export interface ChipProps {
  * - 只读态：高 20，用于行内元信息
  * - 可点态：高 34，用于筛选/切换
  */
-export function Chip({ label, color, selected = false, onPress, prefix }: ChipProps) {
+export function Chip({ label, color, selected = false, onPress, prefix, a11yLabel }: ChipProps) {
   const colors = useTheme();
   const focus = useFocusStyle(radius.pill);
   const accent = color ?? colors.primary;
@@ -42,7 +48,7 @@ export function Chip({ label, color, selected = false, onPress, prefix }: ChipPr
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={interactiveLabel}
+      accessibilityLabel={a11yLabel ?? interactiveLabel}
       accessibilityState={{ selected }}
       onPress={onPress}
       style={({ pressed }) => [

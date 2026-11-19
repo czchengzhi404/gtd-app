@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   BulkActionBar,
   Button,
+  Chip,
   FilterBar,
   IconButton,
   NowView,
@@ -82,11 +83,16 @@ export default function InboxScreen() {
     void runCommand("settings.set", { key: "inbox.focusMode", value: mode }).catch(() => undefined);
   };
 
+  // 视角切换：从纯图标改成带文字的胶囊。
+  // 理由：首屏其它动作（Process / Add / Done）都有文字，唯独这个切换只有
+  // 一个 list / square 的图标，用户看不出它是「切换视角」还是「筛选」。
+  // Chip + prefix=null 复用现有胶囊语言，体积也和 header 的 actions 相称。
   const viewToggle = (
-    <IconButton
-      icon={focusMode ? "list-outline" : "square-outline"}
+    <Chip
+      label={focusMode ? t("now.viewAll") : t("now.viewOne")}
+      prefix={null}
+      a11yLabel={focusMode ? t("now.toggleAll") : t("now.toggleOne")}
       onPress={() => setFocusMode(focusMode ? "all" : "one")}
-      accessibilityLabel={focusMode ? t("now.toggleAll") : t("now.toggleOne")}
     />
   );
 
