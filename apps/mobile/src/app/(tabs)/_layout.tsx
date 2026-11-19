@@ -1,5 +1,6 @@
 import { Tabs, usePathname, router } from "expo-router";
 import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppTabBar, AppText, NAV_ITEMS, Sidebar, useTheme, useT, useBreakpoint, useNowMinute, useAppStore } from "@gtd/ui";
 import { getInboxTasks, getTodayTasks } from "@gtd/core";
@@ -12,6 +13,7 @@ import { getInboxTasks, getTodayTasks } from "@gtd/core";
  */
 export default function TabsLayout() {
   const { isTabletUp } = useBreakpoint();
+  const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const colors = useTheme();
   const tr = useT();
@@ -56,8 +58,18 @@ export default function TabsLayout() {
   }
 
   return (
-    <View style={{ flex: 1, flexDirection: "row" }}>
+    <View
+      style={{
+        flex: 1,
+        flexDirection: "row",
+        backgroundColor: colors.canvas,
+        paddingLeft: insets.left,
+        paddingRight: insets.right,
+        paddingBottom: insets.bottom,
+      }}
+    >
       <Sidebar
+        style={{ marginTop: insets.top }}
         activeRoute={activeRoute}
         onSelect={(route) => {
           router.navigate(route === "index" ? "/" : `/${route}`);

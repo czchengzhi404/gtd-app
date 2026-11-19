@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 
 import { NAV_ITEMS } from "../nav-config";
@@ -15,18 +15,20 @@ export interface SidebarProps {
   activeRoute: string;
   onSelect: (route: string) => void;
   footer?: ReactNode;
+  /** 原生壳层可注入安全区间距；桌面端默认保持原样。 */
+  style?: StyleProp<ViewStyle>;
 }
 
 /**
  * 桌面端左侧栏（≥768）。与移动端 TabBar 同源于 NAV_ITEMS——
  * 同一份导航配置，两种呈现，不存在第二套导航定义。
  */
-export function Sidebar({ activeRoute, onSelect, footer }: SidebarProps) {
+export function Sidebar({ activeRoute, onSelect, footer, style }: SidebarProps) {
   const colors = useTheme();
   const focus = useFocusStyle(radius.sm);
 
   return (
-    <View style={[styles.wrap, { backgroundColor: colors.canvas, borderRightColor: colors.border }]}>
+    <View style={[styles.wrap, { backgroundColor: colors.canvas, borderRightColor: colors.border }, style]}>
       <View style={styles.brandRow}>
         <View style={[styles.logo, { backgroundColor: colors.primary }]}>
           <Ionicons name="checkmark-done" size={16} color={colors.onPrimary} />
