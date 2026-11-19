@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   android-apk:
@@ -134,3 +134,11 @@ jobs:
           name: gtd-apks
           path: apps/mobile/android/app/build/outputs/apk/release/GTD-*.apk
           retention-days: 7
+
+      - name: Publish signed layout verification candidate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create responsive-check-2.7.36-r2 --repo czchengzhi404/gtd-app --target "$GITHUB_SHA" --prerelease --title 'GTD 2.7.36 responsive verification candidate 2' --notes 'Candidate only; runtime verification is pending.'
+          gh release upload responsive-check-2.7.36-r2 apps/mobile/android/app/build/outputs/apk/release/GTD-*.apk --repo czchengzhi404/gtd-app
