@@ -18,8 +18,15 @@ function withLegacyAlias(c: ThemeColors): AppThemeColors {
 }
 
 const ThemeColorsContext = createContext<AppThemeColors>(withLegacyAlias(lightColors));
-const ThemeSettingsContext = createContext<{ mode: ThemeMode; fontFamily: FontFamily }>({
+type ThemeSettings = {
+  mode: ThemeMode;
+  colorScheme: "light" | "dark";
+  fontFamily: FontFamily;
+};
+
+const ThemeSettingsContext = createContext<ThemeSettings>({
   mode: "system",
+  colorScheme: "light",
   fontFamily: "system",
 });
 
@@ -41,18 +48,18 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   // 默认系统字体（内置霞鹜文楷为可选项，选中时才懒加载）
   const fontFamily: FontFamily = fontPref ?? "system";
 
-  const isDark = mode === "dark" || (mode === "system" && system === "dark");
-  const colors = withLegacyAlias(isDark ? darkColors : lightColors);
+  const colorScheme = mode === "dark" || (mode === "system" && system === "dark") ? "dark" : "light";
+  const colors = withLegacyAlias(colorScheme === "dark" ? darkColors : lightColors);
 
   return (
-    <ThemeSettingsContext.Provider value={{ mode, fontFamily }}>
+    <ThemeSettingsContext.Provider value={{ mode, colorScheme, fontFamily }}>
       <ThemeColorsContext.Provider value={colors}>{children}</ThemeColorsContext.Provider>
     </ThemeSettingsContext.Provider>
   );
 }
 
-/** 当前主题设置（模式 + 字体族） */
-export function useThemeSettings(): { mode: ThemeMode; fontFamily: FontFamily } {
+/** 当前主题偏好及最终生效的主题 */
+export function useThemeSettings(): ThemeSettings {
   return useContext(ThemeSettingsContext);
 }
 

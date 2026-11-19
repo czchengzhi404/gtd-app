@@ -167,7 +167,7 @@ export const darkColors = {
   surfaceOverlay: "#1E2128",
   text: "#F2F0EB",
   textSecondary: "#B3AFA6",
-  textTertiary: "#8A857C",
+  textTertiary: "#928D84",
   primary: "#E0A878",
   primaryMuted: "#3A2818",
   onPrimary: "#2A1A0C",

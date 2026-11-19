@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Stack, router } from "expo-router";
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider as NavigationThemeProvider, router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { StyleSheet, View } from "react-native";
 import Constants from "expo-constants";
@@ -15,6 +15,7 @@ import {
   space,
   useAppStore,
   useTheme,
+  useThemeSettings,
   useT,
   PromptHost,
 } from "@gtd/ui";
@@ -118,7 +119,32 @@ export default function RootLayout() {
       onError={(error, info) => void recordCrash("render", error, info.componentStack ?? "")}
     >
       <ThemeProvider>
-      <StatusBar style="auto" />
+        <AppNavigation error={error} />
+      </ThemeProvider>
+    </ErrorBoundary>
+  );
+}
+
+function AppNavigation({ error }: { error: string | null }) {
+  const colors = useTheme();
+  const { colorScheme } = useThemeSettings();
+  const baseTheme = colorScheme === "dark" ? DarkTheme : DefaultTheme;
+
+  return (
+    <NavigationThemeProvider
+      value={{
+        ...baseTheme,
+        colors: {
+          primary: colors.primary,
+          background: colors.canvas,
+          card: colors.surface,
+          text: colors.text,
+          border: colors.border,
+          notification: colors.primary,
+        },
+      }}
+    >
+      <StatusBar style={baseTheme.dark ? "light" : "dark"} />
       {error !== null ? (
         <BootError message={error} />
       ) : (
@@ -130,8 +156,7 @@ export default function RootLayout() {
           <ToastHost bottomOffset={132} />
         </>
       )}
-      </ThemeProvider>
-    </ErrorBoundary>
+    </NavigationThemeProvider>
   );
 }
 

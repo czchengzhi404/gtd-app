@@ -48,17 +48,17 @@ const BODY_PAIRS: { fg: keyof ThemeColors; bg: keyof ThemeColors }[] = [
   { fg: "text", bg: "surface" },
   { fg: "textSecondary", bg: "canvas" },
   { fg: "textSecondary", bg: "surface" },
+  { fg: "textSecondary", bg: "surfaceMuted" }, // 视角切换胶囊
+  { fg: "textTertiary", bg: "canvas" },
+  { fg: "textTertiary", bg: "surface" },
+  { fg: "textTertiary", bg: "surfaceMuted" }, // 标签等输入框的占位文字
+  { fg: "primary", bg: "canvas" }, // 首屏查看全部
+  { fg: "primary", bg: "surface" }, // 撤销按钮
+  { fg: "primary", bg: "primaryMuted" }, // 当前底栏入口
   { fg: "onPrimary", bg: "primary" },
   { fg: "danger", bg: "canvas" },
   { fg: "success", bg: "canvas" },
   { fg: "warning", bg: "canvas" },
-];
-
-/** 弱化文本（caption/占位符）按 3:1 起（WCAG 对大字号/次要文本的宽松档） */
-const MUTED_PAIRS: { fg: keyof ThemeColors; bg: keyof ThemeColors }[] = [
-  { fg: "textTertiary", bg: "canvas" },
-  { fg: "textTertiary", bg: "surface" },
-  { fg: "textTertiary", bg: "surfaceMuted" },
 ];
 
 for (const [name, theme] of [
@@ -70,13 +70,6 @@ for (const [name, theme] of [
       it(`${fg} on ${bg} ≥ 4.5:1`, () => {
         const ratio = contrastRatio(theme[fg], theme[bg]);
         expect(ratio).toBeGreaterThanOrEqual(4.5);
-      });
-    }
-
-    for (const { fg, bg } of MUTED_PAIRS) {
-      it(`${fg} on ${bg} ≥ 3:1（次要文本）`, () => {
-        const ratio = contrastRatio(theme[fg], theme[bg]);
-        expect(ratio).toBeGreaterThanOrEqual(3);
       });
     }
 
