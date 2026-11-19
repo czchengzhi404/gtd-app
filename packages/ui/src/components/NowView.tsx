@@ -185,10 +185,10 @@ export function NowView({
             onPress={onSeeAll}
             style={styles.seeAll}
           >
-            <AppText variant="label" color={colors.info} lines={1}>
+            <AppText variant="label" color={colors.primary} lines={1}>
               {t("now.seeAll", { n: availableCount })}
             </AppText>
-            <Ionicons name="arrow-forward" size={14} color={colors.info} />
+            <Ionicons name="arrow-forward" size={14} color={colors.primary} />
           </Pressable>
         ) : null}
       </View>
