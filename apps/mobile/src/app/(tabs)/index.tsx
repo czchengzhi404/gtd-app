@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
-import { View } from "react-native";
+import { Keyboard, View, useWindowDimensions } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import {
@@ -61,6 +61,7 @@ export default function InboxScreen() {
   const allTags = useAppStore(getAllTags);
   const loaded = useAppStore((s) => s.loaded);
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const colors = useTheme();
   const t = useT();
 
@@ -73,6 +74,16 @@ export default function InboxScreen() {
   const [activePerspective, setActivePerspective] = useState<string | null>(null);
   const [moveSheetOpen, setMoveSheetOpen] = useState(false);
   const [deferSheetOpen, setDeferSheetOpen] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(() => Keyboard.isVisible());
+
+  useEffect(() => {
+    const show = Keyboard.addListener("keyboardDidShow", () => setKeyboardVisible(true));
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboardVisible(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
+
+  // 矮视口输入时先给快速添加让出空间，收起键盘后完整标题操作区恢复。
+  const compactKeyboard = keyboardVisible && windowHeight < 480;
 
   /**
    * 首屏视角：默认「一张」（只看现在该做的那一件），可切回「全部」完整列表。
@@ -209,7 +220,7 @@ export default function InboxScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.canvas }}>
       <View style={{ paddingTop: insets.top }}>
-        <PageHeader
+        {!compactKeyboard ? <PageHeader
           title={showNow ? t("now.pageTitle") : t("nav.inbox")}
           subtitle={showNow ? undefined : t("app.inbox.subtitle", { n: inbox.length })}
           actions={
@@ -233,7 +244,7 @@ export default function InboxScreen() {
               />
             </View>
           }
-        />
+        /> : null}
       </View>
       <QuickAddBar
         value={input}
