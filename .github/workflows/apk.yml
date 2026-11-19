@@ -5,14 +5,17 @@ permissions:
   actions: read
   contents: write
 jobs:
-  relay-existing-candidate:
+  publish-verified-android:
     runs-on: ubuntu-latest
     steps:
-      - name: Relay already signed and verified CI outputs
+      - name: Publish the already verified signed APKs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           gh run download 44515987156 --repo czchengzhi404/gtd-app --name gtd-apks --dir apks
-          gh release view dark-check-2.7.35 --repo czchengzhi404/gtd-app >/dev/null 2>&1 || gh release create dark-check-2.7.35 --repo czchengzhi404/gtd-app --target 324d0d017f75131c9973c8380ab0f1209f19027e --prerelease --title 'GTD 2.7.35 dark-mode verification candidate' --notes 'Signed candidate from CI run 44515987156. Runtime verification is in progress; this is not the stable release.'
-          gh release upload dark-check-2.7.35 apks/GTD-v2.7.35-x86_64.apk apks/GTD-v2.7.35-arm64-v8a.apk --repo czchengzhi404/gtd-app --clobber
+          printf 'f70484e011d5eea2afe9e82d5ad2345434dda874021e12bfc2d087bc166daa5a  apks/GTD-v2.7.35-x86_64.apk\nd87809ae84492f09596c06fb419a8949a2115c808b245394f284cbccd5df90c6  apks/GTD-v2.7.35-arm64-v8a.apk\n' | sha256sum -c -
+          gh api repos/czchengzhi404/gtd-app/contents/docs/release-notes-v2.7.35.md?ref=2466d5ea6e403dfb81e77a05e6d5b1a39dd60337 --jq .content | base64 --decode > release-notes.md
+          gh release create v2.7.35 --repo czchengzhi404/gtd-app --target 2466d5ea6e403dfb81e77a05e6d5b1a39dd60337 --draft --title 'GTD 清单 v2.7.35' --notes-file release-notes.md
+          gh release upload v2.7.35 apks/GTD-*.apk --repo czchengzhi404/gtd-app
+          gh release edit v2.7.35 --repo czchengzhi404/gtd-app --draft=false --latest
