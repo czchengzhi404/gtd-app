@@ -1714,6 +1714,14 @@ export function setLang(lang: Lang): void {
   langStore.setState({ lang: lang === "en" ? "en" : "zh" });
 }
 
+/**
+ * 启动时把 settings.set 写入的语言偏好恢复到内存 store。
+ * 无效/缺失值不覆盖首次启动的系统语言探测结果。
+ */
+export function restoreLang(value: unknown): void {
+  if (value === "zh" || value === "en") setLang(value);
+}
+
 /** 翻译：支持 {name} 参数插值；缺键回退中文，再回退键名 */
 export function t(key: string, params?: Record<string, string | number>): string {
   const lang = getLang();

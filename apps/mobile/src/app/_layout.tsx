@@ -18,6 +18,7 @@ import {
   useThemeSettings,
   useT,
   PromptHost,
+  restoreLang,
 } from "@gtd/ui";
 import { appStore, bootstrapStore, runCommand } from "@gtd/core";
 import { initPlatform } from "@/platform/bootstrap";
@@ -55,6 +56,7 @@ export default function RootLayout() {
         cleanup = result.cleanup;
         justSeededRef.current = result.justSeeded;
         await bootstrapStore();
+        restoreLang(appStore.getState().kv["lang"]);
         if (isBuiltinFontSelected()) {
           await ensureBuiltinFont();
         }
