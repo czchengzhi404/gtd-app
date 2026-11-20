@@ -6,7 +6,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   android-apk:
@@ -134,3 +134,11 @@ jobs:
           name: gtd-apks
           path: apps/mobile/android/app/build/outputs/apk/release/GTD-*.apk
           retention-days: 7
+
+      - name: Publish signed language candidate
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release create verify-lang-2.7.37 --repo czchengzhi404/gtd-app --target "$GITHUB_SHA" --prerelease --title 'GTD 2.7.37 language persistence candidate' --notes 'Candidate only; runtime verification is pending.'
+          gh release upload verify-lang-2.7.37 apps/mobile/android/app/build/outputs/apk/release/GTD-*.apk --repo czchengzhi404/gtd-app
