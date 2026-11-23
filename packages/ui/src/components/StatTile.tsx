@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { ComponentProps } from "react";
 
@@ -19,13 +19,20 @@ export interface StatTileProps {
   delta?: string;
   icon?: IoniconName;
   tone?: StatTone;
+  /**
+   * 覆盖卡片尺寸。
+   *
+   * 默认带 `minWidth/flexBasis: 160`（统计面板两列网格用）。放在窄屏的一行
+   * 三张里（如素材库）会超出屏宽、右侧被裁掉，那里需要传 `{ minWidth: 0, flexBasis: 0, flex: 1 }`。
+   */
+  style?: StyleProp<ViewStyle>;
 }
 
 /**
  * 统计卡片（统计面板用）。
  * 所有文本走 AppText；数值用 display 阶梯建立视觉锚点。
  */
-export function StatTile({ label, value, delta, icon, tone = "default" }: StatTileProps) {
+export function StatTile({ label, value, delta, icon, tone = "default", style }: StatTileProps) {
   const colors = useTheme();
   const accent = {
     default: colors.textSecondary,
@@ -41,7 +48,11 @@ export function StatTile({ label, value, delta, icon, tone = "default" }: StatTi
   const deltaColor = flat ? colors.textSecondary : negative ? colors.danger : colors.success;
 
   return (
-    <Card variant="outline" padding="normal" style={styles.card}>
+    <Card
+      variant="outline"
+      padding="normal"
+      style={StyleSheet.flatten([styles.card, style]) as ViewStyle}
+    >
       <View style={styles.labelRow}>
         <AppText variant="label" tone="secondary" lines={1} style={styles.label}>
           {label}

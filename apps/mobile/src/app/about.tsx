@@ -12,6 +12,7 @@ import {
   Screen,
   SectionHeader,
   useAppStore,
+  getLang,
   radius,
   space,
   useTheme,
@@ -37,7 +38,12 @@ export default function AboutScreen() {
   // 启动时自动检测的结果（launch 时写进 kv）；没有就是 null
   const pending = readPendingUpdate(kv, version);
   const checkedAt = Number(kv[KV_UPDATE_CHECKED_AT] ?? 0);
-  const lastChecked = checkedAt > 0 ? new Date(checkedAt).toLocaleString() : null;
+  // 时间按界面语言格式化：toLocaleString() 不带 locale 会用系统区域，
+  // 中文界面里于是出现「11/22/2026, 12:51:40 AM」这种美式格式。
+  const lastChecked =
+    checkedAt > 0
+      ? new Date(checkedAt).toLocaleString(getLang() === "en" ? "en-US" : "zh-CN")
+      : null;
 
   const open = async (url: string) => {
     const ok = await openExternalUrl(url);
@@ -125,11 +131,8 @@ export default function AboutScreen() {
               {lastChecked !== null ? t("about.lastChecked", { time: lastChecked }) : t("about.neverChecked")}
             </AppText>
           </Card>
-          <Card variant="outline" padding="normal" style={styles.card}>
-            <AppText variant="mono" lines={1}>
-              {version}
-            </AppText>
-          </Card>
+
+          {/* 版本号已在标题下的 about.body 里写过一次，这里不再重复展示 */}
 
           <SectionHeader title={t("about.openSource")} />
           <Card variant="outline" padding="none" style={styles.card}>

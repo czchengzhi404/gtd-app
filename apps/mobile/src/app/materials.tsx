@@ -18,6 +18,9 @@ import { useTaskActions } from "@/hooks/useRowActions";
 import { openTaskContextMenu } from "@/lib/context-menu";
 import { completeTaskWithUndo } from "@/lib/task-ops";
 
+/** 一行三张统计卡片的尺寸覆盖：等分、允许收缩 */
+const tileStyle = { minWidth: 0, flexBasis: 0, flex: 1 } as const;
+
 /**
  * 素材库：someday 状态的条目集中看。
  *
@@ -60,9 +63,10 @@ export default function MaterialsScreen() {
       </View>
 
       <View style={{ flexDirection: "row", gap: space.sm, paddingHorizontal: space.lg, paddingBottom: space.sm }}>
-        <StatTile label={t("materials.count")} value={`${items.length}`} />
-        <StatTile label={t("materials.withBody")} value={`${withBody}`} />
-        <StatTile label={t("materials.words")} value={`${totalWords}`} />
+        {/* 窄屏一行三张：必须压掉 StatTile 默认的 minWidth/flexBasis，否则右侧会被裁掉 */}
+        <StatTile label={t("materials.count")} value={`${items.length}`} style={tileStyle} />
+        <StatTile label={t("materials.withBody")} value={`${withBody}`} style={tileStyle} />
+        <StatTile label={t("materials.words")} value={`${totalWords}`} style={tileStyle} />
       </View>
       <TaskList
         tasks={items}
