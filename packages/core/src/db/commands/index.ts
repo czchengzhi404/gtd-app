@@ -11,6 +11,7 @@ import {
   sectionCreatePayloadSchema,
   settingsSetPayloadSchema,
   taskCompletePayloadSchema,
+  taskUncompletePayloadSchema,
   taskCreatePayloadSchema,
   taskMoveStatusPayloadSchema,
   taskReorderPayloadSchema,
@@ -69,7 +70,7 @@ export const COMMAND_REGISTRY: CommandRegistry = {
   "task.reorder": { schema: taskReorderPayloadSchema, handler: taskCommands["task.reorder"] },
   "task.complete": { schema: taskCompletePayloadSchema, handler: taskCommands["task.complete"] },
   "task.uncomplete": {
-    schema: taskCompletePayloadSchema,
+    schema: taskUncompletePayloadSchema,
     handler: taskCommands["task.uncomplete"],
   },
   "task.softDelete": { schema: idOnlyPayloadSchema, handler: taskCommands["task.softDelete"] },

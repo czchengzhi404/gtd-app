@@ -8,7 +8,7 @@ import fs from "node:fs";
 import type { SqliteExecutor } from "@gtd/core";
 import { migrate } from "@gtd/core";
 import { executeCommand } from "@gtd/core";
-import { loadBootstrapData, getTasks, getDeletedTasks, maybeCompactTombstones } from "@gtd/core";
+import { loadBootstrapData, getTasks, getDeletedTasks, maybeCompactTombstones, getTaskById } from "@gtd/core";
 import { getTodayTasks, getFocusTasks, getProjectNextAction, appStore, applyRecords } from "@gtd/core";
 
 /**
@@ -280,5 +280,70 @@ describe("命令层（真实 SQLite）", () => {
     expect(focus[0]?.starred).toBe(true);
 
     applyRecords([]);
+  });
+
+  // ---- 2026-11-23 逻辑审计回归：撤销必须是真正的逆操作 ----
+  it("撤销完成：waiting 任务回到 waiting，而不是掉进收集箱", async () => {
+    const created = await executeCommand(
+      executor,
+      "task.create",
+      { title: "等对方回邮件", status: "waiting" },
+      ctx,
+    );
+    const before = created.records[0]!.record as { id: string; status: string; dueAt: number | null };
+    await executeCommand(executor, "task.complete", { id: before.id }, ctx);
+    await executeCommand(
+      executor,
+      "task.uncomplete",
+      {
+        id: before.id,
+        restore: { status: "waiting", dueAt: before.dueAt, lastCompletedAt: null },
+      },
+      ctx,
+    );
+    const after = await getTaskById(executor, before.id);
+    expect(after?.status).toBe("waiting");
+    expect(after?.completedAt).toBeNull();
+  });
+
+  it("撤销完成：重复任务到期日与 lastCompletedAt 都回到完成前", async () => {
+    const dueAt = new Date(2026, 9, 25, 9, 0).getTime();
+    const created = await executeCommand(
+      executor,
+      "task.create",
+      { title: "每天喝水", dueAt, recurrence: { freq: "daily", interval: 1, until: null } },
+      ctx,
+    );
+    const id = (created.records[0]!.record as { id: string }).id;
+    const advanced = await executeCommand(executor, "task.complete", { id }, ctx);
+    expect((advanced.records[0]!.record as { dueAt: number | null }).dueAt).not.toBe(dueAt);
+
+    await executeCommand(
+      executor,
+      "task.uncomplete",
+      { id, restore: { status: "inbox", dueAt, lastCompletedAt: null } },
+      ctx,
+    );
+    const after = await getTaskById(executor, id);
+    expect(after?.dueAt).toBe(dueAt);
+    expect(after?.lastCompletedAt).toBeNull();
+    expect(after?.status).not.toBe("done");
+  });
+
+  it("创建每两周任务时自动补 originAt（否则完成一次就重置成每周）", async () => {
+    const dueAt = new Date(2026, 10, 2, 9, 0).getTime();
+    const created = await executeCommand(
+      executor,
+      "task.create",
+      {
+        title: "双周复盘",
+        dueAt,
+        recurrence: { freq: "weekly", interval: 2, byWeekday: [1], until: null },
+      },
+      ctx,
+    );
+    const rule = (created.records[0]!.record as { recurrence: { originAt?: number | null } })
+      .recurrence;
+    expect(rule.originAt).toBe(dueAt);
   });
 });

@@ -1,6 +1,7 @@
 import type { AppState } from "../store/app-store";
 import { getInboxTasks, getProjectNextAction, getSomedayTasks, getWaitingTasks, selectActiveProjects } from "../store/selectors";
 import { endOfDay, startOfDay } from "./recurrence";
+import { completionTime } from "./stats";
 
 /**
  * 每周回顾摘要（纯函数）：向导六个步骤的数据源。
@@ -50,7 +51,11 @@ export function buildReviewSummary(state: AppState, now: number): ReviewSummary 
   let upcomingCount = 0;
   for (const task of Object.values(state.tasks)) {
     if (task.deletedAt !== null) continue;
-    if (task.status === "done" && task.completedAt !== null && task.completedAt >= startOfDay(weekAgo)) {
+    // 与统计页同一口径：重复任务完成时 status 不变、completedAt 被置空，
+    // 只留 lastCompletedAt。任何「完成数」都必须走 completionTime，
+    // 且不能再用 status === "done" 过滤，否则重复任务的完成全被漏计。
+    const completedAt = completionTime(task);
+    if (completedAt !== null && completedAt >= startOfDay(weekAgo)) {
       completedLastWeek++;
     }
     if (task.status !== "done" && task.dueAt !== null && task.dueAt >= startOfDay(now) && task.dueAt <= horizon) {
@@ -72,8 +77,10 @@ export function buildReviewSummary(state: AppState, now: number): ReviewSummary 
   const weeklyCompletion = new Array<number>(8).fill(0);
   const thisWeekStart = startOfDay(now - ((new Date(now).getDay() + 6) % 7) * 86400000);
   for (const task of Object.values(state.tasks)) {
-    if (task.deletedAt !== null || task.completedAt === null) continue;
-    const weeksAgo = Math.floor((thisWeekStart - startOfDay(task.completedAt)) / (7 * 86400000));
+    if (task.deletedAt !== null) continue;
+    const completedAt = completionTime(task);
+    if (completedAt === null) continue;
+    const weeksAgo = Math.floor((thisWeekStart - startOfDay(completedAt)) / (7 * 86400000));
     if (weeksAgo >= 0 && weeksAgo < 8) {
       const index = 7 - weeksAgo;
       weeklyCompletion[index] = (weeklyCompletion[index] ?? 0) + 1;

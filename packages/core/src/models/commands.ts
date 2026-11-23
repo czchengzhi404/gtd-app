@@ -29,6 +29,8 @@ const recurrenceSchema = z.object({
   freq: z.enum(["daily", "weekly", "monthly", "yearly", "weekdays", "afterCompletion"]),
   interval: z.number().int().min(1).max(999),
   byWeekday: z.array(z.number().int().min(0).max(6)).optional(),
+  /** 每周规则的起始时刻（interval>1 时算周次奇偶用） */
+  originAt: timestampSchema.nullable().optional(),
   lastWeekday: z.boolean().optional(),
   remainingCount: z.number().int().min(0).nullable().optional(),
   until: timestampSchema.nullable().optional(),
@@ -101,6 +103,27 @@ export type TaskReorderPayload = z.infer<typeof taskReorderPayloadSchema>;
 
 export const taskCompletePayloadSchema = z.object({ id: idSchema });
 export type TaskCompletePayload = z.infer<typeof taskCompletePayloadSchema>;
+
+/**
+ * 撤销完成：可携带「完成前的快照」，让撤销成为真正的逆操作。
+ *
+ * 为什么需要：`task.complete` 对重复任务会把 dueAt 推进一个周期、写 lastCompletedAt；
+ * 对普通任务会改写 status 为 done。只按 id 反推无法还原原来的状态与日期，
+ * 早期实现于是硬编码成 `projectId ? next : inbox`——waiting 任务撤销后跑到收集箱，
+ * 重复任务的到期日也回不去。调用方通常手上就有完成前的任务对象，顺手带上即可；
+ * 不传时保留旧的兜底行为（批量场景未捕获快照时不至于报错）。
+ */
+export const taskUncompletePayloadSchema = z.object({
+  id: idSchema,
+  restore: z
+    .object({
+      status: statusInputSchema.optional(),
+      dueAt: timestampSchema.nullable().optional(),
+      lastCompletedAt: timestampSchema.nullable().optional(),
+    })
+    .optional(),
+});
+export type TaskUncompletePayload = z.infer<typeof taskUncompletePayloadSchema>;
 
 export const idOnlyPayloadSchema = z.object({ id: idSchema });
 export type IdOnlyPayload = z.infer<typeof idOnlyPayloadSchema>;
@@ -209,7 +232,7 @@ export interface CommandMap {
   "task.moveStatus": TaskMoveStatusPayload;
   "task.reorder": TaskReorderPayload;
   "task.complete": TaskCompletePayload;
-  "task.uncomplete": TaskCompletePayload;
+  "task.uncomplete": TaskUncompletePayload;
   "task.softDelete": IdOnlyPayload;
   /** 撤销删除：清空墓碑并提升 revision（供 Undo 使用） */
   "task.restore": IdOnlyPayload;

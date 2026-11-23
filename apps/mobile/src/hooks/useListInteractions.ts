@@ -87,7 +87,15 @@ export function useListInteractions(tasks: Task[]): ListInteractions {
   const completeSelected = useCallback(async () => {
     const targets = selectedTasks();
     if (targets.length === 0) return;
-    const plan = planBulkComplete(targets.map((task) => task.id));
+    const plan = planBulkComplete(
+      targets.map((task) => ({
+        id: task.id,
+        // 已完成的任务没有可回退状态，交给 uncomplete 的兜底规则
+        status: task.status === "done" ? undefined : task.status,
+        dueAt: task.dueAt,
+        lastCompletedAt: task.lastCompletedAt,
+      })),
+    );
     exitSelection();
     await runAll(plan.run);
     showUndo(t("bulk.completed", { n: targets.length }), () => {

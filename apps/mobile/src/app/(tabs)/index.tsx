@@ -15,6 +15,7 @@ import {
   PerspectiveBar,
   QuickAddBar,
   TaskList,
+  showToast,
   space,
   useAppStore,
   useTheme,
@@ -164,11 +165,39 @@ export default function InboxScreen() {
     return `${t("inbox.previewArrow")} ${parsed.title}${parts.length > 0 ? ` · ${parts.join(" · ")}` : ""}`;
   }, [input, t]);
 
+  /**
+   * 快速添加提交。
+   *
+   * 为什么要有反馈与自动解除筛选：收集箱默认停在「一张」视角，
+   * 且用户常带着搜索/情境/标签筛选。此时新增的任务既不是「那一件」、
+   * 也可能不匹配筛选——界面上毫无变化，用户会以为记录失败并重复输入。
+   * 这里显式给一条成功提示，并在筛选会挡住新任务时自动清空筛选。
+   */
   const submit = async (text: string) => {
     setSubmitting(true);
     setInput("");
+    const now = Date.now();
     try {
-      await quickAdd(text, Date.now());
+      const title = parseQuickAdd(text, now).title;
+      await quickAdd(text, now);
+      const filterActive =
+        query.trim().length > 0 || contextId !== null || tag !== null || overdueOnly;
+      if (filterActive) {
+        setQuery("");
+        setContextId(null);
+        setTag(null);
+        setOverdueOnly(false);
+        setActivePerspective(null);
+      }
+      showToast({
+        message: filterActive
+          ? t("inbox.addedClearedFilter", { title })
+          : t("inbox.added", { title }),
+        tone: "success",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      showToast({ message: t("inbox.addFailed", { message }), tone: "danger" });
     } finally {
       setSubmitting(false);
     }

@@ -16,14 +16,45 @@ export interface CommandEnvelope<K extends CommandOp = CommandOp> {
   payload: CommandMap[K];
 }
 
-/** 批量完成的执行计划：正序完成，撤销按原序 uncomplete */
-export function planBulkComplete(ids: readonly string[]): {
+export interface BulkCompleteEntry {
+  id: string;
+  /** 完成前的状态（撤销用）：不传则 uncomplete 走旧兜底 */
+  status?: TaskStatusInput;
+  dueAt?: number | null;
+  lastCompletedAt?: number | null;
+}
+
+/**
+ * 批量完成的执行计划：正序完成，撤销按原序 uncomplete。
+ *
+ * 撤销条目会带上完成前的状态/到期日快照（传入 snapshot 时），
+ * 否则重复任务撤销后到期日回不去、waiting 任务会跑到收集箱。
+ * 为兼容旧调用方，也接受纯 id 数组。
+ */
+export function planBulkComplete(entries: readonly (string | BulkCompleteEntry)[]): {
   run: CommandEnvelope<"task.complete">[];
   undo: CommandEnvelope<"task.uncomplete">[];
 } {
+  const normalized: BulkCompleteEntry[] = entries.map((entry) =>
+    typeof entry === "string" ? { id: entry } : entry,
+  );
   return {
-    run: ids.map((id) => ({ op: "task.complete", payload: { id } })),
-    undo: ids.map((id) => ({ op: "task.uncomplete", payload: { id } })),
+    run: normalized.map((entry) => ({ op: "task.complete", payload: { id: entry.id } })),
+    undo: normalized.map((entry) => ({
+      op: "task.uncomplete",
+      payload: {
+        id: entry.id,
+        ...(entry.status !== undefined
+          ? {
+              restore: {
+                status: entry.status,
+                dueAt: entry.dueAt ?? null,
+                lastCompletedAt: entry.lastCompletedAt ?? null,
+              },
+            }
+          : {}),
+      },
+    })),
   };
 }
 

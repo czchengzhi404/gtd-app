@@ -25,8 +25,25 @@ type TaskCommandOp =
   | "task.softDelete"
   | "task.restore";
 
+/**
+ * 每周间隔的稳定起点：interval>1 时若规则没带 originAt，用**首次到期日**补齐。
+ *
+ * 不补的话 anchor 会随每次完成前进，周次奇偶被不断重置，
+ * 「每两周」退化成每周（审计缺陷 #6 的第二层原因）。
+ */
+function withWeeklyOrigin<T extends RecurrenceRule | null>(
+  rule: T,
+  dueAt: number | null,
+  now: number,
+): T {
+  if (rule === null || rule.freq !== "weekly" || rule.interval <= 1) return rule;
+  if (rule.originAt !== undefined && rule.originAt !== null) return rule;
+  return { ...rule, originAt: dueAt ?? now };
+}
+
 const createTask: Handler<"task.create"> = async (tx, payload, ctx) => {
   const now = ctx.now();
+  const dueAt = payload.dueAt ?? null;
   const task: Task = {
     id: uuidv7(now),
     title: payload.title,
@@ -34,7 +51,7 @@ const createTask: Handler<"task.create"> = async (tx, payload, ctx) => {
     status: payload.status ?? "inbox",
     priority: payload.priority ?? 0,
     deferUntil: payload.deferUntil ?? null,
-    dueAt: payload.dueAt ?? null,
+    dueAt,
     completedAt: null,
     lastCompletedAt: null,
     projectId: payload.projectId ?? null,
@@ -42,7 +59,7 @@ const createTask: Handler<"task.create"> = async (tx, payload, ctx) => {
     contextIds: payload.contextIds ?? [],
     waitingFor: payload.waitingFor ?? null,
     starred: payload.starred ?? false,
-    recurrence: payload.recurrence ?? null,
+    recurrence: withWeeklyOrigin(payload.recurrence ?? null, dueAt, now),
     checklist: payload.checklist ?? [],
     tags: payload.tags ?? [],
     blockedBy: payload.blockedBy ?? [],
@@ -64,13 +81,19 @@ const updateTask: Handler<"task.update"> = async (tx, payload, ctx) => {
   if (patch.notes !== undefined && patch.notes !== existing.notes) {
     await pushNoteVersion(tx, existing.id, existing.notes, ctx.now()).catch(() => null);
   }
+  // 改到「每两周」时同样要补 originAt（否则完成一次就退回每周）
+  const nextDueAt = patch.dueAt !== undefined ? patch.dueAt : existing.dueAt;
+  const nextRecurrence =
+    patch.recurrence !== undefined
+      ? withWeeklyOrigin(patch.recurrence as RecurrenceRule | null, nextDueAt, ctx.now())
+      : existing.recurrence;
   const task: Task = {
     ...existing,
     title: patch.title ?? existing.title,
     notes: patch.notes ?? existing.notes,
     priority: patch.priority ?? existing.priority,
     deferUntil: patch.deferUntil !== undefined ? patch.deferUntil : existing.deferUntil,
-    dueAt: patch.dueAt !== undefined ? patch.dueAt : existing.dueAt,
+    dueAt: nextDueAt,
     projectId: patch.projectId !== undefined ? patch.projectId : existing.projectId,
     sectionId: patch.sectionId !== undefined ? patch.sectionId : existing.sectionId,
     contextIds: patch.contextIds ?? existing.contextIds,
@@ -79,10 +102,7 @@ const updateTask: Handler<"task.update"> = async (tx, payload, ctx) => {
     checklist: (patch.checklist as ChecklistItem[] | undefined) ?? existing.checklist,
     tags: patch.tags ?? existing.tags,
     blockedBy: patch.blockedBy ?? existing.blockedBy,
-    recurrence:
-      patch.recurrence !== undefined
-        ? (patch.recurrence as RecurrenceRule | null)
-        : existing.recurrence,
+    recurrence: nextRecurrence,
     updatedAt: ctx.now(),
     revision: existing.revision + 1,
   };
@@ -176,9 +196,18 @@ const completeTask: Handler<"task.complete"> = async (tx, payload, ctx) => {
 const uncompleteTask: Handler<"task.uncomplete"> = async (tx, payload, ctx) => {
   const existing = await getTaskRow(tx, payload.id);
   if (!existing) throw new Error(`task not found: ${payload.id}`);
+  const restore = payload.restore;
   const task: Task = {
     ...existing,
-    status: existing.projectId ? "next" : "inbox",
+    // 撤销是逆操作：优先用调用方带上的完成前快照（状态/到期日/上次完成时间），
+    // 没有快照时才退回旧启发式——否则 waiting 任务会跑到收集箱、
+    // 重复任务的到期日也回不到完成前。
+    status: restore?.status ?? (existing.projectId ? "next" : "inbox"),
+    dueAt: restore !== undefined && "dueAt" in restore ? (restore.dueAt ?? null) : existing.dueAt,
+    lastCompletedAt:
+      restore !== undefined && "lastCompletedAt" in restore
+        ? (restore.lastCompletedAt ?? null)
+        : existing.lastCompletedAt,
     completedAt: null,
     updatedAt: ctx.now(),
     revision: existing.revision + 1,

@@ -53,7 +53,14 @@ export interface StatsOptions {
 
 const DAY = 86_400_000;
 
-function completionTime(task: Task): number | null {
+/**
+ * 任务的「完成时刻」：普通任务看 completedAt，重复任务看 lastCompletedAt。
+ *
+ * 重复任务完成时 completedAt 会被置空、只留 lastCompletedAt，
+ * 因此任何统计口径都必须走这个函数——回顾页曾只用 completedAt，
+ * 于是所有重复任务的完成都被漏计，与统计页对不上。
+ */
+export function completionTime(task: Task): number | null {
   if (task.completedAt !== null) return task.completedAt;
   if (task.lastCompletedAt !== null) return task.lastCompletedAt;
   return null;

@@ -136,19 +136,22 @@ export default function InsightsScreen() {
                 Math.round((bucket.completed / maxDaily) * CHART_HEIGHT),
               );
               const date = new Date(bucket.dayStart);
-              const dayLabel = `${String(date.getMonth() + 1)}/${String(date.getDate())}`;
+              // 图轴只放「日」：14 根柱子每根宽度很窄，写 11/22 会被省略成 11/...
+              // 完整日期仍用于无障碍播报与点击提示。
+              const dayLabel = String(date.getDate());
+              const fullLabel = `${String(date.getMonth() + 1)}/${String(date.getDate())}`;
               return (
                 <Pressable
                   key={bucket.dayStart}
                   accessibilityRole="button"
                   accessibilityLabel={t("app.insights.chartValue", {
-                    date: dayLabel,
+                    date: fullLabel,
                     n: bucket.completed,
                   })}
                   onPress={() =>
                     showToast({
                       message: t("app.insights.chartValue", {
-                        date: dayLabel,
+                        date: fullLabel,
                         n: bucket.completed,
                       }),
                       tone: "info",

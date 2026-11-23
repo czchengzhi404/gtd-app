@@ -17,6 +17,14 @@ export interface RecurrenceRule {
   interval: number;
   /** 0=周日 … 6=周六，仅 freq=weekly 时有意义 */
   byWeekday?: number[];
+  /**
+   * 每周规则的「起始时刻」：interval>1 时用它算周次奇偶。
+   *
+   * 为什么不能只用 anchor：完成一次后 anchor（= 上次到期日）会前进，
+   * 相对自己的周次永远是 0，interval 会被不断重置成「每周」。
+   * 缺省（老数据）时回退到 anchor，行为与修复前一致。
+   */
+  originAt?: number | null;
   /** monthly 专用：取当月最后一个工作日（周一至周五），优先于日序 */
   lastWeekday?: boolean;
   /** 剩余次数：null 表示无限；完成时递减，归零后任务结束 */

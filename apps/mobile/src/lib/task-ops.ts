@@ -16,20 +16,44 @@ export async function decryptSecret(ciphertext: string): Promise<string> {
   return gtd().secret.decrypt(ciphertext);
 }
 
-/** 完成任务：可撤销（uncomplete） */
+/**
+ * 完成前快照（撤销用）。
+ *
+ * 已完成的任务没有「可回退的状态」——它本来就是 done，撤销时按兜底规则处理，
+ * 所以这里把 done 收敛成 undefined，其余状态原样带回。
+ */
+function completionSnapshot(task: Task): {
+  status: "inbox" | "next" | "waiting" | "someday" | undefined;
+  dueAt: number | null;
+  lastCompletedAt: number | null;
+} {
+  return {
+    status: task.status === "done" ? undefined : task.status,
+    dueAt: task.dueAt,
+    lastCompletedAt: task.lastCompletedAt,
+  };
+}
+
+/** 完成任务：可撤销（uncomplete 带回完成前快照，撤销才是真正的逆操作） */
 export async function completeTaskWithUndo(task: Task): Promise<void> {
   await runCommand("task.complete", { id: task.id }).catch(() => undefined);
   // 勾选是全天最高频的动作，也是唯一值得给声音的；未开启时 playSfx 直接返回
   void playSfx("complete");
   showUndo(t("undo.completed", { title: task.title }), () => {
     void playSfx("undo");
-    void runCommand("task.uncomplete", { id: task.id }).catch(() => undefined);
+    void runCommand("task.uncomplete", {
+      id: task.id,
+      restore: completionSnapshot(task),
+    }).catch(() => undefined);
   });
 }
 
 /** 取消完成 */
 export async function uncompleteTask(task: Task): Promise<void> {
-  await runCommand("task.uncomplete", { id: task.id }).catch(() => undefined);
+  await runCommand("task.uncomplete", {
+    id: task.id,
+    restore: completionSnapshot(task),
+  }).catch(() => undefined);
 }
 
 /** 删除任务：软删除 + 可撤销（task.restore 清墓碑） */

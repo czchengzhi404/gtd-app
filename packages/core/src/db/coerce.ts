@@ -40,6 +40,26 @@ function asStringArray(v: unknown): string[] {
   return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
 }
 
+/**
+ * 星期数组（0=周日 … 6=周六）：**数字**数组，不能用 asStringArray。
+ *
+ * 历史缺陷：coerceTask 曾误用 asStringArray，把 [1,3] 过滤成空数组，
+ * 导致「每周一三」经一次同步或备份恢复就退化成「每周锚点日」，且无报错。
+ * 任务与模板共用本函数，避免两处再次分叉。
+ *
+ * 同时兼容字符串数字（老版本/第三方导出写成 "1"），统一收敛为 number。
+ */
+function asWeekdayArray(v: unknown): number[] {
+  if (!Array.isArray(v)) return [];
+  const days: number[] = [];
+  for (const item of v) {
+    const value = typeof item === "string" ? Number(item) : item;
+    if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > 6) continue;
+    if (!days.includes(value)) days.push(value);
+  }
+  return days;
+}
+
 /** 清单子项：id 缺失的条目丢弃（子项 id 是同步合并/实例化的身份键） */
 function asChecklist(v: unknown): ChecklistItem[] {
   if (!Array.isArray(v)) return [];
@@ -68,38 +88,36 @@ const RECURRENCE_FREQS: readonly RecurrenceRule["freq"][] = [
   "afterCompletion",
 ];
 
-/**
- * 重复规则（任务与模板共用字段集）。与 coerceTask 内联版本的区别：
- * 这里保留全部六种频率与 lastWeekday / remainingCount，供模板原样往返。
- */
-function asRecurrence(v: unknown): RecurrenceRule | null {
-  if (v === null || typeof v !== "object") return null;
+/** 任务与模板共用的重复规则归一化（六种 freq + byWeekday/lastWeekday/remainingCount/until） */
+function normalizeRecurrence(v: unknown): RecurrenceRule | null {
+  if (v === null || v === undefined || typeof v !== "object") return null;
   const r = v as Record<string, unknown>;
   const freq = asString(r.freq) as RecurrenceRule["freq"];
   if (!RECURRENCE_FREQS.includes(freq)) return null;
-  const byWeekday = Array.isArray(r.byWeekday)
-    ? r.byWeekday.filter(
-        (x): x is number => typeof x === "number" && Number.isInteger(x) && x >= 0 && x <= 6,
-      )
-    : [];
   const rule: RecurrenceRule = {
     freq,
     interval: Math.max(1, Math.trunc(asNumber(r.interval) ?? 1)),
   };
+  const byWeekday = asWeekdayArray(r.byWeekday);
   if (byWeekday.length > 0) rule.byWeekday = byWeekday;
-  if (typeof r.lastWeekday === "boolean") rule.lastWeekday = r.lastWeekday;
-  if (typeof r.remainingCount === "number") {
-    rule.remainingCount = Math.max(0, Math.trunc(r.remainingCount));
-  } else if (r.remainingCount === null) {
-    rule.remainingCount = null;
-  }
-  if (typeof r.until === "number" && Number.isFinite(r.until)) {
-    rule.until = r.until;
-  } else if (r.until === null) {
-    rule.until = null;
-  }
+  if (r.lastWeekday === true) rule.lastWeekday = true;
+  const originAt = asNumber(r.originAt);
+  if (originAt !== null) rule.originAt = originAt;
+  // 显式 null 而非省略：缺字段等于「无限重复」，下游据此判断是否递减剩余次数
+  const remaining = asNumber(r.remainingCount);
+  rule.remainingCount =
+    typeof r.remainingCount === "number" || remaining !== null
+      ? Math.max(0, Math.trunc(remaining ?? 0))
+      : null;
+  rule.until = asNumber(r.until);
   return rule;
 }
+
+/**
+ * 历史遗留的别名：模板路径曾单独实现一份（保留 lastWeekday / remainingCount）。
+ * 现在统一走 normalizeRecurrence，避免任务与模板两套规则再次分叉。
+ */
+const asRecurrence = normalizeRecurrence;
 
 function baseFields(obj: Record<string, unknown>) {
   const now = Date.now();
@@ -117,33 +135,9 @@ export function coerceTask(obj: Record<string, unknown>): Task | null {
   if (base.id.length === 0) return null;
   const status = asString(obj.status, "inbox");
   const priority = asNumber(obj.priority) ?? 0;
-  const recurrenceRaw = obj.recurrence;
-  let recurrence: RecurrenceRule | null = null;
-  if (recurrenceRaw !== null && typeof recurrenceRaw === "object") {
-    const r = recurrenceRaw as Record<string, unknown>;
-    const freq = asString(r.freq);
-    // 必须覆盖 RecurrenceRule 声明的全部 6 种 freq：漏一种，同步/导入就会把
-    // 该重复规则的 recurrence 静默置为 null（规则丢失且没有任何报错）。
-    if (
-      freq === "daily" ||
-      freq === "weekly" ||
-      freq === "monthly" ||
-      freq === "yearly" ||
-      freq === "weekdays" ||
-      freq === "afterCompletion"
-    ) {
-      recurrence = {
-        freq,
-        interval: Math.max(1, Math.trunc(asNumber(r.interval) ?? 1)),
-        byWeekday: asStringArray(r.byWeekday).length > 0
-          ? asStringArray(r.byWeekday).map((x) => Number(x)).filter((n) => n >= 0 && n <= 6)
-          : undefined,
-        lastWeekday: asBool(r.lastWeekday) || undefined,
-        remainingCount: asNumber(r.remainingCount),
-        until: asNumber(r.until),
-      };
-    }
-  }
+  // 统一走 normalizeRecurrence：早期内联版本误用 asStringArray 过滤 byWeekday（数字数组），
+  // 导致「每周一三」经同步/备份恢复后退化成每周一次。现在任务与模板共用同一实现。
+  const recurrence = normalizeRecurrence(obj.recurrence);
   const checklist = asChecklist(obj.checklist);
 
   return {

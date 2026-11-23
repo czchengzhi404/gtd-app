@@ -39,10 +39,18 @@ export function pickNextAction(tasks: readonly Task[], now: number): NextActionR
     (t) => t.deletedAt === null && t.status !== "done" && (t.deferUntil === null || t.deferUntil <= now),
   );
 
-  // 已完成 / 已删除的 id 集合：前置指向它们时视为「已满足」
-  const doneIds = new Set(
-    tasks.filter((t) => t.status === "done" && t.deletedAt === null).map((t) => t.id),
-  );
+  // 前置「已满足」的口径必须与 unresolvedPrereqs 一致：已完成或已删除都算不再挡着。
+  // 早期只认「已完成且未删除」，导致删掉一个前置后依赖它的任务在首屏永远不可做
+  // （静默消失），而详情页却显示「没有未完成前置」。
+  //
+  // 但「本地完全查不到这个 id」仍然按挡住处理（既有测试固化的保守选择）：
+  // 那可能只是对端的前置还没同步过来，宁可暂时不显示，也不要让用户误做。
+  const byId = new Map(tasks.map((t) => [t.id, t]));
+  const satisfied = (id: string): boolean => {
+    const prereq = byId.get(id);
+    if (prereq === undefined) return false;
+    return prereq.status === "done" || prereq.deletedAt !== null;
+  };
 
   const available: Task[] = [];
   let blockedCount = 0;
@@ -50,7 +58,7 @@ export function pickNextAction(tasks: readonly Task[], now: number): NextActionR
     // 防御：旧版本导出的记录 / 未走 coerce 的对象可能没有 blockedBy。
     // 这类任务当作「没有前置」处理，绝不能让整个首屏崩掉。
     const prereqs = task.blockedBy ?? [];
-    const waiting = prereqs.some((id) => !doneIds.has(id));
+    const waiting = prereqs.some((id) => !satisfied(id));
     if (waiting) blockedCount += 1;
     else available.push(task);
   }

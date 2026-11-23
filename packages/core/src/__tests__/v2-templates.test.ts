@@ -4,7 +4,7 @@ import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { executeCommand } from "../db/commands";
 import { padOrderKey } from "../db/commands/shared";
 import { coerceTaggedRecords } from "../db/coerce";
-import { LATEST_SCHEMA_VERSION, migrate } from "../db/migrations";
+import { LATEST_SCHEMA_VERSION, MIGRATIONS, migrate } from "../db/migrations";
 import { getTasks, getTemplateById, getTemplates, loadBootstrapData } from "../db/queries";
 import { AppError } from "../models/errors";
 import type { TaggedRecord, TemplateUpsertPayload } from "../models/commands";
@@ -316,12 +316,25 @@ describe("template.softDelete · 墓碑", () => {
 describe("migrations · v5 任务模板表", () => {
   test("v4 → 最新：建表 + 索引 + 版本号推进，v1–v4 不受影响", async () => {
     const db = new Database(":memory:");
+    // 造一个**真实的 v4 库**（而不是只有 meta 表）。
+    // 以前这里只手写 meta 表就能跑过，是因为 v5–v7 恰好全是
+    // `CREATE TABLE IF NOT EXISTS`，缺表也不报错；从 v8 起出现
+    // `ALTER TABLE tasks ADD COLUMN`，一个声称 v4 却没有 tasks 表的库
+    // 本来就不是合法状态，所以改成真的把 1–4 跑一遍。
     db.run("CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
-    db.run("INSERT INTO meta (key, value) VALUES ('schema_version', '4')");
+    db.run("INSERT INTO meta (key, value) VALUES ('schema_version', '0')");
     const executor = makeExecutor(db);
+    for (const migration of MIGRATIONS) {
+      if (migration.version > 4) continue;
+      for (const statement of migration.statements) db.run(statement);
+      db.run("UPDATE meta SET value = ? WHERE key = 'schema_version'", [String(migration.version)]);
+    }
+    expect(
+      (db.query("SELECT value FROM meta WHERE key = 'schema_version'").get() as { value: string }).value,
+    ).toBe("4");
 
     const applied = await migrate(executor);
-    // v5（task_templates）与 v6（record_base 基线快照）各一条
+    // v5（task_templates）、v6（record_base）、v7（note_versions）、v8（blocked_by）各一条
     expect(applied).toBe(LATEST_SCHEMA_VERSION - 4);
 
     const columns = db.query("PRAGMA table_info(task_templates)").all() as { name: string }[];
@@ -445,7 +458,14 @@ describe("同步 · 模板记录收集与合并", () => {
     expect(record.contextIds).toEqual(["c1"]);
     expect(record.notes).toBe("");
     expect(record.revision).toBe(1);
-    expect(record.recurrence).toEqual({ freq: "weekdays", interval: 1 });
+    // 归一化后的规范形状：remainingCount/until 显式 null（= 无限重复），
+    // 与 coerceTask 共用同一实现，避免任务/模板两套规则再次分叉。
+    expect(record.recurrence).toEqual({
+      freq: "weekdays",
+      interval: 1,
+      remainingCount: null,
+      until: null,
+    });
     expect(record.checklist).toHaveLength(1);
     expect(record.checklist[0]?.done).toBe(true);
   });

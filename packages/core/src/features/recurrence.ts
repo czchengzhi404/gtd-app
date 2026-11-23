@@ -69,21 +69,25 @@ export function nextOccurrence(
         rule.byWeekday && rule.byWeekday.length > 0
           ? [...new Set(rule.byWeekday)].sort((a, b) => a - b)
           : [new Date(anchor).getDay()];
-      // 从 floor 的次日开始逐日找（interval 周的组内多天 / 跨周推进按 7 天粒度近似，
-      // 个人 GTD 场景按自然周推进即可满足语义）
+      /**
+       * 周次奇偶必须相对**稳定起点**计算。
+       *
+       * 只用 anchor 不够：anchor 是「上次到期日」，完成一次后它会前进，
+       * 相对自身的周次永远是 0，interval 于是被不断重置成每周。
+       * 因此优先用规则里记录的 originAt（创建时写入），老数据回退到 anchor。
+       */
+      const origin = startOfDay(rule.originAt ?? anchor);
       let day = startOfDay(floor) + DAY_MS;
-      const baseWeekday = new Date(anchor).getDay();
-      const weeksFromAnchor = Math.floor((startOfDay(floor) - startOfDay(anchor)) / (7 * DAY_MS));
-      let steps = 0;
-      while (steps < limit) {
+      for (let steps = 0; steps < limit; steps += 1) {
         const weekday = new Date(day).getDay();
-        const weekIndex = Math.floor((startOfDay(day) - startOfDay(anchor)) / (7 * DAY_MS));
-        const inCycle = (weekIndex - weeksFromAnchor) % interval === 0 || weekIndex === weeksFromAnchor;
-        if (weekdays.includes(weekday) && day > floor && (interval === 1 || inCycle || sameWeekdayCycle(weekday, weekdays, baseWeekday))) {
-          return checkUntil(day, rule);
+        if (weekdays.includes(weekday)) {
+          const weekIndex = Math.floor((startOfDay(day) - origin) / (7 * DAY_MS));
+          if (weekIndex >= 0 && weekIndex % interval === 0) {
+            // 保留 anchor 的时分：否则「每周一 09:00」会退化成「每周一 00:00」
+            return checkUntil(atPreservedTime(day, anchor), rule);
+          }
         }
         day += DAY_MS;
-        steps++;
       }
       return checkUntil(null, rule);
     }
@@ -142,11 +146,6 @@ function lastWeekdayOfMonth(year: number, monthIndex0: number, hour: number, min
     day -= 1;
   }
   return new Date(year, monthIndex0, day, hour, minute).getTime();
-}
-
-function sameWeekdayCycle(weekday: number, weekdays: number[], baseWeekday: number): boolean {
-  // interval>1 且未跨越完整周周期时的宽松判定：只要命中组内任一天即接受
-  return weekdays.includes(weekday) || weekday === baseWeekday;
 }
 
 function checkUntil(next: number | null, rule: RecurrenceRule): number | null {

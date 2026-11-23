@@ -19,12 +19,24 @@ import { useTheme } from "../hooks/useTheme";
 import { useT } from "../i18n";
 import { hit, radius, space } from "../theme/tokens";
 
-/** 重复预设：覆盖核心的 5 种（yearly 用「每年」在同一条里循环不现实，先用 interval=1 的常见档） */
+/**
+ * 重复预设。
+ *
+ * 覆盖引擎支持的常用档：每天 / 每周 / 每两周 / 每月 / 每月最后工作日 /
+ * 每工作日 / 完成后循环。早先只有 5 档，用户能输入「每两周」却选不到，
+ * 属于功能缺口（引擎与快速添加都支持 interval>1 与 lastWeekday）。
+ */
 const RECURRENCE_OPTIONS: { key: string; labelKey: string; rule: RecurrenceRule | null }[] = [
   { key: "none", labelKey: "recurrence.none", rule: null },
   { key: "daily", labelKey: "recurrence.daily", rule: { freq: "daily", interval: 1 } },
   { key: "weekly", labelKey: "recurrence.weekly", rule: { freq: "weekly", interval: 1 } },
+  { key: "biweekly", labelKey: "recurrence.biweekly", rule: { freq: "weekly", interval: 2 } },
   { key: "monthly", labelKey: "recurrence.monthly", rule: { freq: "monthly", interval: 1 } },
+  {
+    key: "monthlyLastWeekday",
+    labelKey: "recurrence.monthlyLastWeekday",
+    rule: { freq: "monthly", interval: 1, lastWeekday: true },
+  },
   { key: "weekdays", labelKey: "recurrence.weekdays", rule: { freq: "weekdays", interval: 1 } },
   {
     key: "afterCompletion",
@@ -32,6 +44,21 @@ const RECURRENCE_OPTIONS: { key: string; labelKey: string; rule: RecurrenceRule 
     rule: { freq: "afterCompletion", interval: 1 },
   },
 ];
+
+/**
+ * 预设是否对应当前规则。
+ *
+ * 早先只比较 freq，导致「每周」与「每两周」会同时高亮。
+ * 这里把 interval 与 lastWeekday 也纳入比较；byWeekday 不参与
+ * （快速添加生成的「每周一三」应显示为「每周」被选中）。
+ */
+function matchesRule(option: RecurrenceRule | null, rule: RecurrenceRule | null): boolean {
+  if (option === null) return rule === null;
+  if (rule === null) return false;
+  if (rule.freq !== option.freq) return false;
+  if ((rule.interval ?? 1) !== (option.interval ?? 1)) return false;
+  return (rule.lastWeekday === true) === (option.lastWeekday === true);
+}
 
 const STATUS_KEYS: { status: TaskStatusInput; labelKey: string }[] = [
   { status: "inbox", labelKey: "detail.status.inbox" },
@@ -366,10 +393,7 @@ export function TaskDetailContent({
           <SectionHeader title={t("detail.recurrence")} />
           <View style={styles.metaRow}>
               {RECURRENCE_OPTIONS.map((option) => {
-                const selected =
-                  option.rule === null
-                    ? task.recurrence === null
-                    : task.recurrence !== null && task.recurrence.freq === option.rule.freq;
+                const selected = matchesRule(option.rule, task.recurrence);
                 return (
                   <Chip
                     key={option.key}
