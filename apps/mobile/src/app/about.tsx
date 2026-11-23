@@ -18,6 +18,7 @@ import {
   useTheme,
   useT,
   showToast,
+  formatDateTime,
 } from "@gtd/ui";
 import { checkForUpdate, openReleasesPage, persistUpdateCheck, readPendingUpdate, KV_UPDATE_CHECKED_AT } from "@/platform/update-check";
 import { GITHUB_URL, ISSUES_URL, openExternalUrl } from "@/platform/links";
@@ -42,7 +43,7 @@ export default function AboutScreen() {
   // 中文界面里于是出现「11/22/2026, 12:51:40 AM」这种美式格式。
   const lastChecked =
     checkedAt > 0
-      ? new Date(checkedAt).toLocaleString(getLang() === "en" ? "en-US" : "zh-CN")
+      ? formatDateTime(checkedAt)
       : null;
 
   const open = async (url: string) => {

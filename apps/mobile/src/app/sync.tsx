@@ -14,6 +14,7 @@ import {
   useT,
   radius,
   space,
+  formatDateTime,
 } from "@gtd/ui";
 import { getSyncConfig } from "@gtd/core";
 import type { PeerDeviceInfo, SyncConfig } from "@gtd/core";
@@ -98,7 +99,7 @@ export default function SyncScreen() {
 
   const lastSync = useMemo(() => {
     const raw = kv["sync.last"];
-    return raw !== undefined ? new Date(Number(raw)).toLocaleString() : t("more.lastSyncNever");
+    return raw !== undefined ? formatDateTime(Number(raw)) : t("more.lastSyncNever");
   }, [kv, t]);
 
   /**
@@ -385,7 +386,7 @@ export default function SyncScreen() {
                   {t("sync.deviceLabel", { id: peer.shortId })}
                 </AppText>
                 <AppText variant="caption" tone="tertiary" lines={1}>
-                  {peer.lastActivityAt !== null ? new Date(peer.lastActivityAt).toLocaleString() : t("sync.peerNever")}
+                  {peer.lastActivityAt !== null ? formatDateTime(peer.lastActivityAt) : t("sync.peerNever")}
                 </AppText>
               </View>
             ))

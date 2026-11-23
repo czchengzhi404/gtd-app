@@ -29,7 +29,7 @@ import {
   useTheme,
   useT,
 } from "@gtd/ui";
-import { quickAdd, searchAll } from "@gtd/core";
+import { quickAdd, runCommand, searchAll } from "@gtd/core";
 import type { SearchHit, SearchMatchedField, SearchScope } from "@gtd/core";
 
 /**
@@ -40,9 +40,26 @@ import type { SearchHit, SearchMatchedField, SearchScope } from "@gtd/core";
  * 组合实现；待 SearchBar 扩展受控能力后可无缝替换。
  */
 
-/** 最近搜索只存本机内存（页面级模块变量），不写库、不参与同步 */
-let recentQueries: string[] = [];
+/**
+ * 最近搜索：持久化到 kv（`search.recent`，本机数据、不参与同步）。
+ *
+ * 早先只放在模块级变量里，进程一重启就清空——用户看到「最近搜索」分区
+ * 却永远是「还没有最近搜索」，与分区名不符。
+ */
+const RECENT_KEY = "search.recent";
 const MAX_RECENT = 6;
+
+function readRecent(kv: Record<string, string>): string[] {
+  const raw = kv[RECENT_KEY];
+  if (raw === undefined || raw === "") return [];
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item): item is string => typeof item === "string").slice(0, MAX_RECENT);
+  } catch {
+    return [];
+  }
+}
 
 const FIELD_TONE: Record<SearchMatchedField, "accent" | "info" | "success" | "warning"> = {
   title: "accent",
@@ -64,7 +81,8 @@ export default function SearchScreen() {
   // 搜索范围：写作者常需要"只在正文里找"，避免标题里的词把结果冲淡
   const [scope, setScope] = useState<SearchScope>("all");
   const [selected, setSelected] = useState(0);
-  const [recent, setRecent] = useState<string[]>(recentQueries);
+  const kv = useAppStore((s) => s.kv);
+  const [recent, setRecent] = useState<string[]>(() => readRecent(kv));
 
   const results = useMemo(
     () =>
@@ -85,11 +103,13 @@ export default function SearchScreen() {
   const remember = useCallback((value: string) => {
     const trimmed = value.trim();
     if (trimmed.length === 0) return;
-    recentQueries = [trimmed, ...recentQueries.filter((item) => item !== trimmed)].slice(
-      0,
-      MAX_RECENT,
-    );
-    setRecent(recentQueries);
+    setRecent((previous) => {
+      const next = [trimmed, ...previous.filter((item) => item !== trimmed)].slice(0, MAX_RECENT);
+      void runCommand("settings.set", { key: RECENT_KEY, value: JSON.stringify(next) }).catch(
+        () => undefined,
+      );
+      return next;
+    });
   }, []);
 
   const openHit = useCallback(
@@ -210,8 +230,11 @@ export default function SearchScreen() {
                     variant="ghost"
                     size="sm"
                     onPress={() => {
-                      recentQueries = [];
                       setRecent([]);
+                      void runCommand("settings.set", {
+                        key: RECENT_KEY,
+                        value: JSON.stringify([]),
+                      }).catch(() => undefined);
                     }}
                     accessibilityLabel={t("app.search.clearRecent")}
                   />

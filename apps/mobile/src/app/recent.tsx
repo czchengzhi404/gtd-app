@@ -18,6 +18,7 @@ import {
   useTheme,
   useT,
   type UndoEntry,
+  formatTime,
 } from "@gtd/ui";
 
 /**
@@ -97,7 +98,7 @@ export default function RecentScreen() {
                         {entry.message}
                       </AppText>
                       <AppText variant="caption" tone="tertiary" lines={1}>
-                        {new Date(entry.createdAt).toLocaleTimeString()}
+                        {formatTime(entry.createdAt)}
                         {index === 0 ? ` · ${t("undo.history.latest")}` : ""}
                       </AppText>
                     </View>

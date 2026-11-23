@@ -24,6 +24,7 @@ import {
   useKeyboardShortcuts,
   useTheme,
   useT,
+  formatDate,
 } from "@gtd/ui";
 import {
   appStore,
@@ -435,7 +436,7 @@ export default function ProcessScreen() {
             {current.dueAt !== null ? (
               <Chip
                 label={t("app.process.meta.due", {
-                  date: new Date(current.dueAt).toLocaleDateString(),
+                  date: formatDate(current.dueAt),
                 })}
                 prefix={null}
               />

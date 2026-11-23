@@ -14,6 +14,7 @@ import {
   space,
   useTheme,
   useT,
+  formatDateTime,
 } from "@gtd/ui";
 import { getSqliteExecutor, listNoteVersions, runCommand } from "@gtd/core";
 import type { NoteVersion } from "@gtd/core";
@@ -84,7 +85,7 @@ export default function HistoryScreen() {
               <View style={styles.row}>
                 <View style={styles.text}>
                   <AppText variant="label" weight="semibold" lines={1}>
-                    {new Date(version.createdAt).toLocaleString()}
+                    {formatDateTime(version.createdAt)}
                     {index === 0 ? ` · ${t("history.latest")}` : ""}
                   </AppText>
                   <AppText variant="caption" tone="tertiary" lines={1}>

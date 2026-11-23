@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../hooks/useTheme";
 import { AppText } from "../theme/AppText";
 import { Button, Divider } from "../theme/primitives";
+import { formatTime } from "../format/date";
 import { elevation, radius, space } from "../theme/tokens";
 import { Sheet } from "./Sheet";
 import { t } from "../i18n";
@@ -242,7 +243,7 @@ export function UndoHost({ bottomOffset = 76 }: { bottomOffset?: number }) {
                       {item.message}
                     </AppText>
                     <AppText variant="caption" tone="tertiary" lines={1}>
-                      {new Date(item.createdAt).toLocaleTimeString()}
+                      {formatTime(item.createdAt)}
                     </AppText>
                   </View>
                   <AppText variant="caption" tone="tertiary" lines={1}>

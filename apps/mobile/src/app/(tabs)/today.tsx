@@ -24,6 +24,7 @@ import {
   useNowMinute,
   useTheme,
   useT,
+  formatDate,
 } from "@gtd/ui";
 import {
   applyListFilter,
@@ -308,7 +309,7 @@ function formatDateLabel(now: number): string {
     const weekday = new Intl.DateTimeFormat(locale, { weekday: "short" }).format(date);
     return `${monthDay} · ${weekday}`;
   } catch {
-    return new Date(now).toLocaleDateString();
+    return formatDate(now);
   }
 }
 

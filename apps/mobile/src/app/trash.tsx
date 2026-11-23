@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { FlatList, StyleSheet, View } from "react-native";
 
-import { AppText, EmptyState, Screen, showUndo, useT } from "@gtd/ui";
+import {
+  AppText,
+  EmptyState,
+  Screen,
+  formatDate,
+  showUndo,
+  useT,
+} from "@gtd/ui";
 import { getDeletedTasks, getSqliteExecutor, runCommand } from "@gtd/core";
 import type { Task } from "@gtd/core";
 import { Button, Divider } from "@gtd/ui";
@@ -59,7 +66,7 @@ export default function TrashScreen() {
                 {item.title}
               </AppText>
               <AppText variant="caption" tone="tertiary" lines={1}>
-                {t("trash.deletedAt", { date: new Date(item.deletedAt ?? 0).toLocaleDateString() })}
+                {t("trash.deletedAt", { date: formatDate(item.deletedAt ?? 0) })}
               </AppText>
             </View>
             <Button

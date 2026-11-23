@@ -9,7 +9,7 @@ import {
   planDeferToTomorrow,
   runCommand,
 } from "@gtd/core";
-import { showUndo, t } from "@gtd/ui";
+import { formatDate, showUndo, t } from "@gtd/ui";
 import { deleteTaskWithUndo, completeTaskWithUndo } from "@/lib/task-ops";
 
 /**
@@ -168,7 +168,7 @@ export function useListInteractions(tasks: Task[]): ListInteractions {
   const swipeRight = useCallback(async (task: Task) => {
     const plan = planDeferToTomorrow(task.id, Date.now(), task.deferUntil);
     await runCommand(plan.run.op, plan.run.payload).catch(() => undefined);
-    showUndo(t("task.deferredLabel", { date: new Date(plan.deferredAt).toLocaleDateString() }), () => {
+    showUndo(t("task.deferredLabel", { date: formatDate(plan.deferredAt) }), () => {
       void runCommand(plan.undo.op, plan.undo.payload).catch(() => undefined);
     });
   }, []);

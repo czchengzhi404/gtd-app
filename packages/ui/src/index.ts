@@ -4,6 +4,7 @@ export * from "./theme/AppText";
 export * from "./theme/primitives";
 export * from "./nav-config";
 export * from "./i18n";
+export * from "./format/date";
 export * from "./hooks/useTheme";
 export * from "./hooks/useBreakpoint";
 export * from "./hooks/useAppStore";

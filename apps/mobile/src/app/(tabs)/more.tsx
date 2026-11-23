@@ -18,6 +18,8 @@ import {
   radius,
   space,
   type,
+  formatDate,
+  formatDateTime,
 } from "@gtd/ui";
 import { getWaitingTasks, getSomedayTasks } from "@gtd/core";
 import type { SyncConfig } from "@gtd/core";
@@ -68,11 +70,11 @@ export default function MoreScreen() {
 
   const lastSync =
     kv["sync.last"] !== undefined
-      ? new Date(Number(kv["sync.last"])).toLocaleString()
+      ? formatDateTime(Number(kv["sync.last"]))
       : t("more.lastSyncNever");
   const lastReviewAt = kv["review.lastAt"] !== undefined ? Number(kv["review.lastAt"]) : null;
   const lastReview =
-    lastReviewAt !== null ? new Date(lastReviewAt).toLocaleDateString() : t("more.reviewNever");
+    lastReviewAt !== null ? formatDate(lastReviewAt) : t("more.reviewNever");
   // 距上次回顾 ≥7 天（或从未回顾）时提示；红点只在 More 页出现
   const reviewDue = lastReviewAt === null || Date.now() - lastReviewAt >= 7 * 86_400_000;
   const reviewDistance =

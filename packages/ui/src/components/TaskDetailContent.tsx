@@ -17,6 +17,7 @@ import { Button, Divider } from "../theme/primitives";
 import { AppText } from "../theme/AppText";
 import { useTheme } from "../hooks/useTheme";
 import { useT } from "../i18n";
+import { formatDate } from "../format/date";
 import { hit, radius, space } from "../theme/tokens";
 
 /**
@@ -381,7 +382,7 @@ export function TaskDetailContent({
             {task.deferUntil !== null ? (
               <AppText variant="caption" tone="tertiary" lines={1}>
                 {t("detail.deferred")}：
-                {new Date(task.deferUntil).toLocaleDateString()}
+                {formatDate(task.deferUntil)}
               </AppText>
             ) : null}
           </View>
